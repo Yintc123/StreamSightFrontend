@@ -3,7 +3,7 @@ services:
     image: redis:7-alpine
     container_name: jko-bff-redis
     ports:
-      - '6379:6379'
+      - '6380:6379'   # host 6380 → container 6379（避開其他專案常用 6379）
     command: redis-server --appendonly yes --save ""
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
