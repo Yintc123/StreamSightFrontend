@@ -43,6 +43,25 @@ jobs:
   test:
     name: Unit / Integration tests
     runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      REDIS_URL: redis://localhost:6379/0
+      REDIS_KEY_PREFIX: jko-bff-ci
+      USE_MOCK: '1'
+      SESSION_SECRET: ci-test-session-secret-must-be-at-least-32-chars-long
+      ALLOWED_ORIGINS: http://localhost:3000
+
     steps:
       - uses: actions/checkout@v4
 
@@ -72,6 +91,26 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      REDIS_URL: redis://localhost:6379/0
+      REDIS_KEY_PREFIX: jko-bff-e2e
+      USE_MOCK: '1'
+      SESSION_SECRET: e2e-session-secret-must-be-at-least-32-chars-long
+      ALLOWED_ORIGINS: http://localhost:3000
+      ENABLE_DEV_LOGIN: '1'
+
     steps:
       - uses: actions/checkout@v4
 
