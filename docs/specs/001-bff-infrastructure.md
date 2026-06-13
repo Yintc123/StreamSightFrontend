@@ -95,10 +95,25 @@ export type StoredSession = {
 
 | 層 | 機制 | 觸發 |
 |---|---|---|
-| Cookie | iron-session `cookieOptions.maxAge` + `writeSessionId()` 每次 save 重簽 | 每次 `SessionService.touch()` |
-| Redis | `EXPIRE session:<sessionId> SESSION_TTL_SECONDS` | 同上（在 `SessionStore.get()` 命中時自動 touch） |
+| Redis | `SessionStore.get()` 內用 Lua atomic `GET + EXPIRE`（ADR 006 §5.1.2） | 每次 `SessionService.get()` |
+| Cookie | iron-session `cookieOptions.maxAge` + `writeSessionId()` 重簽 | 每次 `SessionService.touch()`，由 `createRoute` 在 response phase 觸發 |
 
-兩層 TTL 應**同步設定**（同一 `SESSION_TTL_SECONDS`），避免一邊先失效造成 ghost session。
+兩層 TTL 共用同一 `SESSION_TTL_SECONDS`。
+
+#### 2.3.1 為何 cookie sliding 不在 `get()` 內做（RSC 限制）
+
+Next.js 16 **Server Component** 中 `cookies()` 為唯讀；`cookies().set(...)` 會拋出 `Cookies can only be modified...`。如果 `SessionService.get()` 內偷偷寫 cookie，所有「在 RSC 內取 session 顯示 user 名」的場景都會炸。
+
+**解法（採用）**：將 cookie sliding 與 store sliding **拆兩個 method**：
+
+- `get()` **只** slide Redis TTL，不碰 cookie → RSC 安全可呼叫
+- `touch()` slide cookie + Redis TTL → 僅 Route Handler / Server Action context 安全；由 `createRoute` 在 response phase 自動呼叫（§9.2 第 11 步）
+
+**邊界後果**：
+- 使用者在 RSC 上瀏覽（如 SSR 列表頁）只 slide Redis；cookie maxAge 不變
+- 使用者下一次任何 Route Handler 互動（搜尋、無限滾動、寫入）即 slide cookie
+- 純看 RSC 不互動 → 最終 cookie 過期 = 重新登入（可接受）；Redis 條目仍 TTL 內所以後端依然有 session
+- Cookie 過期但 Redis 條目仍存活的 ghost session 由 Redis TTL 自然清理（最長 `SESSION_TTL_SECONDS` 後）
 
 ### 2.4 各模組責任
 
@@ -414,8 +429,9 @@ export type SessionUpdatePatch = Partial<
 
 export interface SessionService {
   /**
-   * 解 cookie → 查 store；命中時觸發 sliding TTL。
+   * 解 cookie → 查 store；命中時觸發 **Redis sliding TTL**（**不**寫 cookie，RSC 安全）。
    * **Per-request 去重**：用 `react.cache()` wrap，同一請求多次呼叫共用結果。
+   * Cookie sliding 由 `touch()` 負責，於 Route Handler / Server Action context 呼叫。
    */
   get(): Promise<StoredSession | null>
 
@@ -443,8 +459,10 @@ export interface SessionService {
   destroy(): Promise<void>
 
   /**
-   * 顯式 sliding TTL；`get()` 已自動 touch，本方法給「不取內容只延期」場景。
+   * Slide **cookie maxAge + Redis TTL**。Cookie 寫入需 Route Handler / Server Action context。
+   * 由 `createRoute` 在 response phase 自動呼叫（§9.2 第 11 步）。
    * 無 session → no-op。
+   * @throws Error - 在 RSC context 呼叫時，cookie 寫入會由 Next.js 拋出（呼叫端責任）
    */
   touch(): Promise<void>
 
@@ -467,12 +485,53 @@ export interface SessionService {
 
 /**
  * 取得 SessionService 實例。Store 透過 `getSessionStore()` 取得（依 env 決定 impl）。
- * 測試可以在 `vi.mock('@/lib/session/store')` 後 mock store。
- *
  * 不要在模組 top-level 呼叫；它需要 Request scope（cookie / store handle）。
  */
 export function getSessionService(): SessionService
 ```
+
+#### `getSessionStore` DI pattern
+
+```ts
+// src/lib/session/store/index.ts
+import 'server-only'
+import type { SessionStore } from './types'
+import { RedisSessionStore } from './redis'
+
+let instance: SessionStore | undefined
+
+/** Production / dev 預設用 Redis；testing 可透過 __setSessionStoreForTest 替換 */
+export function getSessionStore(): SessionStore {
+  if (!instance) instance = new RedisSessionStore()
+  return instance
+}
+
+/** Test-only：手動注入替身（typically InMemorySessionStore） */
+export function __setSessionStoreForTest(store: SessionStore | undefined): void {
+  instance = store
+}
+```
+
+測試用法：
+
+```ts
+// vitest.setup.ts 或個別 test
+import { InMemorySessionStore } from '@/lib/session/store/in-memory'
+import { __setSessionStoreForTest } from '@/lib/session/store'
+
+beforeEach(() => __setSessionStoreForTest(new InMemorySessionStore()))
+afterEach(() => __setSessionStoreForTest(undefined))    // 還原 → 下次 getSessionStore() 重建 Redis 連線
+```
+
+或用 `vi.mock` 整模組替換（適合廣域）：
+
+```ts
+vi.mock('@/lib/session/store', () => ({
+  getSessionStore: () => mockStore,
+}))
+```
+
+> 約定：**`__` 前綴函式僅測試可用**，正式程式碼 lint rule 禁用。
 
 #### 實作要點
 
@@ -577,19 +636,49 @@ export class BffError extends Error {
     public readonly httpStatus: number,
     message: string,
     public readonly cause?: unknown,
-  ) { super(message) }
+  ) {
+    super(message)
+    this.name = this.constructor.name
+  }
+}
+```
+
+#### 7.2.1 各派生 class 規範簽名（**統一 `(message, cause?)`**）
+
+每個檔案一個 class，pattern 相同：
+
+```ts
+// src/lib/errors/BackendTimeoutError.ts
+import { BffError } from './BffError'
+export class BackendTimeoutError extends BffError {
+  constructor(message: string, cause?: unknown) { super('BACKEND_TIMEOUT', 504, message, cause) }
 }
 
-// 各派生 class 將 code/httpStatus 寫死
-export class BackendTimeoutError extends BffError { /* 504, BACKEND_TIMEOUT */ }
-export class BackendUpstreamError extends BffError { /* 502, BACKEND_UPSTREAM_ERROR */ }
-export class ContractViolationError extends BffError { /* 502, CONTRACT_VIOLATION */ }
-export class ValidationError extends BffError { /* 400, VALIDATION_ERROR */ }
-export class UnauthenticatedError extends BffError { /* 401, UNAUTHENTICATED */ }
-export class CsrfError extends BffError { /* 403, CSRF_INVALID */ }
-export class NotFoundError extends BffError { /* 404, NOT_FOUND */ }
-export class PayloadTooLargeError extends BffError { /* 413, PAYLOAD_TOO_LARGE */ }
+// 其餘比照（每檔一個）：
+export class BackendUpstreamError extends BffError {
+  constructor(message: string, cause?: unknown) { super('BACKEND_UPSTREAM_ERROR', 502, message, cause) }
+}
+export class ContractViolationError extends BffError {
+  constructor(message: string, cause?: unknown) { super('CONTRACT_VIOLATION', 502, message, cause) }
+}
+export class ValidationError extends BffError {
+  constructor(message: string, cause?: unknown) { super('VALIDATION_ERROR', 400, message, cause) }
+}
+export class UnauthenticatedError extends BffError {
+  constructor(message: string, cause?: unknown) { super('UNAUTHENTICATED', 401, message, cause) }
+}
+export class CsrfError extends BffError {
+  constructor(message: string, cause?: unknown) { super('CSRF_INVALID', 403, message, cause) }
+}
+export class NotFoundError extends BffError {
+  constructor(message: string, cause?: unknown) { super('NOT_FOUND', 404, message, cause) }
+}
+export class PayloadTooLargeError extends BffError {
+  constructor(message: string, cause?: unknown) { super('PAYLOAD_TOO_LARGE', 413, message, cause) }
+}
 ```
+
+> 統一 `(message, cause?)` 簽名讓呼叫端可機械化地寫 `throw new XError('...', err)`，避免不同 class 不同參數位置造成 bug。
 
 ### 7.3 統一映射
 
@@ -806,44 +895,82 @@ async function safeReadJson(res: Response): Promise<any> {
 
 集中 try/catch + getSession + verifyCsrf + body/query parse + logging + toErrorResponse，避免每個 handler 重複 boilerplate。
 
-### 9.1 簽名
+### 9.1 簽名（型別層 `requireAuth` × `revalidate` 互斥）
 
 ```ts
 // src/lib/api/create-route.ts
+import type { ZodType } from 'zod'
+
+type CacheOption =
+  | 'no-store'
+  | { revalidate: number; tags?: readonly string[] }
+
 type RouteHandlerArgs<TBody, TQuery, TParams, TRequireAuth extends boolean> = {
   req: Request
   requestId: string
   body: TBody
   query: TQuery
   params: TParams
-  session: TRequireAuth extends true ? Session : Session | null
+  session: TRequireAuth extends true ? StoredSession : StoredSession | null
 }
 
-export function createRoute<TBody, TQuery, TParams, TRequireAuth extends boolean = false>(opts: {
-  requireAuth?: TRequireAuth                      // 預設 false（公開 endpoint）
-  bodySchema?: ZodType<TBody>                     // 不傳則 body = undefined
-  querySchema?: ZodType<TQuery>                   // 不傳則 query = undefined
-  paramsSchema?: ZodType<TParams>                 // 動態路由 params 必填用
-  cache?: 'no-store' | { revalidate: number; tags?: string[] }
-  handler: (args: RouteHandlerArgs<TBody, TQuery, TParams, TRequireAuth>) => Promise<Response> | Response
-}): (req: Request, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>
+type Common<TBody, TQuery, TParams, TAuth extends boolean> = {
+  bodySchema?: ZodType<TBody>
+  querySchema?: ZodType<TQuery>
+  paramsSchema?: ZodType<TParams>
+  handler: (args: RouteHandlerArgs<TBody, TQuery, TParams, TAuth>) => Promise<Response> | Response
+}
+
+/**
+ * 型別層互斥：requireAuth: true 時 cache 只能是 'no-store'（per-user 資料禁 revalidate）。
+ * 由 discriminated union 強制：TS 型別檢查階段直接擋下違規組合。
+ */
+type RouteOptions<TBody, TQuery, TParams, TAuth extends boolean> =
+  TAuth extends true
+    ? Common<TBody, TQuery, TParams, true> & {
+        requireAuth: true
+        cache?: 'no-store'                                       // ← 只允許 no-store
+      }
+    : Common<TBody, TQuery, TParams, false> & {
+        requireAuth?: false
+        cache?: CacheOption                                      // ← 全部允許
+      }
+
+export function createRoute<TBody = undefined, TQuery = undefined, TParams = undefined, TAuth extends boolean = false>(
+  opts: RouteOptions<TBody, TQuery, TParams, TAuth>,
+): (req: Request, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>
 ```
+
+#### 9.1.1 使用驗證
+
+| 寫法 | TS 結果 |
+|---|---|
+| `createRoute({ requireAuth: true, cache: 'no-store', handler })` | ✅ 通過 |
+| `createRoute({ requireAuth: true, cache: { revalidate: 60 }, handler })` | ❌ `Type '{ revalidate: number; }' is not assignable to type '"no-store" \| undefined'` |
+| `createRoute({ cache: { revalidate: 60 }, handler })` | ✅ 通過（公開 endpoint） |
+| `createRoute({ requireAuth: true, handler })` 內部 `args.session` | ✅ `StoredSession`（非 null） |
+| `createRoute({ handler })` 內部 `args.session` | ✅ `StoredSession \| null` |
+
+> **Runtime 防線**：即使型別被 `as any` 繞過，wrapper 在 step 9（cache 套用）若偵測 `requireAuth: true && cache !== 'no-store'` 應 `throw new Error('createRoute: requireAuth=true requires cache=no-store')`。型別 + runtime 雙重防護。
 
 ### 9.2 wrapper 行為
 
 按順序執行（任一失敗 → 走 `toErrorResponse`）：
 
-1. 產 `requestId`、`log.info('bff.request.in', ...)`
+1. 產 `requestId`、`log.info({ requestId, path, method }, 'bff.request.in')`
 2. 動態 params parse（若有 `paramsSchema`）→ 失敗 `VALIDATION_ERROR`
 3. Query parse（若有 `querySchema`）→ 失敗 `VALIDATION_ERROR`
-4. 讀 session
+4. 讀 session（`SessionService.get()`）
 5. 若 `requireAuth: true` 且無 session → `UnauthenticatedError`
 6. unsafe method（POST/PUT/PATCH/DELETE）→ `verifyCsrf(req, session)`
 7. Body parse（若有 `bodySchema`）→ 失敗 `VALIDATION_ERROR` / `PAYLOAD_TOO_LARGE`
 8. 呼叫 `handler(args)` 取得 `Response`
 9. 套用 `cache` 設定到回應
-10. `log.info('bff.response.out', ...)`
-11. 全程 try/catch → `toErrorResponse(err, requestId)`
+10. **若 step 4 有 session：呼叫 `SessionService.touch()`**（slide cookie maxAge + Redis TTL；§2.3.1）
+11. `log.info({ requestId, status, durationMs }, 'bff.response.out')`
+12. 全程 try/catch → `toErrorResponse(err, requestId)`
+
+> Step 10 在 step 9 之後執行——cache 設定先綁回應，touch 寫 cookie；兩者順序無依賴但放最後便於失敗回滾思考。
 
 ### 9.3 使用範例
 
@@ -886,11 +1013,69 @@ export function okResponse<T>(data: T, meta?: Record<string, unknown>): Response
 
 ```ts
 // src/lib/api/parsers.ts
-const MAX_BODY_BYTES = 1_000_000 // 1MB；超過拋 PayloadTooLargeError
-export async function parseBody<T>(req: Request, schema: ZodType<T>): Promise<T> { /* ... */ }
-export function parseQuery<T>(req: Request, schema: ZodType<T>): T { /* ... */ }
-export function parsePathParams<T>(raw: Record<string, string>, schema: ZodType<T>): T { /* ... */ }
+import 'server-only'
+import type { ZodType } from 'zod'
+import { ValidationError } from '@/lib/errors/ValidationError'
+import { PayloadTooLargeError } from '@/lib/errors/PayloadTooLargeError'
+import { MAX_BODY_BYTES } from './constants'
+
+/** Body 大小雙保險 + JSON parse + Zod 驗證 */
+export async function parseBody<T>(req: Request, schema: ZodType<T>): Promise<T> {
+  // Step 1：Content-Length 預檢（攻擊者宣稱大小）
+  const len = req.headers.get('content-length')
+  if (len && Number(len) > MAX_BODY_BYTES) {
+    throw new PayloadTooLargeError(`Body exceeds ${MAX_BODY_BYTES} bytes (content-length)`)
+  }
+  // Step 2：實際讀取時逐 chunk 計數（防止 chunked transfer 繞過 Content-Length）
+  if (!req.body) {
+    const result = schema.safeParse(undefined)
+    if (!result.success) throw new ValidationError(formatZod(result.error))
+    return result.data
+  }
+  const reader = req.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel().catch(() => {})
+      throw new PayloadTooLargeError(`Body exceeds ${MAX_BODY_BYTES} bytes (streamed)`)
+    }
+    chunks.push(value)
+  }
+  const buf = new Uint8Array(total)
+  let off = 0
+  for (const c of chunks) { buf.set(c, off); off += c.byteLength }
+  const text = new TextDecoder().decode(buf)
+  let raw: unknown
+  try { raw = text.length ? JSON.parse(text) : undefined }
+  catch (e) { throw new ValidationError('Body is not valid JSON', e) }
+  const result = schema.safeParse(raw)
+  if (!result.success) throw new ValidationError(formatZod(result.error))
+  return result.data
+}
+
+export function parseQuery<T>(req: Request, schema: ZodType<T>): T {
+  const raw = Object.fromEntries(new URL(req.url).searchParams)
+  const result = schema.safeParse(raw)
+  if (!result.success) throw new ValidationError(formatZod(result.error))
+  return result.data
+}
+
+export function parsePathParams<T>(raw: Record<string, string>, schema: ZodType<T>): T {
+  const result = schema.safeParse(raw)
+  if (!result.success) throw new ValidationError(formatZod(result.error))
+  return result.data
+}
+
+function formatZod(err: import('zod').ZodError): string {
+  return err.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')
+}
 ```
+
+`MAX_BODY_BYTES` 由 `src/lib/api/constants.ts` 匯出（預設 `1_000_000`，可由 spec 補微調）。
 
 ### 9.5 cache 安全性（critical）
 
@@ -1184,9 +1369,54 @@ export const allowedOrigins = new Set(
 | Internal error stack trace | 完整記入 server log；**不**回傳到 client envelope |
 | Upstream error message | 摘要記入 server log；不洩漏 backend 內部訊息給 client |
 
-### 14.3 MVP 實作
+### 14.3 MVP 實作（具體 API）
 
-可先 `console.log(JSON.stringify(...))`；接 backend 後換 `pino`，串 trace ID。
+```ts
+// src/lib/log.ts
+import 'server-only'
+
+type LogObj = Record<string, unknown>
+type Level = 'info' | 'warn' | 'error'
+
+function emit(level: Level, obj: LogObj, event: string): void {
+  const line = JSON.stringify({ level, event, time: new Date().toISOString(), ...obj })
+  if (level === 'error') console.error(line)
+  else if (level === 'warn') console.warn(line)
+  else console.log(line)
+}
+
+export const log = {
+  info:  (obj: LogObj, event: string) => emit('info',  obj, event),
+  warn:  (obj: LogObj, event: string) => emit('warn',  obj, event),
+  error: (obj: LogObj, event: string) => emit('error', obj, event),
+}
+
+// —— Masking helpers ——
+export function maskBearer(authHeader: string | null | undefined): string {
+  if (!authHeader) return ''
+  const m = /^Bearer\s+(\S+)$/i.exec(authHeader)
+  return m ? `Bearer ${m[1].slice(0, 8)}...` : '<malformed>'
+}
+export function maskToken(token: string | null | undefined): string {
+  return token ? `${token.slice(0, 8)}...` : ''
+}
+export function maskSessionId(id: string | null | undefined): string {
+  return id ? `${id.slice(0, 4)}...` : ''
+}
+export function maskCsrfToken(token: string | null | undefined): { present: boolean; length: number } {
+  return { present: Boolean(token), length: token?.length ?? 0 }
+}
+```
+
+呼叫方式（spec 全篇統一）：
+
+```ts
+log.info({ requestId, path, method }, 'bff.request.in')
+log.warn({ requestId, code: errorCodeOf(err) }, 'bff.upstream.error')
+log.error({ requestId, err: err instanceof Error ? err.message : String(err) }, 'bff.internal.error')
+```
+
+> 接 backend 後可在不改呼叫端的前提下，把 `emit` 內部換成 `pino`。
 
 ---
 
