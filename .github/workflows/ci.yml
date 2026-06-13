@@ -13,7 +13,7 @@ concurrency:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '9'
+  PNPM_VERSION: '11'
 
 jobs:
   lint-typecheck:
@@ -152,6 +152,20 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [lint-typecheck]
+
+    # Next sets NODE_ENV=production during build, which triggers config.ts
+    # superRefine guards: SESSION_SECRET >=32 chars (always), ALLOWED_ORIGINS
+    # non-localhost, ENABLE_DEV_LOGIN must not be '1'. We give the build
+    # phase prod-safe placeholders so the env-validation pass succeeds —
+    # no Redis or backend is actually contacted because routes are dynamic.
+    env:
+      USE_MOCK: '0'
+      SESSION_SECRET: ci-build-secret-must-be-at-least-32-chars-long-xx
+      BACKEND_API_URL: https://api.example.com
+      REDIS_URL: redis://localhost:6379/0
+      ALLOWED_ORIGINS: https://www.example.com
+      ENABLE_DEV_LOGIN: '0'
+
     steps:
       - uses: actions/checkout@v4
 
