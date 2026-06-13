@@ -85,12 +85,12 @@ export function createRoute<TBody = undefined, TQuery = undefined, TParams = und
 6. unsafe method（POST/PUT/PATCH/DELETE）→ `verifyCsrf(req, session, { exempt: opts.csrfExempt })`
 7. Body parse（若有 `bodySchema`）→ 失敗 `VALIDATION_ERROR` / `PAYLOAD_TOO_LARGE`
 8. 呼叫 `handler({ ..., session })` 取得 `Response`
-9. **若 Response headers 沒有 `Cache-Control`**：重新建構 Response 帶上 `Cache-Control: no-store, private`（Web `Response.headers` 有 guard 不保證 mutable，安全做法是 new Response 而非 set）。`okResponse` / `toErrorResponse` 已主動設好，這裡是 fallback
+9. **強制覆寫 `Cache-Control: no-store, private`**（即使 handler 自己設了別的值，也以 BFF 策略為準）：用 `new Response(res.body, { ..., headers })` 把 body stream 轉接到新 Response，避免 in-memory 緩衝、也避開 Web `Response.headers.set` runtime 差異。`okResponse` / `toErrorResponse` 在源頭已帶 `no-store, private`，此步在那種情況退化為 no-op（short-circuit 判斷 header 已是預期值就直接 return 原 res）
 10. **若 step 4 有 session 且 `!getSessionService().wasMutated()`：`await getSessionService().touch()`**（同步 slide cookie maxAge + Redis TTL；001b §3）。`wasMutated()` 涵蓋 handler 內呼叫的 `update / refresh / destroy / rotateCsrfToken`，避免雙 slide
 11. `log.info({ requestId, status, durationMs }, 'bff.response.out')`
 12. 全程 try/catch → `toErrorResponse(err, requestId)`
 
-> Step 9 用「new Response 補 header」而非「response.headers.set」：Web Response 的 Headers 有 guard，某些 runtime（含 Next.js Route Handler）對 `set('cache-control', ...)` 行為不保證一致；建構新 Response 是跨 runtime 安全的做法。`okResponse` / `toErrorResponse` 在源頭就帶 `no-store` → 大多情況 step 9 是 no-op。
+> Step 9 用「new Response 重組」而非「response.headers.set」：Web Response 的 Headers 有 guard，某些 runtime（含 Next.js Route Handler）對 `set('cache-control', ...)` 行為不保證一致；建構新 Response 是跨 runtime 安全的做法。`new Response(res.body, ...)` 把 ReadableStream 轉接過去，不 buffer body，未來若有 streaming handler 也不會被卡。`okResponse` / `toErrorResponse` 在源頭就帶 `no-store, private` → step 9 的 short-circuit 直接回原 res；只有「handler 自建 Response 但忘了帶 / 帶錯 Cache-Control」時才走重組分支。
 
 ### 2.4 使用範例
 

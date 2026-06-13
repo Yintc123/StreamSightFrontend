@@ -155,7 +155,7 @@ export function newSessionId(): string {
 | 層 | 機制 | 觸發位置 |
 |---|---|---|
 | Cookie | iron-session `cookieOptions.maxAge` + `writeSessionId()` 重簽 | `SessionService.touch()`（001c） |
-| Redis | Lua atomic `EXPIRE`（ADR 006 §5.1.2） | `SessionService.touch()`（001c） |
+| Redis | Lua atomic `PEXPIRE`（ms-precision；ADR 006 §5.1.2） | `SessionService.touch()`（001c） |
 
 兩層共用 `SESSION_TTL_SECONDS`。
 
@@ -191,7 +191,7 @@ export interface SessionStore {
   /** 覆寫 + 重設 TTL（= `SESSION_TTL_SECONDS`）。新舊都用。 */
   set(sessionId: string, session: StoredSession): Promise<void>
 
-  /** Atomic EXPIRE（Lua）— 不存在回 false（呼叫端可決定清 cookie）。 */
+  /** Atomic PEXPIRE（Lua, ms-precision）— 不存在回 false（呼叫端可決定清 cookie）。 */
   touch(sessionId: string): Promise<boolean>
 
   /** 刪除 entry。不存在也視為成功（冪等）。 */
@@ -229,7 +229,7 @@ export interface SessionStore {
   - refresh lock：`${REDIS_KEY_PREFIX}:refresh-lock:<userId>`
   - fresh tokens：`${REDIS_KEY_PREFIX}:fresh-tokens:<userId>`
 - `set`：`SET key payload EX SESSION_TTL_SECONDS`
-- `touch`：Lua —— `if redis.call('EXISTS', KEYS[1]) == 1 then return redis.call('EXPIRE', KEYS[1], ARGV[1]) else return 0 end`
+- `touch`：Lua —— `if redis.call('EXISTS', KEYS[1]) == 1 then return redis.call('PEXPIRE', KEYS[1], ARGV[1]) else return 0 end`（ARGV[1] 為 ms，與 §3 的 ms TTL 對齊）
 - `acquireLock`：`SET key token NX EX (ttlMs/1000)`；token 用 `randomBytes(16).toString('base64url')`
 - `releaseLock`：Lua —— `if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end`
 - `getCachedTokens` / `setCachedTokens`：`GET` / `SETEX`

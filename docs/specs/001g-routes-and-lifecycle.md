@@ -154,6 +154,7 @@ import { env } from '@/lib/config'
 import { getSessionService } from '@/lib/session/service'
 import { NotFoundError } from '@/lib/errors/NotFoundError'
 import { okResponse, createRoute } from '@/lib/api'
+import { DEV_LOGIN_ACCESS_TTL_MS, DEV_LOGIN_REFRESH_TTL_MS } from '@/lib/api/constants'
 
 const DEV_USER = { id: 'dev-user-1', name: 'Dev User' }
 
@@ -164,19 +165,17 @@ export const POST = createRoute({
       throw new NotFoundError('dev login disabled')
     }
     const now = Date.now()
-    const accessTtlMs = 3 * 60 * 60 * 1000      // 3h，對齊 ADR 004
-    const refreshTtlMs = 30 * 24 * 60 * 60 * 1000 // 30d
-
+    // TTL 常數對齊 ADR 004（access 3h / refresh 30d），定義在 001a §4
     const result = await getSessionService().create({
       user: DEV_USER,
       tokens: {
         accessToken: 'dev-fake-access-token',
-        accessTokenExpiresAt: now + accessTtlMs,
+        accessTokenExpiresAt: now + DEV_LOGIN_ACCESS_TTL_MS,
         refreshToken: 'dev-fake-refresh-token',
-        refreshTokenExpiresAt: now + refreshTtlMs,
+        refreshTokenExpiresAt: now + DEV_LOGIN_REFRESH_TTL_MS,
       },
     })
-    return okResponse({ ...result, user: DEV_USER, expiresAt: now + accessTtlMs })
+    return okResponse({ ...result, user: DEV_USER, expiresAt: now + DEV_LOGIN_ACCESS_TTL_MS })
   },
 })
 ```
@@ -216,6 +215,7 @@ Next.js 16 沒有官方 lifecycle hook。利用 Node.js process signal：
 import 'server-only'
 import { getSessionStore } from '@/lib/session/store'
 import { log } from '@/lib/log'
+import { SHUTDOWN_DEADLINE_MS } from '@/lib/api/constants'
 
 let shuttingDown = false
 
@@ -224,11 +224,11 @@ function handleSignal(signal: NodeJS.Signals) {
   shuttingDown = true
   log.info({ signal }, 'bff.shutdown.begin')
 
-  // 8s 內優雅關閉，留 2s 給 Cloud Run SIGKILL 餘裕
+  // SHUTDOWN_DEADLINE_MS（001a §4）：8s 寬限，留 2s 給 Cloud Run SIGKILL 餘裕
   const deadline = setTimeout(() => {
     log.warn({}, 'bff.shutdown.force')
     process.exit(0)
-  }, 8000).unref()
+  }, SHUTDOWN_DEADLINE_MS).unref()
 
   ;(async () => {
     try {

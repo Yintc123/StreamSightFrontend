@@ -175,11 +175,11 @@ SessionService.refresh():
      │   - 打 backend /auth/refresh
      │   - 成功 → setCachedTokens(FRESH_TOKENS_TTL_MS) + 更新 session + releaseLock + 回傳
      │   - 401 UNAUTHORIZED → destroy() + 401 + releaseLock
-     │   - 5xx / timeout → 不 destroy，回 503 + releaseLock
+     │   - 5xx / timeout → 不 destroy，回 `BackendUpstreamError (502)` / `BackendTimeoutError (504)` + releaseLock
      └─ 未取得鎖：
          - polling getCachedTokens 每 REFRESH_POLLER_INTERVAL_MS，最長 REFRESH_POLLER_TIMEOUT_MS
          - 命中 → 用該 pair 更新 session、回傳
-         - 超時 → 503 BACKEND_UPSTREAM_ERROR
+         - 超時 → `BackendUpstreamError (502)`（001a §2.1 沒有 503，refresh poll 超時統一歸 upstream error）
 ```
 
 ### 3.1 常數對映

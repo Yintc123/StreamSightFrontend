@@ -178,7 +178,9 @@ const RawEnv = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   BACKEND_API_URL: z.string().url().optional(),
   USE_MOCK: z.enum(['0', '1']).default('0'),
-  SESSION_SECRET: z.string().min(32).optional(),
+  // iron-session 在 cookie 路徑一律會用到 password，即便 USE_MOCK=1 也跑
+  // sessionService.get() → 解 cookie。因此 SESSION_SECRET 一律必填，不受 USE_MOCK 控制。
+  SESSION_SECRET: z.string().min(32),
   /** 上一代 secret，用於 rotation 期間 verify-only。iron-session 餵 [current, previous]，
    *  既能讀舊 cookie 又會用新 secret 重簽。輪換完拿掉即可。 */
   SESSION_SECRET_PREVIOUS: z.string().min(32).optional(),
@@ -200,10 +202,10 @@ const RawEnv = z.object({
   ENABLE_DEV_LOGIN: z.enum(['0', '1']).default('0'),  // 給 /api/dev/login 用（001g §4）
   NEXT_PUBLIC_APP_NAME: z.string().default('JKODonation'),
 }).superRefine((env, ctx) => {
-  // USE_MOCK=0 時：BACKEND_API_URL、SESSION_SECRET、REDIS_URL 必填
+  // USE_MOCK=0 時：BACKEND_API_URL、REDIS_URL 必填
+  // (SESSION_SECRET 已在 schema 層 unconditional 要求，不需在這裡再守一道)
   if (env.USE_MOCK === '0') {
     if (!env.BACKEND_API_URL) ctx.addIssue({ code: 'custom', path: ['BACKEND_API_URL'], message: 'required when USE_MOCK=0' })
-    if (!env.SESSION_SECRET)  ctx.addIssue({ code: 'custom', path: ['SESSION_SECRET'],  message: 'required when USE_MOCK=0' })
     if (!env.REDIS_URL)       ctx.addIssue({ code: 'custom', path: ['REDIS_URL'],       message: 'required when USE_MOCK=0' })
   }
   // production 不允許 ALLOWED_ORIGINS 為空或僅含 localhost
@@ -231,7 +233,7 @@ export const env = RawEnv.parse(process.env)
 | `NODE_ENV` | server | 必（Next.js 自動） | `development` | 環境模式 |
 | `BACKEND_API_URL` | server | `USE_MOCK=0` 時必填 | — | BFF → backend base URL |
 | `USE_MOCK` | server | — | `'0'` | `'1'` 走 mock fixture |
-| `SESSION_SECRET` | server | `USE_MOCK=0` 時必填 | — | iron-session cookie 加密金鑰（≥ 32 字元） |
+| `SESSION_SECRET` | server | **必填**（≥ 32 字元，含 USE_MOCK=1 模式） | — | iron-session cookie 加密金鑰；cookie 路徑一律會用到 |
 | `SESSION_SECRET_PREVIOUS` | server | — | — | Rotation 期間 verify-only 的舊 secret；輪換完拿掉 |
 | `SESSION_COOKIE_NAME` | server | — | `jko_session` | session cookie 名稱 |
 | `SESSION_TTL_SECONDS` | server | — | `2592000`（30d，與 refresh token 對齊） | session 存活秒數（cookie + Redis 同步） |
@@ -265,6 +267,13 @@ export const REFRESH_POLLER_INTERVAL_MS = 50         // 001c §3
 export const FRESH_TOKENS_TTL_MS = 60_000            // 001c §3
 export const CSRF_TOKEN_BYTES = 32                   // 001d §2 → 43-char base64url
 export const SESSION_ID_BYTES = 32                   // 001b §2 → 43-char base64url
+
+// ADR 004：access 3h、refresh 30d。給 /api/dev/login 簽 fake token 用（001g §4）
+export const DEV_LOGIN_ACCESS_TTL_MS = 3 * 60 * 60 * 1_000
+export const DEV_LOGIN_REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1_000
+
+// Cloud Run SIGTERM → 10s 內必須結束；留 2s 給 runtime + log flush，所以 8s deadline
+export const SHUTDOWN_DEADLINE_MS = 8_000             // 001g §5
 ```
 
 > 集中常數的價值：log / test / spec 改數字只動一處；避免「PRE_REFRESH_MARGIN 在規格寫 30s，但 backend.ts 寫死 25s」這類飄移。
@@ -433,8 +442,9 @@ export function resolveMock(path: string): MockHandler | undefined { return regi
 ### 9.1 `config`
 
 - 必填變數缺漏 → `parse` throw
-- `USE_MOCK=1` 時 `BACKEND_API_URL` / `SESSION_SECRET` / `REDIS_URL` 可缺
-- `USE_MOCK=0` 時三者必須齊全否則 throw
+- `USE_MOCK=1` 時 `BACKEND_API_URL` / `REDIS_URL` 可缺，但 `SESSION_SECRET` **仍必填**
+- `USE_MOCK=0` 時 `BACKEND_API_URL` / `REDIS_URL` 必填，否則 throw
+- `SESSION_SECRET` 缺漏 → 不論 `USE_MOCK` 值都 throw
 - `production` 的 `ALLOWED_ORIGINS` 守門：空 / 僅 localhost → throw
 - `production` + `ENABLE_DEV_LOGIN=1` → throw
 
