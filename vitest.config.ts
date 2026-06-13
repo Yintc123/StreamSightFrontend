@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      'server-only': path.resolve(__dirname, './node_modules/server-only/empty.js'),
     },
   },
   test: {
@@ -14,6 +15,19 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     css: true,
+    env: {
+      NODE_ENV: 'test',
+      USE_MOCK: '1',
+      SESSION_SECRET: 'test-session-secret-must-be-32-chars-long',
+      SESSION_COOKIE_NAME: 'jko_session',
+      SESSION_TTL_SECONDS: '2592000',
+      ALLOWED_ORIGINS: 'http://localhost:3000',
+      REDIS_URL: 'redis://localhost:6380/0',
+      REDIS_KEY_PREFIX: 'jko-bff-test',
+      APP_VERSION: '0.0.0-test',
+      ENABLE_DEV_LOGIN: '1',
+      NEXT_PUBLIC_APP_NAME: 'JKODonation',
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

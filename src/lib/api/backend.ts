@@ -1,0 +1,184 @@
+import 'server-only'
+import { env } from '@/lib/config'
+import { log } from '@/lib/log'
+import { resolveMock } from '@/lib/mock/dispatch'
+import { BackendTimeoutError } from '@/lib/errors/BackendTimeoutError'
+import { BackendUpstreamError } from '@/lib/errors/BackendUpstreamError'
+import { UnauthenticatedError } from '@/lib/errors/UnauthenticatedError'
+import { NotFoundError } from '@/lib/errors/NotFoundError'
+import { BffError } from '@/lib/errors/BffError'
+import { getSessionService } from '@/lib/session/service'
+import type { StoredSession } from '@/lib/session/types'
+import { DEFAULT_BACKEND_TIMEOUT_MS, PRE_REFRESH_MARGIN_MS } from './constants'
+import { newRequestId } from './request-id'
+
+export type BackendFetchOptions = {
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  body?: unknown
+  query?: Record<string, string | number | undefined>
+  timeoutMs?: number
+  headers?: Record<string, string>
+  session?: StoredSession | null
+  requestId?: string
+}
+
+export type BackendResponse<T> = { data: T; requestId: string }
+
+export async function backendFetch<T = unknown>(
+  path: string,
+  options: BackendFetchOptions = {},
+): Promise<BackendResponse<T>> {
+  const requestId = options.requestId ?? newRequestId()
+  const start = Date.now()
+  const method = options.method ?? 'GET'
+  log.info({ requestId, path, method }, 'bff.upstream.start')
+
+  try {
+    if (env.USE_MOCK === '1') {
+      const handler = resolveMock(path)
+      if (!handler) throw new BackendUpstreamError(`No mock registered for ${path}`)
+      const data = handler({ query: options.query, body: options.body }) as T
+      log.info(
+        { requestId, durationMs: Date.now() - start },
+        'bff.upstream.mock.ok',
+      )
+      return { data, requestId }
+    }
+
+    const headers: Record<string, string> = {
+      'x-request-id': requestId,
+      'content-type': 'application/json',
+      ...options.headers,
+    }
+
+    const inputSession = options.session ?? null
+    let activeSession: StoredSession | null = inputSession
+    if (inputSession) {
+      if (inputSession.accessTokenExpiresAt < Date.now() + PRE_REFRESH_MARGIN_MS) {
+        activeSession = await getSessionService().refresh()
+      }
+      headers.authorization = `Bearer ${activeSession!.accessToken}`
+    }
+
+    const url = buildUrl(env.BACKEND_API_URL!, path, options.query)
+    const body = options.body != null ? JSON.stringify(options.body) : undefined
+    const timeoutMs = options.timeoutMs ?? DEFAULT_BACKEND_TIMEOUT_MS
+
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method,
+        headers,
+        body,
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+    } catch (err) {
+      throw classifyNetworkError(err)
+    }
+
+    let retried = false
+    if (response.status === 401) {
+      const errBody = await safeReadJson(response)
+      const backendCode = errBody?.error?.code
+
+      if (activeSession && backendCode === 'AUTH_TOKEN_EXPIRED') {
+        const refreshed = await getSessionService().refresh()
+        headers.authorization = `Bearer ${refreshed.accessToken}`
+        try {
+          response = await fetch(url, {
+            method,
+            headers,
+            body,
+            signal: AbortSignal.timeout(timeoutMs),
+          })
+        } catch (err) {
+          throw classifyNetworkError(err)
+        }
+        retried = true
+      } else {
+        // Both session and non-session 401s collapse to UNAUTHENTICATED at the
+        // BFF boundary. The destroy step only applies when we actually have a
+        // session to revoke; the no-session case (e.g. internal /auth/refresh
+        // when the refresh token itself is rejected) still surfaces as 401 so
+        // SessionService.refresh() can wire its own destroy.
+        if (activeSession) {
+          await getSessionService().destroy().catch(() => {})
+        }
+        throw new UnauthenticatedError(backendCode ?? 'UNAUTHORIZED')
+      }
+    }
+
+    if (retried && response.status === 401) {
+      await getSessionService().destroy().catch(() => {})
+      throw new UnauthenticatedError('refresh succeeded but retry still 401')
+    }
+
+    if (!response.ok) {
+      if (response.status === 404) throw new NotFoundError(`Backend 404 on ${path}`)
+      if (response.status >= 500) {
+        throw new BackendUpstreamError(`Backend ${response.status}`)
+      }
+      throw new BackendUpstreamError(`Unexpected backend status ${response.status}`)
+    }
+
+    let data: T
+    try {
+      data = (await response.json()) as T
+    } catch {
+      throw new BackendUpstreamError('Backend response not valid JSON')
+    }
+
+    log.info(
+      { requestId, durationMs: Date.now() - start, status: response.status },
+      'bff.upstream.ok',
+    )
+    return { data, requestId }
+  } catch (err) {
+    log.warn(
+      { requestId, durationMs: Date.now() - start, code: errorCodeOf(err) },
+      'bff.upstream.error',
+    )
+    throw err
+  }
+}
+
+function errorCodeOf(err: unknown): string {
+  return err instanceof BffError ? err.code : 'UNKNOWN'
+}
+
+function buildUrl(
+  base: string,
+  path: string,
+  query?: Record<string, string | number | undefined>,
+): string {
+  const url = new URL(path, base.endsWith('/') ? base : base + '/')
+  if (query) {
+    for (const [k, v] of Object.entries(query)) {
+      if (v != null) url.searchParams.set(k, String(v))
+    }
+  }
+  return url.toString()
+}
+
+function classifyNetworkError(err: unknown): BffError {
+  if (err instanceof Error) {
+    if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+      return new BackendTimeoutError(err.message, err)
+    }
+    const code = (err as { code?: string }).code
+    if (code === 'ECONNREFUSED' || code === 'ENOTFOUND') {
+      return new BackendUpstreamError(err.message, err)
+    }
+  }
+  return new BackendUpstreamError('Network error', err)
+}
+
+async function safeReadJson(
+  res: Response,
+): Promise<{ error?: { code?: string } } | null> {
+  try {
+    return await res.clone().json()
+  } catch {
+    return null
+  }
+}
