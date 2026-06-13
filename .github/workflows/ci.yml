@@ -131,11 +131,19 @@ jobs:
           # cache that previously only held chromium.
           key: playwright-chromium-webkit-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: Install Playwright browsers
+      - name: Install Playwright browser binaries
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         # playwright.config.ts has two projects: chromium + mobile-iphone-x
         # (iPhone X device uses WebKit). Install both engines.
-        run: pnpm exec playwright install --with-deps chromium webkit
+        run: pnpm exec playwright install chromium webkit
+
+      - name: Install Playwright system dependencies
+        # Must run unconditionally — browser binaries can be cached (~/.cache/
+        # ms-playwright) but the matching apt-get libs (e.g. libwoff2dec) live
+        # under /var/lib/apt and reset on every runner. A cache hit on browsers
+        # would otherwise skip --with-deps and WebKit fails to launch with
+        # "libwoff2dec.so.1.0.2: cannot open shared object file".
+        run: pnpm exec playwright install-deps chromium webkit
 
       - name: Run Playwright tests
         run: pnpm test:e2e
