@@ -11,6 +11,7 @@ import { DonationProjectCard } from '@/components/ui/DonationProjectCard'
 import { SaleItemCard } from '@/components/ui/SaleItemCard'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
+import { useUrlSync } from '@/lib/hooks/useUrlSync'
 import { getCategoryLabel, type CategoryKey } from '@/lib/schemas/categories'
 import type {
   Charity,
@@ -22,21 +23,41 @@ import { CHARITY_FIXTURES } from '@/lib/mock/charity-fixtures'
 import { DONATION_FIXTURES } from '@/lib/mock/donation-fixtures'
 import { ITEM_FIXTURES } from '@/lib/mock/item-fixtures'
 
+type PreviewShellProps = {
+  initialQ: string
+  initialTab: ResourceKey
+  initialCategory: CategoryKey | null
+}
+
 /**
  * Preview Shell — 用 useState + 本地 fixtures，**不**打 API。
  *
  * 本元件是「臨時 demo」，用於在 BFF / TanStack Query / MSW 完成前
  * 視覺驗證所有 003 UI 元件。下一批 spec 002 §6/§7 完成後會被真正的
  * `CharityListShell` (003i) + `ResourceInfiniteList` (003j) 取代。
+ *
+ * URL 持久化（spec 002 §7.2）：透過 `useUrlSync` 把 tab/q/category 寫入
+ * URL searchParams。返回詳情頁時 page.tsx 解析 URL 還原 initialState，
+ * browser history 還原 scrollY，達成「記住上一頁的 tab + 位置」。
  */
-export function PreviewShell() {
-  const [draft, setDraft] = useState('')
-  const [activeTab, setActiveTab] = useState<ResourceKey>('charity')
+export function PreviewShell({
+  initialQ,
+  initialTab,
+  initialCategory,
+}: PreviewShellProps) {
+  const [draft, setDraft] = useState(initialQ)
+  const [activeTab, setActiveTab] = useState<ResourceKey>(initialTab)
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(
-    null,
+    initialCategory,
   )
   const [isMenuOpen, setMenuOpen] = useState(false)
   const q = useDebouncedValue(draft.trim().toLowerCase(), 300)
+
+  useUrlSync({
+    q: q || undefined,
+    tab: activeTab === 'charity' ? undefined : activeTab,
+    category: selectedCategory ?? undefined,
+  })
 
   const filteredCharities = useFilter(CHARITY_FIXTURES, q, selectedCategory)
   const filteredDonations = useFilter(DONATION_FIXTURES, q, selectedCategory)

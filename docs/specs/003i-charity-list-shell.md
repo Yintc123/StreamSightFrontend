@@ -1,6 +1,6 @@
 # Spec 003i：CharityListShell（feature）
 
-- **狀態**：Draft（v0.5 — 校正 category key 為 002 v0.4 `animal_protection`、與下游 spec 文案同步）
+- **狀態**：Draft（v0.6 — preview 階段以 `PreviewShell` 暫代；新增「上一頁狀態還原」設計章節）
 - **路徑**：`src/components/features/CharityListShell.tsx`
 - **依賴**：
   - [003a Design System](./003a-design-system.md)
@@ -11,6 +11,8 @@
 - **複用性**：**低**（feature） — orchestrate 業務 state 流（draft / debounced / activeTab / URL）。模式可仿造別的列表頁，但本元件不複用
 
 ---
+
+> **v0.6 preview 階段暫代**：spec 002 §6 BFF / hooks 接上前，本 spec 描述的 Shell **尚未實作為元件**。實際運行的暫代版 `src/app/donation/PreviewShell.tsx` 用本地 fixtures + useState 串元件，對外契約（`initialQ / initialTab / initialCategory` props + `useUrlSync` 行為）一致；BFF 完成後將以本 spec §3 為準改寫並搬到 `src/components/features/CharityListShell.tsx`。
 
 ## 1. 職責
 
@@ -277,3 +279,49 @@ FilterButton label 更新為「動物保護 ▼」
 | 0.3 | 2026-06-14 | 加 `selectedCategory` + `isMenuOpen` state + 串 [003k FilterButton](./003k-filter-button.md) / [003m CategoryMenu](./003m-category-menu.md)；三 list 收 `category` prop；`initialCategory` 由 RSC 預載 |
 | 0.4 | 2026-06-14 | 配合 003m v0.4 改 bottom-sheet：拿掉 FilterButton wrapper 的 `relative`、CategoryMenu 渲染上提到頁面層級（不再嵌在 row 內） |
 | 0.5 | 2026-06-14 | 文案校正：所有 category key 範例從 `'animal'` 改為 [002 v0.4](./002-list-data.md) 的 `'animal_protection'`，label 範例「流浪動物」改「動物保護」對齊 002 §3.1 `CATEGORY_LABELS` |
+| 0.6 | 2026-06-14 | 新增 §10「上一頁狀態還原」設計：URL 持久化 tab/q/category + browser 自動 scroll restore；preview 階段以 `src/app/donation/PreviewShell.tsx` 暫代本元件，spec 002 §6 hooks 完成後改寫為本 spec 規格 |
+
+---
+
+## 10. 上一頁狀態還原（v0.6 新增）
+
+從列表頁點卡片進詳情，使用者按返回時應回到「同一個 tab、同一個位置、同一個搜尋字、同一個篩選分類」。最佳實踐拆兩層：
+
+### 10.1 Tab / q / category — URL 持久化
+
+URL 是 server-side hydration 的單一資料來源（spec 002 §5 RSC pattern）：
+
+```
+/donation                            charity tab、無 q、無 category
+/donation?tab=item                   義賣商品 tab
+/donation?q=魚油                     charity tab 搜尋「魚油」
+/donation?tab=donation&category=animal_protection&q=毛孩
+```
+
+寫入：`useUrlSync` 用 `router.replace({ scroll: false })`（[002 §7.2](./002-list-data.md#72-useurlsyncq--tab-同步)）。
+- `replace` 而非 `push` — tab 切換不污染 history stack
+- `scroll: false` — 切 tab / 改搜尋字不 scroll-to-top（user 仍在當前位置）
+
+讀取：page.tsx（Server Component）解析 `searchParams` 得 `initialQ / initialTab / initialCategory` 傳給 Shell，Shell 用 `useState(initial...)` 接管。
+
+### 10.2 ScrollY — 交給 browser
+
+App Router 對 **forward** navigation（卡片 `<Link>`）會把當前 URL + `window.scrollY` 寫入 history entry。**back** navigation 觸發時 Next.js 自動 `window.scrollTo(0, savedY)`。
+
+兩個前提：
+1. Shell 必須 **同步**渲染相同 DOM 高度，scroll restore 才會落在原位（preview 階段 fixtures 是 sync OK；真實 API 階段需 RSC SSR 第一頁、Hydrate 後不能再洗）
+2. Shell **不能 unmount**（spec §3.1 三 list 同 mount + `display:none` 已滿足）
+
+### 10.3 為什麼不用 sessionStorage / Activity
+
+| 選項 | 評估 |
+|---|---|
+| **sessionStorage** | 多此一舉：URL 已是 source of truth、可深連結、可分享、refresh 不丟。sessionStorage 沒有 URL 持久化的好處 |
+| **Next 16 `cacheComponents: true`** | 用 React `<Activity>` 把整頁 state + scroll + DOM 全部 cache。**更強**但要遷移 `dynamic` / `revalidate` → `use cache`，是更大的架構動作。本作業 v0.6 不開；BFF 上線後評估 |
+| **手動 scroll restore（useEffect + sessionStorage）** | 重複造輪：browser + Next 已內建。除非 URL hash 跳到特定卡片需求才需要 |
+
+### 10.4 已知限制
+
+- 直接開啟 `/sale-items/:id` 後按返回：瀏覽器無前一頁歷史 → `router.back()` 無作用（停留原頁）。設計上可加 fallback `router.push('/donation?tab=item')`，但會違反「回上頁」直覺，本 spec 不做（[003b §9 也記載](./003b-topnav.md#9-開放問題)）
+- 直接訪問 `/donation?tab=item` 後切到 `donation` tab：URL 變 `/donation?tab=donation`，按返回會回到 `/donation?tab=item`（history stack 自然行為，可接受）
+- scroll restore 需 list height **同步可計算**：若未來改非同步資料（TanStack Query `pending`），首次 paint 高度可能不足 → 落空。屆時可用 RSC SSR 保證高度，或記下 prevPagesItemCount 補渲染。本 spec 不預先處理
