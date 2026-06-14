@@ -41,8 +41,12 @@ describe('list schemas', () => {
       expect(() => ListQuery.parse({ q: 'x'.repeat(80) })).not.toThrow()
     })
 
-    it('cursor 超 512 字 → 失敗', () => {
-      expect(() => ListQuery.parse({ cursor: 'x'.repeat(513) })).toThrow()
+    it('cursor 超 1024 字 → 失敗（對齊 backend 016 v0.13 三段 cursor）', () => {
+      expect(() => ListQuery.parse({ cursor: 'x'.repeat(1025) })).toThrow()
+    })
+
+    it('cursor 1024 字 → 通過', () => {
+      expect(() => ListQuery.parse({ cursor: 'x'.repeat(1024) })).not.toThrow()
     })
 
     it('category 非白名單 → 失敗', () => {
@@ -230,18 +234,46 @@ describe('list schemas', () => {
   })
 
   describe('BackendListResponse', () => {
-    it('完整 pageInfo + items 通過', () => {
+    it('Charity 完整 pageInfo + items 通過（spec 016 v0.13 — null logoUrl, inflated categories）', () => {
       const parsed = BackendListResponse.parse({
         items: [
           {
             id: VALID_UUID,
             name: 'x',
             description: 'y',
+            logoUrl: null,
+            categories: [
+              { id: 'cat-1', key: 'child_care', displayName: '兒少照護' },
+            ],
             createdAt: '2026-01-01T00:00:00Z',
             updatedAt: '2026-01-01T00:00:00Z',
           },
         ],
         pageInfo: { nextCursor: null, hasMore: false },
+      })
+      expect(parsed.items).toHaveLength(1)
+    })
+
+    it('Item 完整 shape 通過(charityId + priceTwd + inflated categories)', () => {
+      const parsed = BackendListResponse.parse({
+        items: [
+          {
+            id: VALID_UUID,
+            charityId: VALID_UUID_2,
+            charityName: '紅絲帶基金會',
+            name: '寵物魚油',
+            description: '愛購一份善意',
+            logoUrl: 'https://cdn.example.com/x.png',
+            coverImageUrl: null,
+            priceTwd: 920,
+            categories: [
+              { id: 'cat-1', key: 'animal_protection', displayName: '動物保護' },
+            ],
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+        pageInfo: { nextCursor: 'next', hasMore: true },
       })
       expect(parsed.items).toHaveLength(1)
     })

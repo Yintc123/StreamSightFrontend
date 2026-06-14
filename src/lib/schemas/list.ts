@@ -24,9 +24,13 @@ export const RESOURCE_TO_PATH: Record<ResourceKey, string> = {
 }
 
 // —— BFF inbound (client → BFF) ——
+//
+// `cursor.max(1024)` matches backend 016 v0.13 §4.2 / §12 (the three-segment
+// base64url payload). Anything the backend emits as `nextCursor` must round-
+// trip through this validator unchanged — opaque to us.
 export const ListQuery = z.object({
   q: z.string().max(80).optional(),
-  cursor: z.string().max(512).optional(),
+  cursor: z.string().max(1024).optional(),
   category: CategoryKeyEnum.optional(),
 })
 export type ListQuery = z.infer<typeof ListQuery>
@@ -75,20 +79,67 @@ export const ListPage = z.object({
 })
 export type ListPage = z.infer<typeof ListPage>
 
-// —— Backend response shape ——
-// BFF 從 backend 取 raw shape 帶 createdAt / updatedAt，BFF 轉發給前端時 strip。
-export const BackendCharityListItem = Charity.extend({
+// —— Backend response shape (spec 016 v0.13 §4.3 / §4.4) ——
+//
+// Backend differences from the client-facing schemas above:
+//   - `logoUrl` / `coverImageUrl` are `string | null` (key always present;
+//     spec 009 §4.4 v0.2 null semantics). BFF maps null → omit before
+//     sending to client.
+//   - `categories` is `InflatedCategory[]` (spec 016 §4.4 v0.13). BFF
+//     extracts `.key` to send `string[]` to client.
+//   - `createdAt` / `updatedAt` are present on every row and are stripped
+//     by the BFF — clients don't render them and they bloat the response.
+//
+// These schemas drive Zod validation in `createListRoute` — any drift
+// from the real backend response trips a ContractViolationError at the
+// BFF before reaching the client.
+
+const InflatedCategory = z.object({
+  id: z.string(),
+  key: CategoryKeyEnum,
+  displayName: z.string(),
+})
+
+export const BackendCharityListItem = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string(),
+  logoUrl: z.string().url().nullable(),
+  categories: z.array(InflatedCategory),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
-export const BackendDonationListItem = Donation.extend({
+export type BackendCharityListItem = z.infer<typeof BackendCharityListItem>
+
+export const BackendDonationListItem = z.object({
+  id: z.string().uuid(),
+  charityId: z.string().uuid(),
+  charityName: z.string(),
+  name: z.string(),
+  description: z.string(),
+  logoUrl: z.string().url().nullable(),
+  coverImageUrl: z.string().url().nullable(),
+  categories: z.array(InflatedCategory),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
-export const BackendItemListItem = Item.extend({
+export type BackendDonationListItem = z.infer<typeof BackendDonationListItem>
+
+export const BackendItemListItem = z.object({
+  id: z.string().uuid(),
+  charityId: z.string().uuid(),
+  charityName: z.string(),
+  name: z.string(),
+  description: z.string(),
+  logoUrl: z.string().url().nullable(),
+  coverImageUrl: z.string().url().nullable(),
+  priceTwd: z.number().int().nonnegative(),
+  categories: z.array(InflatedCategory),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
+export type BackendItemListItem = z.infer<typeof BackendItemListItem>
+
 export const BackendListItem = z.union([
   BackendCharityListItem,
   BackendDonationListItem,
@@ -102,3 +153,60 @@ export const BackendListResponse = z.object({
   }),
 })
 export type BackendListResponse = z.infer<typeof BackendListResponse>
+
+// —— BFF mappers (backend item → client item) ——
+//
+// Drop createdAt/updatedAt, drop null logoUrl/coverImageUrl, flatten
+// inflated categories to key arrays. Each mapper is the corresponding
+// per-route `toClientItem` for `createListRoute`.
+
+function logoUrlEntry(url: string | null): { logoUrl?: string } {
+  return url ? { logoUrl: url } : {}
+}
+
+function coverUrlEntry(url: string | null): { coverImageUrl?: string } {
+  return url ? { coverImageUrl: url } : {}
+}
+
+function categoryKeys(
+  arr: { key: z.infer<typeof CategoryKeyEnum> }[],
+): z.infer<typeof CategoryKeyEnum>[] {
+  return arr.map((c) => c.key)
+}
+
+export function toClientCharity(b: BackendCharityListItem): Charity {
+  return {
+    id: b.id,
+    name: b.name,
+    description: b.description,
+    ...logoUrlEntry(b.logoUrl),
+    categories: categoryKeys(b.categories),
+  }
+}
+
+export function toClientDonation(b: BackendDonationListItem): Donation {
+  return {
+    id: b.id,
+    charityId: b.charityId,
+    charityName: b.charityName,
+    name: b.name,
+    description: b.description,
+    ...logoUrlEntry(b.logoUrl),
+    ...coverUrlEntry(b.coverImageUrl),
+    categories: categoryKeys(b.categories),
+  }
+}
+
+export function toClientItem(b: BackendItemListItem): Item {
+  return {
+    id: b.id,
+    charityId: b.charityId,
+    charityName: b.charityName,
+    name: b.name,
+    description: b.description,
+    ...logoUrlEntry(b.logoUrl),
+    ...coverUrlEntry(b.coverImageUrl),
+    priceTwd: b.priceTwd,
+    categories: categoryKeys(b.categories),
+  }
+}

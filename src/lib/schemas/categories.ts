@@ -55,3 +55,23 @@ export const CATEGORY_LABELS: Record<CategoryKey, string> = {
 export function getCategoryLabel(key: CategoryKey | null): string {
   return key === null ? '全部' : CATEGORY_LABELS[key]
 }
+
+// —— Backend /v1/donation/categories response shape (spec 016 §6.2) ——
+//
+// Used by the BFF `/api/categories` Route Handler to validate the upstream
+// payload. Client receives the same shape (no transformation needed —
+// `key` already drives the filter URL state and `displayName` already
+// renders in the dropdown).
+
+export const BackendCategoryItem = z.object({
+  id: z.string(),
+  key: CategoryKeyEnum,
+  displayName: z.string(),
+  displayOrder: z.number().int(),
+})
+export type BackendCategoryItem = z.infer<typeof BackendCategoryItem>
+
+export const BackendCategoryListResponse = z.object({
+  items: z.array(BackendCategoryItem),
+})
+export type BackendCategoryListResponse = z.infer<typeof BackendCategoryListResponse>
