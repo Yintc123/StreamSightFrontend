@@ -35,6 +35,11 @@ export async function backendFetch<T = unknown>(
 
   try {
     if (env.USE_MOCK === '1') {
+      // Ensure mock dispatchers are registered in THIS module graph.
+      // Next.js / Turbopack route handlers can run in a worker that
+      // doesn't share state with `instrumentation.ts`, so the
+      // boot-time import there isn't enough.
+      await ensureMocksRegistered()
       const handler = resolveMock(path)
       if (!handler) throw new BackendUpstreamError(`No mock registered for ${path}`)
       const data = handler({ query: options.query, body: options.body }) as T
@@ -158,6 +163,15 @@ function buildUrl(
     }
   }
   return url.toString()
+}
+
+let mocksRegistered = false
+async function ensureMocksRegistered(): Promise<void> {
+  if (mocksRegistered) return
+  // Side-effect import: calls `registerMock` once per process for every
+  // /v1/donation/* upstream path.
+  await import('@/lib/mock/register')
+  mocksRegistered = true
 }
 
 function classifyNetworkError(err: unknown): BffError {
