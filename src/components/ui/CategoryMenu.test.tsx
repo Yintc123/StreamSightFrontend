@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { CategoryMenu } from './CategoryMenu'
 
@@ -179,5 +179,75 @@ describe('CategoryMenu', () => {
     const dialog = screen.getByRole('dialog')
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(screen.getByRole('radiogroup')).toBeInTheDocument()
+  })
+
+  it('動畫：sheet 套了 transition-transform、duration、motion-reduce 安全網', () => {
+    render(
+      <CategoryMenu
+        isOpen={true}
+        selectedCategory={null}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />,
+    )
+    const section = screen.getByRole('dialog').querySelector('section')!
+    expect(section.className).toMatch(/transition-transform/)
+    expect(section.className).toMatch(/duration-300/)
+    expect(section.className).toMatch(/motion-reduce:transition-none/)
+  })
+
+  it('動畫：mount 後 rAF 觸發、sheet 從 translate-y-full → translate-y-0', async () => {
+    render(
+      <CategoryMenu
+        isOpen={true}
+        selectedCategory={null}
+        onSelect={() => {}}
+        onClose={() => {}}
+      />,
+    )
+    const section = screen.getByRole('dialog').querySelector('section')!
+    // initial render 仍在 translate-y-full（rAF 還沒 fire）
+    expect(section.className).toMatch(/translate-y-full/)
+    // rAF 觸發後切到 translate-y-0
+    await waitFor(() => {
+      expect(section.className).toMatch(/translate-y-0/)
+    })
+  })
+
+  it('動畫：close 後 sheet 不立即 unmount，等動畫結束才 return null', async () => {
+    vi.useFakeTimers()
+    try {
+      const { rerender } = render(
+        <CategoryMenu
+          isOpen={true}
+          selectedCategory={null}
+          onSelect={() => {}}
+          onClose={() => {}}
+        />,
+      )
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      rerender(
+        <CategoryMenu
+          isOpen={false}
+          selectedCategory={null}
+          onSelect={() => {}}
+          onClose={() => {}}
+        />,
+      )
+
+      // close 後立刻仍在 DOM（動畫進行中）
+      expect(screen.queryByRole('dialog')).toBeInTheDocument()
+      const section = screen.getByRole('dialog').querySelector('section')!
+      expect(section.className).toMatch(/translate-y-full/)
+
+      // 推進 ANIM_MS 後 setTimeout 觸發 setShouldRender(false)，需 act flush
+      await act(async () => {
+        vi.advanceTimersByTime(350)
+      })
+      expect(screen.queryByRole('dialog')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
