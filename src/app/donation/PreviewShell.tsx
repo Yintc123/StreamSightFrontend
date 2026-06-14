@@ -55,11 +55,10 @@ export function PreviewShell({
   // URL ?q= 有值代表上一次正在搜尋；保留搜尋模式（iOS Mail / Apple HIG 慣例）
   const [isSearching, setIsSearching] = useState(initialQ.length > 0)
   const q = useDebouncedValue(draft.trim().toLowerCase(), 300)
-  // isPending：draft 已輸入內容、但 debounce 還沒同步到 q
-  //   → search-in-flight 狀態，<Spinner label="搜尋中…" /> 顯示
+  // isPending：draft 跟 q 不一致（debounce 進行中）
+  // 拿掉 length guard：清空 input 時也走 spinner 直到 q 跟上
   const normalizedDraft = draft.trim().toLowerCase()
-  const isPending =
-    isSearching && normalizedDraft.length > 0 && normalizedDraft !== q
+  const isPending = isSearching && normalizedDraft !== q
 
   useUrlSync({
     q: q || undefined,
@@ -199,11 +198,13 @@ function ListPanel<T extends Charity | Donation | Item>({
 }) {
   if (!active) return <div hidden aria-hidden />
 
-  // search 模式（spec 003i §3.4，對齊 Figma 1:2247 / 1:2213）：
-  //   isPending  → Figma `shimmer` 24×24 居中（無文字、無 TabsRow）
-  //   else       → 落到「items 0 筆 → folder no-data」或「直接渲染 items」
-  // empty q 不再顯示「請輸入關鍵字搜尋」提示（Figma 不畫；q='' 自然落到渲染所有 items）
-  if (isSearching && isPending) {
+  // search 模式 list 規則（spec 003i §3.4）：
+  //   isPending OR !q → Spinner（不渲染卡片）
+  //                       isPending  : 對齊 Figma 1:2247 typing 狀態
+  //                       !q (空輸入): 「相當於沒搜尋到結果」— 用 spinner 表示「等候輸入」
+  //   q && 0 筆       → folder no-data（Figma 1:2213）
+  //   q && >0 筆      → 渲染 cards
+  if (isSearching && (isPending || !q)) {
     return (
       <div className="flex justify-center mt-16">
         <Spinner label="搜尋中…" />
