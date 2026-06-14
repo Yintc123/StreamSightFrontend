@@ -1,18 +1,40 @@
+// Spec 003i / spec 002 §6-§7 — production list shell.
+//
+// Replaces PreviewShell. The chrome (TopNav / TabsRow / SearchBar /
+// FilterButton / CategoryMenu / BrandFooter) is identical; the difference
+// is that lists are now driven by `useResourceListInfinite` per tab —
+// inactive tabs cost zero network (spec 002 §1.3 lazy fetch).
+//
+// Search is server-side: the debounced `q` flows into the hook's queryKey,
+// TanStack drops stale pages, and the BFF forwards to backend ILIKE. No
+// local filter. The debounce keeps the request count down while the user
+// types.
+//
+// Infinite scroll: `useScrollPercentSentinel` fires `fetchNextPage()` for
+// the active tab when within 10% of the bottom (spec 002 §7.3). The
+// callback is gated on `hasNextPage` + `!isFetchingNextPage` so it can't
+// pile up requests.
+
 'use client'
-import { useMemo, useState } from 'react'
-import { TopNav } from '@/components/ui/TopNav'
-import { FilterButton } from '@/components/ui/FilterButton'
-import { CategoryMenu } from '@/components/ui/CategoryMenu'
-import { SearchBar } from '@/components/ui/SearchBar'
-import { TabsRow } from '@/components/ui/TabsRow'
+
+import { useCallback, useState } from 'react'
+
 import { BrandFooter } from '@/components/ui/BrandFooter'
+import { CategoryMenu } from '@/components/ui/CategoryMenu'
 import { CharityCard } from '@/components/ui/CharityCard'
 import { DonationProjectCard } from '@/components/ui/DonationProjectCard'
-import { SaleItemCard } from '@/components/ui/SaleItemCard'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { FilterButton } from '@/components/ui/FilterButton'
+import { InlineError } from '@/components/ui/InlineError'
+import { SaleItemCard } from '@/components/ui/SaleItemCard'
+import { SearchBar } from '@/components/ui/SearchBar'
 import { Spinner } from '@/components/ui/Spinner'
+import { TabsRow } from '@/components/ui/TabsRow'
+import { TopNav } from '@/components/ui/TopNav'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
+import { useScrollPercentSentinel } from '@/lib/hooks/useScrollPercentSentinel'
 import { useUrlSync } from '@/lib/hooks/useUrlSync'
+import { useResourceListInfinite } from '@/lib/query/useResourceListInfinite'
 import { getCategoryLabel, type CategoryKey } from '@/lib/schemas/categories'
 import type {
   Charity,
@@ -20,45 +42,32 @@ import type {
   Item,
   ResourceKey,
 } from '@/lib/schemas/list'
-import { CHARITY_FIXTURES } from '@/lib/mock/charity-fixtures'
-import { DONATION_FIXTURES } from '@/lib/mock/donation-fixtures'
-import { ITEM_FIXTURES } from '@/lib/mock/item-fixtures'
 
-type PreviewShellProps = {
+type CharityListShellProps = {
   initialQ: string
   initialTab: ResourceKey
   initialCategory: CategoryKey | null
 }
 
-/**
- * Preview Shell — 用 useState + 本地 fixtures，**不**打 API。
- *
- * 本元件是「臨時 demo」，用於在 BFF / TanStack Query / MSW 完成前
- * 視覺驗證所有 003 UI 元件。下一批 spec 002 §6/§7 完成後會被真正的
- * `CharityListShell` (003i) + `ResourceInfiniteList` (003j) 取代。
- *
- * URL 持久化（spec 002 §7.2）：透過 `useUrlSync` 把 tab/q/category 寫入
- * URL searchParams。返回詳情頁時 page.tsx 解析 URL 還原 initialState，
- * browser history 還原 scrollY，達成「記住上一頁的 tab + 位置」。
- */
-export function PreviewShell({
+export function CharityListShell({
   initialQ,
   initialTab,
   initialCategory,
-}: PreviewShellProps) {
+}: CharityListShellProps) {
   const [draft, setDraft] = useState(initialQ)
   const [activeTab, setActiveTab] = useState<ResourceKey>(initialTab)
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | null>(
     initialCategory,
   )
   const [isMenuOpen, setMenuOpen] = useState(false)
-  // URL ?q= 有值代表上一次正在搜尋；保留搜尋模式（iOS Mail / Apple HIG 慣例）
   const [isSearching, setIsSearching] = useState(initialQ.length > 0)
+
+  // Trim + lower for server-side ILIKE; debounce 300ms to keep request
+  // count down while typing. Backend NFC-normalises before its own trim
+  // (spec 016 §4.2 v0.13).
   const q = useDebouncedValue(draft.trim().toLowerCase(), 300)
-  // isPending：draft 跟 q 不一致（debounce 進行中）
-  // 拿掉 length guard：清空 input 時也走 spinner 直到 q 跟上
-  const normalizedDraft = draft.trim().toLowerCase()
-  const isPending = isSearching && normalizedDraft !== q
+  const normalisedDraft = draft.trim().toLowerCase()
+  const isPending = isSearching && normalisedDraft !== q
 
   useUrlSync({
     q: q || undefined,
@@ -66,21 +75,52 @@ export function PreviewShell({
     category: selectedCategory ?? undefined,
   })
 
-  const filteredCharities = useFilter(CHARITY_FIXTURES, q, selectedCategory)
-  const filteredDonations = useFilter(DONATION_FIXTURES, q, selectedCategory)
-  const filteredItems = useFilter(ITEM_FIXTURES, q, selectedCategory)
+  // One hook per tab. Only the active tab's `enabled` is true so the
+  // other two pay nothing until the user switches. TanStack still keeps
+  // their cached data (gcTime 5min) so a tab toggle within window is
+  // instant.
+  const charityList = useResourceListInfinite({
+    resource: 'charity',
+    q,
+    category: selectedCategory,
+    enabled: activeTab === 'charity',
+  })
+  const donationList = useResourceListInfinite({
+    resource: 'donation',
+    q,
+    category: selectedCategory,
+    enabled: activeTab === 'donation',
+  })
+  const itemList = useResourceListInfinite({
+    resource: 'item',
+    q,
+    category: selectedCategory,
+    enabled: activeTab === 'item',
+  })
+
+  const activeList =
+    activeTab === 'charity'
+      ? charityList
+      : activeTab === 'donation'
+        ? donationList
+        : itemList
+
+  // Spec 002 §7.3 — scroll-percent sentinel. Stable callback so the
+  // effect dep array doesn't churn each render.
+  const onTrigger = useCallback(() => {
+    if (activeList.hasNextPage && !activeList.isFetchingNextPage) {
+      void activeList.fetchNextPage()
+    }
+  }, [activeList])
+  useScrollPercentSentinel({
+    enabled: activeList.hasNextPage && !activeList.isLoading && !isPending,
+    onTrigger,
+  })
 
   return (
     <div className="min-h-dvh bg-surface-page flex flex-col">
       <TopNav title="所有捐款項目" />
-      {/* spec 003a §5 RWD container：
-            < md  (手機) max-w-[480px]
-            md   (平板) max-w-3xl  (=768)
-            lg+  (桌機) max-w-5xl  (=1024) */}
       <main className="mx-auto w-full max-w-[480px] md:max-w-3xl lg:max-w-5xl flex-1 flex flex-col">
-        {/* spec 003i §3 兩模式 layout（對齊 Figma IMG_4875）：
-              browse — TabsRow ↑ / [FilterButton .. SearchIconButton] ↓
-              search — [SearchBar 全寬] ↑ / TabsRow ↓ / FilterButton 隱藏 */}
         {isSearching ? (
           <>
             <div className="px-[15px] md:px-6 lg:px-8 pt-[15px]">
@@ -94,8 +134,6 @@ export function PreviewShell({
                 }}
               />
             </div>
-            {/* Figma 1:2247 「搜尋中」狀態：debounce 進行中時藏 TabsRow。
-                debounce 落定 → TabsRow 重新出現（1:2213「no result」狀態）。*/}
             {!isPending && (
               <div className="mt-[6px]">
                 <TabsRow active={activeTab} onTabChange={setActiveTab} />
@@ -115,12 +153,11 @@ export function PreviewShell({
             </div>
           </>
         )}
-        {/* flex flex-col 讓 ListPanel 內的 spinner 容器 flex-1 可垂直填滿 */}
         <div className="flex-1 flex flex-col">
           <ListPanel
             resource="charity"
             active={activeTab === 'charity'}
-            items={filteredCharities}
+            list={charityList}
             q={q}
             isSearching={isSearching}
             isPending={isPending}
@@ -128,7 +165,7 @@ export function PreviewShell({
           <ListPanel
             resource="donation"
             active={activeTab === 'donation'}
-            items={filteredDonations}
+            list={donationList}
             q={q}
             isSearching={isSearching}
             isPending={isPending}
@@ -136,15 +173,13 @@ export function PreviewShell({
           <ListPanel
             resource="item"
             active={activeTab === 'item'}
-            items={filteredItems}
+            list={itemList}
             q={q}
             isSearching={isSearching}
             isPending={isPending}
           />
         </div>
       </main>
-      {/* CategoryMenu 渲染在 main 之外、頁面層級（fixed positioning）；
-          sheet 內部處理 md+ 限寬置中（spec 003m §3）*/}
       <CategoryMenu
         isOpen={isMenuOpen}
         selectedCategory={selectedCategory}
@@ -156,10 +191,6 @@ export function PreviewShell({
   )
 }
 
-/**
- * Collapsed 模式的搜尋觸發 — 純 icon button，無輸入欄。
- * 點擊後 PreviewShell 切到 search 模式，渲染 SearchBar autoFocus 開鍵盤。
- */
 function SearchIconButton({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -182,32 +213,34 @@ function SearchIconButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-function ListPanel<T extends Charity | Donation | Item>({
+type ListLike = {
+  items: (Charity | Donation | Item)[]
+  isLoading: boolean
+  isError: boolean
+  isFetchingNextPage: boolean
+  refetch: () => void
+}
+
+function ListPanel({
   resource,
   active,
-  items,
+  list,
   q,
   isSearching,
   isPending,
 }: {
   resource: ResourceKey
   active: boolean
-  items: T[]
+  list: ListLike
   q: string
   isSearching: boolean
   isPending: boolean
 }) {
   if (!active) return <div hidden aria-hidden />
 
-  // search 模式 list 規則（spec 003i §3.4）：
-  //   isPending OR !q → Spinner（不渲染卡片）
-  //                       isPending  : 對齊 Figma 1:2247 typing 狀態
-  //                       !q (空輸入): 「相當於沒搜尋到結果」— 用 spinner 表示「等候輸入」
-  //   q && 0 筆       → folder no-data（Figma 1:2213）
-  //   q && >0 筆      → 渲染 cards
+  // Spec 003i §3.4 search-mode 3-state: typing → spinner; empty input
+  // in search → spinner; resolved → cards or empty.
   if (isSearching && (isPending || !q)) {
-    // flex-1：搶滿 list 區可用高度（PreviewShell 把 list wrapper 設 flex flex-col）
-    // items-center justify-center：水平 + 垂直雙置中
     return (
       <div className="flex-1 flex items-center justify-center">
         <Spinner label="搜尋中…" />
@@ -215,7 +248,27 @@ function ListPanel<T extends Charity | Donation | Item>({
     )
   }
 
-  if (items.length === 0) {
+  // Initial server fetch loading (no data yet).
+  if (list.isLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Spinner label="載入中…" />
+      </div>
+    )
+  }
+
+  if (list.isError) {
+    return (
+      <div className="px-[15px] md:px-6 lg:px-8 pt-[15px]">
+        <InlineError
+          message="載入失敗,請稍候再試"
+          onRetry={list.refetch}
+        />
+      </div>
+    )
+  }
+
+  if (list.items.length === 0) {
     return (
       <EmptyState
         illustration="/figma/empty-no-data.png"
@@ -225,27 +278,34 @@ function ListPanel<T extends Charity | Donation | Item>({
     )
   }
 
-  // spec 003a §5 / 003j §4.1 RWD 欄數：
-  //   item:            mobile 2 / tablet 3 / desktop 4
-  //   charity/donation: mobile 1 / tablet 2 / desktop 3
   const listClass =
     resource === 'item'
       ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4 px-[15px] md:px-6 lg:px-8 pt-[15px] pb-6'
       : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 px-[15px] md:px-6 lg:px-8 pt-[15px] pb-6'
 
   return (
-    <div className={listClass}>
-      {items.map((it) => {
-        switch (resource) {
-          case 'charity':
-            return <CharityCard key={it.id} item={it as Charity} />
-          case 'donation':
-            return <DonationProjectCard key={it.id} item={it as Donation} />
-          case 'item':
-            return <SaleItemCard key={it.id} item={it as Item} />
-        }
-      })}
-    </div>
+    <>
+      <div className={listClass}>
+        {list.items.map((it) => {
+          switch (resource) {
+            case 'charity':
+              return <CharityCard key={it.id} item={it as Charity} />
+            case 'donation':
+              return <DonationProjectCard key={it.id} item={it as Donation} />
+            case 'item':
+              return <SaleItemCard key={it.id} item={it as Item} />
+          }
+        })}
+      </div>
+      {/* Loading the next page below the grid — distinct from the
+          initial-load spinner so the user keeps seeing already-rendered
+          cards while page N+1 fetches. */}
+      {list.isFetchingNextPage && (
+        <div className="py-4 flex items-center justify-center">
+          <Spinner label="載入更多…" />
+        </div>
+      )}
+    </>
   )
 }
 
@@ -253,21 +313,4 @@ const DEFAULT_EMPTY_TITLE: Record<ResourceKey, string> = {
   charity: '目前沒有公益團體',
   donation: '目前沒有捐款專案',
   item: '目前沒有義賣商品',
-}
-
-function useFilter<T extends { name: string; description: string; categories?: CategoryKey[] }>(
-  list: T[],
-  q: string,
-  category: CategoryKey | null,
-): T[] {
-  return useMemo(() => {
-    return list.filter((it) => {
-      if (category && !(it.categories ?? []).includes(category)) return false
-      if (q) {
-        const blob = `${it.name}\n${it.description}`.toLowerCase()
-        if (!blob.includes(q)) return false
-      }
-      return true
-    })
-  }, [list, q, category])
 }

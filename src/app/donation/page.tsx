@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { PreviewShell } from './PreviewShell'
+import { CharityListShell } from './CharityListShell'
 import { RESOURCE_KEYS, type ResourceKey } from '@/lib/schemas/list'
 import { CATEGORY_KEYS, type CategoryKey } from '@/lib/schemas/categories'
 
@@ -27,14 +27,19 @@ function parseCategory(raw?: string): CategoryKey | null {
 }
 
 /**
- * Spec 002 §5 RSC pattern — 從 searchParams 解出 initial state，
- * 交給 PreviewShell hydrate（PreviewShell 之後會被 spec 003i CharityListShell 取代）。
+ * Spec 002 §5 RSC pattern — parses searchParams into initial state and
+ * hands it to the client shell. URL persistence (tab/q/category) is the
+ * "remember last page state" mechanism:
+ *  - card click → router push to detail page; this URL + scrollY join the
+ *    history entry
+ *  - detail back navigation → URL restored → this page re-parses searchParams
+ *  - CharityListShell resumes the right tab; browser restores scrollY.
  *
- * 用 URL 持久化 tab/q/category 是「記住上一頁狀態」的核心機制：
- *  - 卡片點擊 → router push 詳情頁，本頁 URL+scrollY 寫進 history entry
- *  - 詳情頁返回 → URL 還原 → page.tsx 重新解析 searchParams
- *  - PreviewShell 拿到對應 initialTab → 渲染同一個 tab
- *  - browser 自動還原 scrollY 到當時位置
+ * Server-side prefetch is intentionally NOT done here: the BFF list routes
+ * are `no-store` (spec 002) and `Cache-Control: no-store, private`, so
+ * pre-fetching on the server would cost one round-trip without any
+ * cacheable benefit. TanStack on the client fires the initial request
+ * once the shell mounts.
  */
 export default async function DonationListPage({
   searchParams,
@@ -43,7 +48,7 @@ export default async function DonationListPage({
 }) {
   const sp = await searchParams
   return (
-    <PreviewShell
+    <CharityListShell
       initialQ={sp.q ?? ''}
       initialTab={parseTab(sp.tab)}
       initialCategory={parseCategory(sp.category)}
