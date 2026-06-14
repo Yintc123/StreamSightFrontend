@@ -1,6 +1,6 @@
 # Spec 003k：FilterButton
 
-- **狀態**：Draft（v0.4 — `aria-haspopup` 改 `"dialog"` 對齊 003m bottom-sheet pattern）
+- **狀態**：Draft（v0.5 — label 改 font-bold + whitespace-nowrap，視覺強調 + 防止長分類名稱換行）
 - **路徑**：`src/components/ui/FilterButton.tsx`
 - **依賴**：[003a Design System](./003a-design-system.md)、[003m CategoryMenu](./003m-category-menu.md)（由父層配對）
 - **Figma 對應**：`_Filter Item`（componentId `1:1022`），在 frame `1:2339` 的 row 第一個元素
@@ -37,7 +37,7 @@ type FilterButtonProps = {
 | 元素 | 規格 |
 |---|---|
 | Outer container | `inline-flex items-center bg-black/5 rounded-md px-3 py-1.5` |
-| Label | `text-sm leading-[22px] text-ink-AA` |
+| Label `<span>` | `text-sm leading-[22px] text-ink-AA whitespace-nowrap font-bold`（v0.5：粗體 + 不換行） |
 | Caret icon | `w-4 h-4 ml-1 shrink-0 text-ink-AA transition-transform`，isOpen 時加 `rotate-180` |
 
 Figma 細節對映：
@@ -46,7 +46,8 @@ Figma 細節對映：
 |---|---|
 | Background `palette/gray/100` (`#EDEDF1`) | `bg-black/5`（[003a §2](./003a-design-system.md#2-顏色-token) 統一） |
 | `borderRadius: 6px` | `rounded-md` |
-| Text style `ios/p2` 14/22 regular | `text-sm leading-[22px]` |
+| Text style `ios/p2` 14/22 regular → v0.5 改 **bold** | `text-sm leading-[22px] font-bold` |
+| Label 防換行（長分類名 e.g.「教育議題提倡」） | `whitespace-nowrap`（v0.5 新增） |
 | Text fill `theme/text-AA` | `text-ink-AA` |
 | caret_down SVG | Heroicons `<ChevronDownIcon />` 或自繪 |
 
@@ -81,7 +82,7 @@ export function FilterButton({ label, onClick, isOpen = false }: FilterButtonPro
       className="inline-flex items-center bg-black/5 rounded-md px-3 py-1.5
                  text-sm leading-[22px] text-ink-AA"
     >
-      <span>{label}</span>
+      <span className="whitespace-nowrap font-bold">{label}</span>
       <ChevronDownIcon
         className={`w-4 h-4 ml-1 shrink-0 text-ink-AA transition-transform ${isOpen ? 'rotate-180' : ''}`}
       />
@@ -131,6 +132,7 @@ export function FilterButton({ label, onClick, isOpen = false }: FilterButtonPro
 - `aria-haspopup="dialog"`（v0.4：對齊 [003m](./003m-category-menu.md) `role="dialog"`）
 - `aria-expanded=false` / `true` 反映 isOpen
 - isOpen=true 時 caret 有 `rotate-180` class
+- v0.5：label span 含 `font-bold` + `whitespace-nowrap`（防長分類名換行 / 視覺強調當前篩選）
 
 ---
 
@@ -159,3 +161,4 @@ export function FilterButton({ label, onClick, isOpen = false }: FilterButtonPro
 | 0.2 | 2026-06-14 | 初版（Figma 對齊；`disabled=true` 預設，dropdown 內容缺） |
 | 0.3 | 2026-06-14 | user 補功能：拿掉 disabled、加 isOpen 反映展開、加 onClick 串接 [003m CategoryMenu](./003m-category-menu.md)、caret 旋轉動效 |
 | 0.4 | 2026-06-14 | `aria-haspopup` 從 `"menu"` 改為 `"dialog"` 對齊 003m v0.4 bottom-sheet modal `role="dialog"`（ARIA pattern 配對修正） |
+| 0.5 | 2026-06-14 | label `<span>` 加 `font-bold` + `whitespace-nowrap`：(1) 粗體強調當前篩選分類；(2) 長分類名如「教育議題提倡」「身心障礙服務」遇窄欄不換行影響 chevron 對齊。caret / aria 不變 |

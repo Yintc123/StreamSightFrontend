@@ -47,4 +47,12 @@ describe('FilterButton', () => {
     const cls = svg?.className.baseVal ?? svg?.getAttribute('class') ?? ''
     expect(cls).toMatch(/rotate-180/)
   })
+
+  it('label span 為 font-bold + whitespace-nowrap（同一行、粗體）', () => {
+    render(<FilterButton label="教育議題提倡" onClick={() => {}} />)
+    const labelSpan = screen.getByText('教育議題提倡')
+    expect(labelSpan.tagName).toBe('SPAN')
+    expect(labelSpan.className).toMatch(/font-bold/)
+    expect(labelSpan.className).toMatch(/whitespace-nowrap/)
+  })
 })

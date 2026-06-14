@@ -41,7 +41,7 @@ export function FilterButton({
                  text-sm leading-[22px] text-ink-AA
                  focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
     >
-      <span>{label}</span>
+      <span className="whitespace-nowrap font-bold">{label}</span>
       <ChevronDownIcon
         className={`w-4 h-4 ml-1 shrink-0 text-ink-AA transition-transform ${
           isOpen ? 'rotate-180' : ''
