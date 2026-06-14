@@ -7,6 +7,8 @@ type SearchBarProps = {
   /** 點「取消」時呼叫；元件內會 blur input + 清空 value */
   onCancel?: () => void
   placeholder?: string
+  /** mount 時自動 focus input（搜尋模式進入時開鍵盤） */
+  autoFocus?: boolean
 }
 
 export function SearchBar({
@@ -14,6 +16,7 @@ export function SearchBar({
   onChange,
   onCancel,
   placeholder = '搜尋公益團體',
+  autoFocus = false,
 }: SearchBarProps) {
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -41,6 +44,7 @@ export function SearchBar({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
+          autoFocus={autoFocus}
           className="flex-1 bg-transparent text-sm leading-[22px]
                      text-ink-AAA placeholder:text-ink-A focus:outline-none"
         />

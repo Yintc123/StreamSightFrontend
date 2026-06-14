@@ -119,16 +119,24 @@ export default async function Page({
 }
 ```
 
+> **v0.6 兩模式 layout（Figma IMG_4875 對齊，[003i §3.4](./003i-charity-list-shell.md#34-browse-vs-search-兩模式-layoutv07-新增)）**：
+> - **browse 模式**（預設）：`TabsRow` 在 `[FilterButton ... 🔍 icon]` row **之上**
+> - **search 模式**（點 icon 後）：`SearchBar` 全寬在 `TabsRow` **之上**，FilterButton 消失
+
 ```
 <HydrationBoundary>
 └─ <CharityListShell initialQ initialTab initialCategory>          (003i)
    ├─ <TopNav title="所有捐款項目" />                                (003b)
-   ├─ row [
-   │     <FilterButton label={getCategoryLabel(selectedCategory)} onClick isOpen />   (003k)
-   │     <SearchBar value onChange onCancel />                                        (003c)
-   │   ]
+   ├─ 模式 A — browse（!isSearching）：
+   │     <TabsRow active={activeTab} onTabChange={setActiveTab} />   (003d)
+   │     row [
+   │       <FilterButton label={getCategoryLabel(selectedCategory)} onClick isOpen />   (003k)
+   │       <SearchIconButton onClick={() => setIsSearching(true)} />   (003i §3.4 inline)
+   │     ]
+   ├─ 模式 B — search（isSearching）：
+   │     <SearchBar autoFocus value onChange onCancel />              (003c)
+   │     <TabsRow active onTabChange />                                (003d)
    ├─ <CategoryMenu isOpen selectedCategory onSelect onClose />    (003m  ← bottom-sheet modal, top-level)
-   ├─ <TabsRow active={activeTab} onTabChange={setActiveTab} />    (003d)
    ├─ <ResourceInfiniteList resource="charity"  q category active />   (003j)
    ├─ <ResourceInfiniteList resource="donation" q category active />   (003j)
    ├─ <ResourceInfiniteList resource="item"     q category active />   (003j)
@@ -308,3 +316,4 @@ export default async function Page({
 | 0.5 | 2026-06-14 | 截圖補件 (IMG_4875/4877/4879/4880/4881) 配套：(a) 003e 拆 003e1/e2/e3（三 tab 卡片 layout 顯著不同）；(b) 003m 改 bottom-sheet modal（17 options）；(c) 003f Skeleton 加 `variant` 對應三種 shape；(d) 003i Shell 拿掉 dropdown anchor，CategoryMenu 渲染上提；(e) 003j `<ResourceCard>` → `<CardForResource>` switch dispatch；(f) overview composition 樹、page.tsx prefetch、acceptance、e2e 同步 |
 | 0.5 | 2026-06-14 | 截圖補件 IMG_4875-4883：(1) §2 003e 拆 003e1/e2/e3 三種卡片 layout；(2) §8.1 categories filter 改 bottom-sheet modal（003m v0.4）；(3) §8.2 詳情頁從 out-of-scope 移入範圍內 → 新增 [004 系列](./004-detail-pages.md) |
 | 0.6 | 2026-06-14 | 全面對齊 ground truth（IMG_4875-4883 + Figma file）：(a) §1「9 元件」→「13 元件」；(b) §2 003m 描述「6 categories dropdown」→「17 options bottom-sheet」；(c) §2.1 順序樹：003m 由 003j 下移到 003i 下（dependency 修正）；(d) §4 點 FilterButton 描述「dropdown」→「bottom-sheet」；(e) §5 e2e case 10-13 category key `'animal'` → `'animal_protection'`、label「動物保護」→「動物保護」；(f) e2e case 15 item ribbon 「公益義賣」→「公益標籤」；(g) e2e case 14 donation 主辦團體名 banner 描述為「圖片底部紅色 overlay」 |
+| 0.7 | 2026-06-14 | §3 composition tree 改 browse / search 兩模式表達（對齊 Figma 順序）：(a) browse — TabsRow 提到 FilterButton 行之上；(b) search — SearchBar 全寬 + FilterButton 消失 + TabsRow 移到下方；明細規格放 [003i v0.7 §3.4](./003i-charity-list-shell.md)；下游 SearchBar v0.2 加 `autoFocus` prop |

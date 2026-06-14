@@ -1,6 +1,6 @@
 # Spec 003i：CharityListShell（feature）
 
-- **狀態**：Draft（v0.6 — preview 階段以 `PreviewShell` 暫代；新增「上一頁狀態還原」設計章節）
+- **狀態**：Draft（v0.7 — 加 browse vs search 兩模式 layout（Figma 對齊：TabsRow 提到 filter 列之上、search 模式 FilterButton 隱藏 / SearchBar 在 TabsRow 之上）；新增 `isSearching` state）
 - **路徑**：`src/components/features/CharityListShell.tsx`
 - **依賴**：
   - [003a Design System](./003a-design-system.md)
@@ -129,6 +129,66 @@ export function CharityListShell({
 | 三個 ResourceInfiniteList | `flex-1` wrapper 推 footer 到底；各自管內邊距；非 active 的渲染 `display:none`（保留 scroll position） |
 | BrandFooter | 自帶 padding；自然出現在 list 下方（內容短時 `flex-1` 推到底） |
 
+### 3.4 Browse vs Search 兩模式 layout（v0.7 新增）
+
+對齊 Figma IMG_4875。Shell 多一個 `isSearching: boolean` state 控制 chrome 區排版：
+
+#### Browse 模式（預設 / `isSearching=false`）
+
+```
+[ TopNav ]
+[ TabsRow ]                       ← 上面（Figma 對齊）
+[ FilterButton  ......  🔍 icon ] ← 下面
+[ list ...                       ]
+```
+
+#### Search 模式（`isSearching=true`）
+
+```
+[ TopNav ]
+[ SearchBar 全寬 autoFocus    取消 ]  ← 上面（FilterButton 完全消失）
+[ TabsRow ]                          ← 下面
+[ list ...                          ]
+```
+
+#### Transition
+
+| 動作 | 結果 |
+|---|---|
+| 點放大鏡 icon (browse) | `setIsSearching(true)` → SearchBar mount + autoFocus；FilterButton 從 DOM 消失 |
+| 點「取消」(search) | onCancel：`setDraft('')` + `setIsSearching(false)` → 回 browse 模式 |
+| `initialQ.length > 0`（URL 有 `?q=`） | `useState(initialQ.length > 0)` → 直接以 search 模式啟動，input 帶值 |
+| 切 tab | 兩模式都允許切 tab（tab 在 search 模式仍可見、可點） |
+| 開 CategoryMenu | 僅 browse 模式可達（search 模式無 FilterButton） |
+
+#### 為什麼 SearchBar 不持有 isSearching state
+
+SearchBar 本身永遠是「展開的輸入欄」表現。「collapsed icon-button」是 Shell 為了節省畫面空間自繪的小 `<button>`（[003c §1](./003c-searchbar.md#1-職責)）。讓 Shell 管 isSearching 符合 lifted state pattern — Shell 同時也是 q / tab / category 的容器，避免 SearchBar 跟 Shell 雙方都管「我有沒有展開」這份狀態。
+
+#### `<SearchIconButton>` 規格
+
+```tsx
+function SearchIconButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="開啟搜尋"
+      className="ml-auto w-9 h-9 flex items-center justify-center
+                 focus-visible:outline focus-visible:outline-2
+                 focus-visible:outline-brand rounded"
+    >
+      <img src="/figma/icon-magnifier.svg" alt="" width={20} height={20}
+           className="w-5 h-5 opacity-50" />
+    </button>
+  )
+}
+```
+
+放大鏡 SVG 跟 SearchBar 內共用（`/figma/icon-magnifier.svg`），`opacity-50` 對齊。`ml-auto` 把 icon 推到 row 最右。
+
+---
+
 ### 3.1 「三個 list 同時 mount」的取捨
 
 兩種選擇：
@@ -153,6 +213,7 @@ RSC (spec 002 §5)
   ├─ useState activeTab = initialTab            ← 哪個 tab 顯示
   ├─ useState selectedCategory = initialCategory ← 篩選分類
   ├─ useState isMenuOpen = false                ← CategoryMenu 開合
+  ├─ useState isSearching = initialQ.length > 0 ← search 模式（v0.7）
   ├─ debouncedQ = useDebouncedValue(draft.trim(), 300)
   ├─ useUrlSync({ q, tab, category })
   └─ <FilterButton label={getCategoryLabel(category)} onClick={toggleMenu} isOpen />
@@ -280,6 +341,7 @@ FilterButton label 更新為「動物保護 ▼」
 | 0.4 | 2026-06-14 | 配合 003m v0.4 改 bottom-sheet：拿掉 FilterButton wrapper 的 `relative`、CategoryMenu 渲染上提到頁面層級（不再嵌在 row 內） |
 | 0.5 | 2026-06-14 | 文案校正：所有 category key 範例從 `'animal'` 改為 [002 v0.4](./002-list-data.md) 的 `'animal_protection'`，label 範例「流浪動物」改「動物保護」對齊 002 §3.1 `CATEGORY_LABELS` |
 | 0.6 | 2026-06-14 | 新增 §10「上一頁狀態還原」設計：URL 持久化 tab/q/category + browser 自動 scroll restore；preview 階段以 `src/app/donation/PreviewShell.tsx` 暫代本元件，spec 002 §6 hooks 完成後改寫為本 spec 規格 |
+| 0.7 | 2026-06-14 | 加 browse vs search 兩模式 layout 對齊 Figma IMG_4875：(1) browse 模式 TabsRow 提到 FilterButton + 搜尋 icon 之上；(2) 點放大鏡 icon 進 search 模式 — FilterButton 完全消失、SearchBar 全寬 autoFocus 在 TabsRow 之上；(3) 取消按鈕回 browse + 清空 q；(4) `useState(initialQ.length > 0)` 讓 URL `?q=` 直接以 search 模式啟動；(5) 新 `<SearchIconButton>` 元件規格放 §3.4；(6) [003c v0.2](./003c-searchbar.md) SearchBar 加 `autoFocus` prop |
 
 ---
 

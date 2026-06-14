@@ -43,6 +43,63 @@ test('從 item tab 切回 charity（default）→ URL drop ?tab=', async ({ page
   await expect(page).not.toHaveURL(/[?&]tab=/)
 })
 
+test('browse 模式：TabsRow 在 FilterButton + 搜尋 icon 之上（Figma 對齊）', async ({
+  page,
+}) => {
+  await page.goto('/donation')
+  const tab = page.getByRole('tab', { name: '公益團體' })
+  const filterBtn = page.getByRole('button', { name: '篩選：全部' })
+  await expect(tab).toBeVisible()
+  await expect(filterBtn).toBeVisible()
+  const tabBox = await tab.boundingBox()
+  const filterBox = await filterBtn.boundingBox()
+  expect(tabBox).toBeTruthy()
+  expect(filterBox).toBeTruthy()
+  // tab 的 y 應該比 filter 的 y 小（在上面）
+  expect(tabBox!.y).toBeLessThan(filterBox!.y)
+})
+
+test('點搜尋 icon → 進 search 模式：FilterButton 消失、SearchBar 出現、TabsRow 跑到下方', async ({
+  page,
+}) => {
+  await page.goto('/donation')
+  await page.getByRole('button', { name: '開啟搜尋' }).click()
+
+  // FilterButton 應消失
+  await expect(page.getByRole('button', { name: '篩選：全部' })).toHaveCount(0)
+  // SearchBar input 出現且 focus
+  const input = page.getByRole('searchbox')
+  await expect(input).toBeVisible()
+  await expect(input).toBeFocused()
+
+  // TabsRow 仍存在，但 y 應該大於 SearchBar（在搜尋列下方）
+  const tab = page.getByRole('tab', { name: '公益團體' })
+  const tabBox = await tab.boundingBox()
+  const inputBox = await input.boundingBox()
+  expect(tabBox!.y).toBeGreaterThan(inputBox!.y)
+})
+
+test('search 模式按取消 → 回 browse 模式、清空 q、URL drop ?q=', async ({ page }) => {
+  await page.goto('/donation')
+  await page.getByRole('button', { name: '開啟搜尋' }).click()
+  await page.getByRole('searchbox').fill('魚油')
+  await expect(page).toHaveURL(/[?&]q=/)
+
+  await page.getByRole('button', { name: '取消' }).click()
+  // 回 browse 模式 → FilterButton 又出現
+  await expect(page.getByRole('button', { name: '篩選：全部' })).toBeVisible()
+  // q 從 URL drop
+  await expect(page).not.toHaveURL(/[?&]q=/)
+})
+
+test('URL ?q=xxx 進入頁面 → 直接是 search 模式', async ({ page }) => {
+  await page.goto('/donation?q=動物')
+  // FilterButton 不在
+  await expect(page.getByRole('button', { name: /篩選/ })).toHaveCount(0)
+  // SearchBar input 有值
+  await expect(page.getByRole('searchbox')).toHaveValue('動物')
+})
+
 test('進 item 詳情後返回 → 仍在義賣商品 tab', async ({ page }) => {
   await page.goto('/donation')
   await page.getByRole('tab', { name: '義賣商品' }).click()

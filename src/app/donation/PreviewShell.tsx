@@ -51,6 +51,8 @@ export function PreviewShell({
     initialCategory,
   )
   const [isMenuOpen, setMenuOpen] = useState(false)
+  // URL ?q= 有值代表上一次正在搜尋；保留搜尋模式（iOS Mail / Apple HIG 慣例）
+  const [isSearching, setIsSearching] = useState(initialQ.length > 0)
   const q = useDebouncedValue(draft.trim().toLowerCase(), 300)
 
   useUrlSync({
@@ -66,27 +68,45 @@ export function PreviewShell({
   return (
     <div className="min-h-dvh bg-surface-page flex flex-col">
       <TopNav title="所有捐款項目" />
-      <div className="px-[15px] pt-[15px] flex items-center gap-3">
-        <FilterButton
-          label={getCategoryLabel(selectedCategory)}
-          onClick={() => setMenuOpen((o) => !o)}
-          isOpen={isMenuOpen}
-        />
-        <SearchBar
-          value={draft}
-          onChange={setDraft}
-          onCancel={() => setDraft('')}
-        />
-      </div>
+      {/* spec 003i §3 兩模式 layout（對齊 Figma IMG_4875）：
+            browse — TabsRow ↑ / [FilterButton .. SearchIconButton] ↓
+            search — [SearchBar 全寬] ↑ / TabsRow ↓ / FilterButton 隱藏 */}
+      {isSearching ? (
+        <>
+          <div className="px-[15px] pt-[15px]">
+            <SearchBar
+              autoFocus
+              value={draft}
+              onChange={setDraft}
+              onCancel={() => {
+                setDraft('')
+                setIsSearching(false)
+              }}
+            />
+          </div>
+          <div className="mt-[6px]">
+            <TabsRow active={activeTab} onTabChange={setActiveTab} />
+          </div>
+        </>
+      ) : (
+        <>
+          <TabsRow active={activeTab} onTabChange={setActiveTab} />
+          <div className="px-[15px] pt-[15px] flex items-center gap-3">
+            <FilterButton
+              label={getCategoryLabel(selectedCategory)}
+              onClick={() => setMenuOpen((o) => !o)}
+              isOpen={isMenuOpen}
+            />
+            <SearchIconButton onClick={() => setIsSearching(true)} />
+          </div>
+        </>
+      )}
       <CategoryMenu
         isOpen={isMenuOpen}
         selectedCategory={selectedCategory}
         onSelect={setSelectedCategory}
         onClose={() => setMenuOpen(false)}
       />
-      <div className="mt-[6px]">
-        <TabsRow active={activeTab} onTabChange={setActiveTab} />
-      </div>
       <div className="flex-1">
         <ListPanel resource="charity" active={activeTab === 'charity'} items={filteredCharities} q={q} />
         <ListPanel resource="donation" active={activeTab === 'donation'} items={filteredDonations} q={q} />
@@ -94,6 +114,32 @@ export function PreviewShell({
       </div>
       <BrandFooter />
     </div>
+  )
+}
+
+/**
+ * Collapsed 模式的搜尋觸發 — 純 icon button，無輸入欄。
+ * 點擊後 PreviewShell 切到 search 模式，渲染 SearchBar autoFocus 開鍵盤。
+ */
+function SearchIconButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="開啟搜尋"
+      className="ml-auto w-9 h-9 flex items-center justify-center
+                 focus-visible:outline focus-visible:outline-2
+                 focus-visible:outline-brand rounded"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/figma/icon-magnifier.svg"
+        alt=""
+        width={20}
+        height={20}
+        className="w-5 h-5 opacity-50"
+      />
+    </button>
   )
 }
 

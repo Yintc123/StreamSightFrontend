@@ -61,4 +61,14 @@ describe('SearchBar', () => {
     render(<SearchBar value="" onChange={() => {}} />)
     expect(screen.getByRole('searchbox')).toHaveAttribute('type', 'search')
   })
+
+  it('autoFocus=true → mount 時 input 取得 focus', () => {
+    render(<SearchBar value="" onChange={() => {}} autoFocus />)
+    expect(screen.getByRole('searchbox')).toHaveFocus()
+  })
+
+  it('autoFocus=false (default) → mount 時 input 不 focus', () => {
+    render(<SearchBar value="" onChange={() => {}} />)
+    expect(screen.getByRole('searchbox')).not.toHaveFocus()
+  })
 })
