@@ -56,6 +56,21 @@ describe('list schemas', () => {
     it('category 白名單 → 通過', () => {
       expect(() => ListQuery.parse({ category: 'animal_protection' })).not.toThrow()
     })
+
+    it('viewport=mobile / tablet / desktop 通過', () => {
+      expect(() => ListQuery.parse({ viewport: 'mobile' })).not.toThrow()
+      expect(() => ListQuery.parse({ viewport: 'tablet' })).not.toThrow()
+      expect(() => ListQuery.parse({ viewport: 'desktop' })).not.toThrow()
+    })
+
+    it('viewport 非白名單 → 失敗', () => {
+      expect(() => ListQuery.parse({ viewport: 'wide' })).toThrow()
+      expect(() => ListQuery.parse({ viewport: 'phone' })).toThrow()
+    })
+
+    it('viewport 省略 → 通過（optional）', () => {
+      expect(() => ListQuery.parse({})).not.toThrow()
+    })
   })
 
   describe('Charity schema', () => {

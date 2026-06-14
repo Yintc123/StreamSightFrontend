@@ -34,6 +34,7 @@ import { TopNav } from '@/components/ui/TopNav'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import { useScrollPercentSentinel } from '@/lib/hooks/useScrollPercentSentinel'
 import { useUrlSync } from '@/lib/hooks/useUrlSync'
+import { useViewport } from '@/lib/hooks/useViewport'
 import { useResourceListInfinite } from '@/lib/query/useResourceListInfinite'
 import { getCategoryLabel, type CategoryKey } from '@/lib/schemas/categories'
 import type {
@@ -75,6 +76,10 @@ export function CharityListShell({
     category: selectedCategory ?? undefined,
   })
 
+  // Spec 002 §1.3 v0.6 — viewport hint flows into the BFF so the server
+  // picks per-tab desktopLimit (currently only item: 4 / 12).
+  const viewport = useViewport()
+
   // One hook per tab. Only the active tab's `enabled` is true so the
   // other two pay nothing until the user switches. TanStack still keeps
   // their cached data (gcTime 5min) so a tab toggle within window is
@@ -84,18 +89,21 @@ export function CharityListShell({
     q,
     category: selectedCategory,
     enabled: activeTab === 'charity',
+    viewport,
   })
   const donationList = useResourceListInfinite({
     resource: 'donation',
     q,
     category: selectedCategory,
     enabled: activeTab === 'donation',
+    viewport,
   })
   const itemList = useResourceListInfinite({
     resource: 'item',
     q,
     category: selectedCategory,
     enabled: activeTab === 'item',
+    viewport,
   })
 
   const activeList =

@@ -18,4 +18,6 @@ export const GET = createListRoute({
   upstream: '/v1/donation/donation-projects',
   backendItemSchema: BackendDonationListItem,
   toClientItem: toClientDonation,
+  // Spec 002 §1.3 v0.3 — donation 16:9 cover cards, 5/page at mobile width.
+  limit: 5,
 })

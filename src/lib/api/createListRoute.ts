@@ -7,9 +7,18 @@
 // inflated `[{id, key, displayName}]` (backend spec 016 v0.13) down to a
 // plain `string[]` of keys (client expectation, spec 002 §3.2).
 //
-// Limit is locked at 10 to match the spec 002 §1.3 / brief v0.3 infinite-
-// scroll cadence. The client does NOT get to override it; if a different
-// page size is ever needed it should go through the spec, not the URL.
+// Page limit is per-route (spec 002 §1.3 v0.3): the three tabs have
+// different visual density at mobile width, so the batch size is tuned per
+// tab — charity 10 (single-row list), donation 5 (16:9 cover cards),
+// item 4 (2-col square grid). Default stays 10 if a route does not set it.
+//
+// Viewport-aware override (v0.6): item's grid widens from 2 → 3 → 4 cols
+// across mobile / tablet / desktop, so its route sets `tabletLimit: 6`
+// and `desktopLimit: 12` on top of the 4/page mobile baseline. The client
+// passes `?viewport=mobile|tablet|desktop` (from `useViewport()`), the
+// BFF picks tabletLimit / desktopLimit / limit accordingly. Numbers stay
+// in this file — clients only declare their viewport, never an arbitrary
+// limit.
 //
 // `Accept-Language` is forwarded from the incoming client request to the
 // backend so the upstream's i18n logic (backend spec 016 §4.1.1) sees the
@@ -25,7 +34,7 @@ import { backendFetch } from './backend'
 import { createRoute } from './create-route'
 import { okResponse } from './responses'
 
-const PAGE_LIMIT = 10
+const DEFAULT_PAGE_LIMIT = 10
 
 interface BackendListShape<T> {
   items: T[]
@@ -43,6 +52,22 @@ export interface CreateListRouteOptions<TBackend, TClient> {
    * `logoUrl` / `coverImageUrl`, and flatten inflated categories.
    */
   toClientItem: (item: TBackend) => TClient
+  /**
+   * Per-tab page size for the upstream `limit` query (spec 002 §1.3 v0.3).
+   * Defaults to 10. Tuned per tab to match mobile-width visual density.
+   * Used when client sends `?viewport=mobile` or omits the hint entirely.
+   */
+  limit?: number
+  /**
+   * Override used when client passes `?viewport=tablet` (spec 002 §1.3 v0.6).
+   * Falls back to `limit` if unset.
+   */
+  tabletLimit?: number
+  /**
+   * Override used when client passes `?viewport=desktop` (spec 002 §1.3 v0.6).
+   * Falls back to `limit` if unset.
+   */
+  desktopLimit?: number
 }
 
 export function createListRoute<TBackend, TClient>(
@@ -60,12 +85,19 @@ export function createListRoute<TBackend, TClient>(
     querySchema: ListQuery,
     handler: async ({ req, query, requestId }) => {
       const acceptLanguage = req.headers.get('accept-language') ?? undefined
+      const baseLimit = opts.limit ?? DEFAULT_PAGE_LIMIT
+      const limit =
+        query.viewport === 'desktop' && opts.desktopLimit !== undefined
+          ? opts.desktopLimit
+          : query.viewport === 'tablet' && opts.tabletLimit !== undefined
+            ? opts.tabletLimit
+            : baseLimit
       const { data } = await backendFetch<unknown>(opts.upstream, {
         query: {
           q: query.q,
           cursor: query.cursor,
           category: query.category,
-          limit: PAGE_LIMIT,
+          limit,
         },
         headers: acceptLanguage ? { 'accept-language': acceptLanguage } : undefined,
         requestId,

@@ -1,7 +1,7 @@
 # Spec 002：捐款項目列表 — 業務 / 資料層（三 tab 通用）
 
 - **狀態**：Draft
-- **建立日期**：2026-06-13（v0.1）/ 2026-06-14（v0.2 — 三 tab + 10 筆 + scroll% 觸發 + tab lazy）
+- **建立日期**：2026-06-13（v0.1）/ 2026-06-14（v0.2 — 三 tab + 10 筆 + scroll% 觸發 + tab lazy）/ 2026-06-14（v0.5 — per-tab limit：charity 10 / donation 5 / item 4）/ 2026-06-15（v0.6 — viewport hint：item desktop=12）
 - **影響範圍**：
   - BFF：`src/app/api/{charities,donations,items}/route.ts` + `src/lib/api/createListRoute.ts`
   - 資料層：`src/lib/schemas/list.ts`、`src/lib/api/client.ts`、`src/lib/query/list.ts`
@@ -40,7 +40,8 @@
 
 | 決策 | 理由 |
 |---|---|
-| **`limit=10`**（spec v0.1 是 20） | brief v0.3：「每個 tab 初始 10 筆 / 下一頁 10 筆」 |
+| **Per-tab `limit`**（v0.5；v0.2~0.4 為 10 統一） | 三 tab 卡片視覺密度不同（行高 / 16:9 / 2×square），mobile 寬度下每次取對應自然視覺節奏：charity **10**（row、單行高）、donation **5**（16:9 cover ≈ 半屏）、item **4**（2 欄正方 = 2 列）。預設仍 10，per-route 用 `opts.limit` 覆寫 |
+| **Viewport-aware limits**（v0.6） | item tab grid 隨寬度由 2 → 3 → 4 欄變化；單一 `limit:4` 在 tablet/desktop 偏稀。三檔分流：mobile **4**、tablet **6**（`md:grid-cols-3` × 2 列）、desktop **12**（`lg:grid-cols-4` × 3 列）。client `useViewport()` 用 2 個 matchMedia（`min-width:768px` / `min-width:1024px`）偵測 → 帶 `?viewport=mobile\|tablet\|desktop` → BFF 用對應 `opts.limit` / `tabletLimit` / `desktopLimit`。client 只宣告 viewport，不送任意 limit；數字仍在 spec 控制。SSR 預設 mobile，非 mobile 用戶首訪會多 1 次 fetch（接受） |
 | **Scroll-percent sentinel**（5%~10% from bottom） | brief v0.3 規格；比「絕對 px」更貼近長頁面相對位置感 |
 | **Generic factory** 而非 3 個獨立 hook | 三 tab 契約對稱；3× 重複犯 spec 001a §4.4「禁止硬寫」精神。型別用 `ResourceKey` discriminator 保安全 |
 | **TanStack `enabled` 控制 lazy fetch** | 切到 tab 才打網路；30s `staleTime` 內回切 cache hit |
@@ -68,6 +69,7 @@ GET /api/<resource>?q=<keyword>&cursor=<opaque>
 | `q` | 否 | trim 後 0~80 字 | 空字串 / 全空白 → drop；> 80 字 → 400 `VALIDATION_ERROR` |
 | `cursor` | 否 | opaque base64url 1~512 字 | 透傳到 backend |
 | `category` | 否 | 必須是 [§3.1 CategoryKey 白名單](#31-categories-categorykey-來自-backend-015-7) | 透傳到 backend；不在白名單 → 400 `VALIDATION_ERROR`（v0.3 新增） |
+| `viewport` | 否 | `'mobile' \| 'tablet' \| 'desktop'`（v0.6） | 不透傳；BFF 內部用來選 `opts.limit` / `tabletLimit` / `desktopLimit`。不在白名單 → 400 `VALIDATION_ERROR` |
 
 Response（200 OK）：
 
@@ -119,6 +121,15 @@ export function createListRoute<TBackend, TClient>(opts: {
   upstreamPath: string
   backendItemSchema: ZodType<TBackend>
   project: (item: TBackend) => TClient
+  /** v0.5：per-tab default；default 10。charity 10 / donation 5 / item 4。
+   *  也是 mobile 預設。 */
+  limit?: number
+  /** v0.6：當 client 帶 `?viewport=tablet` 時使用；省略 → 退回 limit。
+   *  目前只有 item 設 6。 */
+  tabletLimit?: number
+  /** v0.6：當 client 帶 `?viewport=desktop` 時使用；省略 → 退回 limit。
+   *  目前只有 item 設 12。 */
+  desktopLimit?: number
 }) {
   const BackendList = z.object({
     items: z.array(opts.backendItemSchema),
@@ -137,7 +148,13 @@ export function createListRoute<TBackend, TClient>(opts: {
           q,
           cursor: query.cursor,
           category: query.category, // v0.3 透傳；ListQuery 已守白名單
-          limit: 10,
+          // v0.6：依 viewport 選 desktopLimit / tabletLimit / limit
+          limit:
+            query.viewport === 'desktop' && opts.desktopLimit !== undefined
+              ? opts.desktopLimit
+              : query.viewport === 'tablet' && opts.tabletLimit !== undefined
+                ? opts.tabletLimit
+                : (opts.limit ?? 10),
           sort: 'createdAt:desc',
         },
         requestId,
@@ -167,6 +184,7 @@ import { BackendCharityListItem } from '@/lib/schemas/list'
 export const GET = createListRoute({
   upstreamPath: '/v1/donation/charities',
   backendItemSchema: BackendCharityListItem,
+  limit: 10, // v0.5 — row 卡，mobile 寬度下單行 → 10 筆 ≈ 滑 1~2 頁觸發 next
   project: (c) => ({
     id: c.id,
     name: c.name,
@@ -183,6 +201,7 @@ import { BackendDonationListItem } from '@/lib/schemas/list'
 export const GET = createListRoute({
   upstreamPath: '/v1/donations',
   backendItemSchema: BackendDonationListItem,
+  limit: 5, // v0.5 — 16:9 cover card 在 mobile 寬度下每張約半屏，5 筆 ≈ 2 屏
   project: (d) => ({
     id: d.id,
     name: d.name,
@@ -200,6 +219,9 @@ import { BackendItemListItem } from '@/lib/schemas/list'
 export const GET = createListRoute({
   upstreamPath: '/v1/items',
   backendItemSchema: BackendItemListItem,
+  limit: 4,         // v0.5 — mobile：2 欄正方 grid，4 筆 = 2 列 ≈ 1 屏
+  tabletLimit: 6,   // v0.6 — tablet：md:grid-cols-3，6 筆 = 2 列
+  desktopLimit: 12, // v0.6 — desktop：lg:grid-cols-4，12 筆 = 3 列
   project: (i) => ({
     id: i.id,
     name: i.name,
@@ -538,7 +560,7 @@ registerMock('/v1/items', itemListHandler)
 
 ### 4.4 Fixture 內容約定
 
-- 每組 ≥ 25 筆（夠 limit=10 演 3 頁滾動）
+- 每組 ≥ 25 筆（最大 limit 為 charity=10，足夠演 3 頁滾動；donation/item limit 較小，演更多頁）
 - 每組 ≥ 2 筆能命中「流浪動物」關鍵字（e2e 搜尋測試共用）
 - 每組涵蓋 ≥ 4 個 [§3.1 CategoryKey](#31-categories-categorykey-來自-backend-015-7)（demo + e2e 都能切換）
 - 完整 ISO 8601 `createdAt` / `updatedAt`
@@ -872,7 +894,11 @@ URL              ?tab=donation&q=foo&category=animal
 
 | # | 案例 | 期望 |
 |---|---|---|
-| 1 | `createListRoute('/v1/X')` 無 query → backend 收 `limit=10 sort=createdAt:desc` | 對 |
+| 1a | `createListRoute('/v1/X')` 無 `opts.limit` → backend 收 `limit=10 sort=createdAt:desc` | 對（default） |
+| 1b | `createListRoute('/v1/X', { limit: 5 })` → backend 收 `limit=5`（v0.5） | 對 |
+| 1c | `createListRoute('/v1/X', { limit:4, tabletLimit:6, desktopLimit:12 })` + `?viewport=mobile\|tablet\|desktop` → backend `limit=4/6/12`；省略 viewport → `4`（v0.6） | 對 |
+| 1d | `viewport=tablet` 但 route 未設 tabletLimit → 退回 limit（v0.6） | 對 |
+| 1e | `?viewport=phone` 等非白名單值 → 400 `VALIDATION_ERROR` | 對 |
 | 2 | `?q=foo` → backend 收 `q=foo` | 對 |
 | 3 | `?q=  ` 全空白 → backend 不收 `q` | 對 |
 | 4 | `?q=` 超 80 字 → 400 `VALIDATION_ERROR` | 對 |
@@ -955,3 +981,5 @@ URL              ?tab=donation&q=foo&category=animal
 | 0.3 | 2026-06-14 | Categories filter：§3.1 categories schema（6 keys hardcoded 對齊 backend 015 §7）+ `ListQuery.category` + queryKey 加 category + `useUrlSync` 加 category + mock handler filter + UI 串 [003k](./003k-filter-button.md) / [003m](./003m-category-menu.md) |
 | 0.4 | 2026-06-14 | 截圖補件配套：(a) categories 6 → 16；(b) per-resource schema 拆 `Charity` / `Donation` / `Item`（加 `coverImageUrl` / `charityId` / `charityName` / `priceTwd` / `categories[]`）；(c) `createListRoute` 從 `(upstreamPath)` 改 `{ upstreamPath, backendItemSchema, project }` 接收 per-resource Zod schema 與投影函式；(d) `BackendListItem` 拆 `BackendCharityListItem` / `BackendDonationListItem` / `BackendItemListItem` 三種 raw shape |
 | 0.4 | 2026-06-14 | 補件 IMG_4875-4883：§3.1 categories 6 → 16 + rename keys 對齊 displayName（`animal` → `animal_protection` 等）；§3.2 per-resource schema 拆分（Charity / Donation + cover/charity / Item + cover/charity/priceTwd），對應 spec 003e1/e2/e3 卡片 layout 差異 |
+| 0.5 | 2026-06-14 | **Per-tab limit**：`createListRoute` 加 `opts.limit?: number`（default 10）；三條 route 各設 `charity=10` / `donation=5` / `item=4`，理由：mobile 寬度下卡片視覺密度不同（row / 16:9 / 2 欄 square），需要不同的 batch size 才不會「滑一下就 fetch」或「滑很久才 fetch」。對應 brief.md v0.7 同步更新 |
+| 0.6 | 2026-06-15 | **Viewport-aware limits**：item tab 在 `md:` / `lg:` grid 由 2 → 3 → 4 欄變化，單一 limit 不夠 → 加 `opts.tabletLimit` / `desktopLimit`；item 設 `limit:4 / tabletLimit:6 / desktopLimit:12`；`ListQuery` 加 `viewport: enum(['mobile','tablet','desktop']).optional()`；新增 `useViewport()` hook（兩個 matchMedia：`min-width:768px` + `min-width:1024px`，對齊 Tailwind `md:` / `lg:`，SSR 預設 mobile）；`useResourceListInfinite` 接 `viewport` 並寫入 queryKey 與 URL；CharityListShell 頂層呼叫 `useViewport()` 串給三個 hook。對應 brief.md v0.8 |

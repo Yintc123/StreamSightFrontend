@@ -13,4 +13,6 @@ export const GET = createListRoute({
   upstream: '/v1/donation/charities',
   backendItemSchema: BackendCharityListItem,
   toClientItem: toClientCharity,
+  // Spec 002 §1.3 v0.3 — charity row layout, 10/page at mobile width.
+  limit: 10,
 })

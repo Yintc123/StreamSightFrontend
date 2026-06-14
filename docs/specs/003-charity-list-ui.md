@@ -176,7 +176,7 @@ export default async function Page({
 | 點「全部」option | 同上但 URL drop `?category=`、label 變「全部」 |
 | 點 menu 外區域 / Esc | menu 關閉，不改 category |
 | 列表為空 | `<EmptyState />` 取代列表，chrome 保留 |
-| 滑到距底 5–10% | scroll-percent sentinel 觸 fetchNextPage → 列尾 2 張 skeleton → 下一頁卡片接後面（每次 10 筆） |
+| 滑到距底 5–10% | scroll-percent sentinel 觸 fetchNextPage → 列尾 2 張 skeleton → 下一頁卡片接後面（per-tab 筆數，spec [002 §1.3 v0.5](./002-list-data.md#13-設計決策)：charity 10 / donation 5 / item 4） |
 | 到底 | sentinel 不再觸；不顯示「沒有更多」（Figma 無設計） |
 | 網路 / backend 錯 | 整片變 InlineError；retry 觸 refetch |
 | fetch-next-page 錯 | 卡片不洗掉，sentinel 處變 InlineError |
@@ -193,7 +193,7 @@ export default async function Page({
 | 2 | 輸入「動物保護」 | 等 ~400ms 後 URL 變 `?q=動物保護`、卡片只剩相關 |
 | 3 | 輸入「zxq」 | 顯示「查無相關資料」illustration + 副標 |
 | 4 | 按「取消」 | URL 回乾淨 `/donation`、卡片回完整列表 |
-| 5 | 捲動到距底 ≤10% | 第二頁 10 張卡片接在後面（fixture 至少 25 筆） |
+| 5 | 捲動到距底 ≤10%（charity tab） | 第二頁 10 張卡片接在後面（fixture 至少 25 筆）。donation tab 為 5 張、item tab 三檔：**mobile 4 / tablet 6 / desktop 12**（[002 §1.3 v0.6](./002-list-data.md#13-設計決策)） |
 | 6 | 重新整理 `?q=動物保護` | 仍顯示過濾後的卡片（refresh 保留搜尋） |
 | 7 | 點擊「捐款專案」tab | URL 變 `?tab=donation`；顯示 donation 列表；charity 那組 hook 不再打網路（spy network） |
 | 8 | 切回「公益團體」tab（30s 內） | 不打網路（cache hit）；列表狀態保留（scroll position 不變） |

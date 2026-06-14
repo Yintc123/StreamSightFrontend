@@ -28,10 +28,19 @@ export const RESOURCE_TO_PATH: Record<ResourceKey, string> = {
 // `cursor.max(1024)` matches backend 016 v0.13 §4.2 / §12 (the three-segment
 // base64url payload). Anything the backend emits as `nextCursor` must round-
 // trip through this validator unchanged — opaque to us.
+/** Viewport hint from client — BFF maps to per-resource limit (spec 002 §1.3 v0.6).
+ *  Buckets align with Tailwind breakpoints used by card grids:
+ *  - mobile : < 768px        (item grid 2 cols)
+ *  - tablet : 768 ~ 1023px   (item grid `md:grid-cols-3`)
+ *  - desktop: ≥ 1024px       (item grid `lg:grid-cols-4`) */
+export const ViewportHint = z.enum(['mobile', 'tablet', 'desktop'])
+export type ViewportHint = z.infer<typeof ViewportHint>
+
 export const ListQuery = z.object({
   q: z.string().max(80).optional(),
   cursor: z.string().max(1024).optional(),
   category: CategoryKeyEnum.optional(),
+  viewport: ViewportHint.optional(),
 })
 export type ListQuery = z.infer<typeof ListQuery>
 

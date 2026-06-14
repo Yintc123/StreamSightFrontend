@@ -131,7 +131,7 @@ File key：`0kx2Ne2rvndhfVr3uVUwad`
 - **詳情頁**（3 個，v0.6 補件後移入範圍） — 公益團體 / 捐款專案 / 義賣商品介紹（IMG_4876 / 4883 / 4882）
   - 路由：`/charities/:id` / `/donation-projects/:id` / `/sale-items/:id`
   - 詳細規格：[frontend spec 004 系列](./specs/004-detail-pages.md)
-- **無限滾動規格**：每個 tab 一開始抓 10 筆；scroll bar 距底剩 5%–10% 觸發再向 backend 要 10 筆
+- **無限滾動規格**：scroll bar 距底剩 5%–10% 觸發向 backend 要下一頁。Per-tab 筆數（mobile 寬度下對應卡片視覺密度）：charity **10 筆**（row 卡）/ donation **5 筆**（16:9 cover）/ item **4 筆**（2 欄 square grid）。**item 因 RWD grid 寬度變化額外分檔**：mobile (<768) **4**、tablet (768–1023, `md:grid-cols-3`) **6**、desktop (≥1024, `lg:grid-cols-4`) **12**，由 `useViewport()`（兩個 matchMedia 對齊 Tailwind `md:` / `lg:`）→ `?viewport=mobile\|tablet\|desktop` → BFF `tabletLimit` / `desktopLimit` 處理 — 詳見 [spec 002 §1.3 v0.6](./specs/002-list-data.md#13-設計決策)
 - **Tab 切換**：URL `?tab=charity|donation|item` 同步，refresh 保留；切到該 tab 才打網路（TanStack `enabled`），cache 保留
 - **Category bottom-sheet modal**：17 options（16 + 全部），3 欄 grid；URL `?category=<key>` 同步
 
@@ -150,4 +150,4 @@ File key：`0kx2Ne2rvndhfVr3uVUwad`
 
 ---
 
-最後更新：2026-06-14（v0.6 — 補件 IMG_4875-4883 截圖：3 個詳情頁納入範圍、category 6 → 16 + bottom-sheet modal、三 tab 卡片 layout 差異化、新欄位（聯絡資訊、核准字號、price、coverImage、content）；v0.5 補 filter dropdown 分類規格(M:N + 子表繼承)；v0.4 修正「分享」→「紀錄」對齊 Figma；v0.3 補無限滾動 10 筆 / 5–10% 觸發 + tab URL sync + lazy fetch）
+最後更新：2026-06-15（v0.8 — RWD viewport-aware：item 三檔（mobile 4 / tablet 6 / desktop 12），client `useViewport()` 兩個 matchMedia 對齊 Tailwind `md:` / `lg:`，BFF 用 `tabletLimit` / `desktopLimit`；v0.7 per-tab 無限滾動筆數：charity 10 / donation 5 / item 4，對應卡片視覺密度；v0.6 補件 IMG_4875-4883 截圖：3 個詳情頁納入範圍、category 6 → 16 + bottom-sheet modal、三 tab 卡片 layout 差異化、新欄位（聯絡資訊、核准字號、price、coverImage、content）；v0.5 補 filter dropdown 分類規格(M:N + 子表繼承)；v0.4 修正「分享」→「紀錄」對齊 Figma；v0.3 補無限滾動 10 筆 / 5–10% 觸發 + tab URL sync + lazy fetch）

@@ -25,6 +25,7 @@ import {
   type AnyResourceItem,
   RESOURCE_TO_PATH,
   type ResourceKey,
+  type ViewportHint,
 } from '@/lib/schemas/list'
 
 interface BffListPage {
@@ -41,6 +42,9 @@ export interface UseResourceListInfiniteOptions {
   q?: string
   category?: CategoryKey | null
   enabled?: boolean
+  /** Spec 002 §1.3 v0.6 — passed to BFF as `?viewport=`; lets server pick
+   * per-tab desktopLimit (currently only item: 4 / 12). */
+  viewport?: ViewportHint
 }
 
 export interface UseResourceListInfiniteResult {
@@ -58,7 +62,7 @@ export interface UseResourceListInfiniteResult {
 export function useResourceListInfinite(
   opts: UseResourceListInfiniteOptions,
 ): UseResourceListInfiniteResult {
-  const { resource, q, category, enabled = true } = opts
+  const { resource, q, category, enabled = true, viewport } = opts
   const path = RESOURCE_TO_PATH[resource]
   // Normalise empty / null inputs so the queryKey is stable
   // ('' and undefined produce the same cache slot).
@@ -66,7 +70,13 @@ export function useResourceListInfinite(
   const normalisedCategory = category ?? undefined
 
   const query = useInfiniteQuery<BffListPage, Error>({
-    queryKey: ['resource-list', resource, normalisedQ ?? '', normalisedCategory ?? ''],
+    queryKey: [
+      'resource-list',
+      resource,
+      normalisedQ ?? '',
+      normalisedCategory ?? '',
+      viewport ?? '',
+    ],
     enabled,
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal }) => {
@@ -74,6 +84,7 @@ export function useResourceListInfinite(
         q: normalisedQ,
         category: normalisedCategory,
         cursor: pageParam as string | undefined,
+        viewport,
       })
       const res = await fetch(url, { signal })
       if (!res.ok) {
@@ -103,12 +114,18 @@ export function useResourceListInfinite(
 
 function buildUrl(
   base: string,
-  params: { q?: string; category?: string; cursor?: string },
+  params: {
+    q?: string
+    category?: string
+    cursor?: string
+    viewport?: ViewportHint
+  },
 ): string {
   const search = new URLSearchParams()
   if (params.q) search.set('q', params.q)
   if (params.category) search.set('category', params.category)
   if (params.cursor) search.set('cursor', params.cursor)
+  if (params.viewport) search.set('viewport', params.viewport)
   const qs = search.toString()
   return qs ? `${base}?${qs}` : base
 }

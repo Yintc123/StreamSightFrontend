@@ -3,8 +3,9 @@
 // Generic Route-Handler factory for the three list endpoints (charities /
 // donations / items). Behaviour pinned by this test:
 //
-//   1. Forwards `q`, `cursor`, `category` to the upstream URL (limit fixed
-//      at 10 — spec 002 §1.3) and forwards `Accept-Language`.
+//   1. Forwards `q`, `cursor`, `category` to the upstream URL (limit
+//      defaults to 10, overridable per route via `opts.limit` — spec 002
+//      §1.3 v0.3) and forwards `Accept-Language`.
 //   2. Validates the upstream response against the supplied backend-item
 //      schema; mismatch → 502-shaped ContractViolationError.
 //   3. Maps inflated `categories: [{id, key, displayName}]` from backend
@@ -214,6 +215,98 @@ describe('createListRoute — happy path', () => {
     const res = await route(getReq('/api/charities'), noParams)
     const body = (await res.json()) as { data: { items: ClientItem[] } }
     expect(body.data.items[0]).not.toHaveProperty('logoUrl')
+  })
+
+  it('opts.tabletLimit / desktopLimit kick in per query.viewport', async () => {
+    // Spec 002 §1.3 v0.6 — item tab: limit:4 / tabletLimit:6 / desktopLimit:12.
+    const route = createListRoute({
+      upstream: '/v1/donation/sale-items',
+      backendItemSchema: BackendItemForTest,
+      toClientItem: (b): ClientItem => ({
+        id: b.id,
+        name: b.name,
+        description: b.description,
+        categories: [],
+      }),
+      limit: 4,
+      tabletLimit: 6,
+      desktopLimit: 12,
+    })
+    const captured: string[] = []
+    mockBackend(
+      'get',
+      'http://backend.test/v1/donation/sale-items',
+      async (req) => {
+        captured.push(new URL(req.url).searchParams.get('limit') ?? '')
+        return HttpResponse.json({
+          items: [],
+          pageInfo: { nextCursor: null, hasMore: false },
+        })
+      },
+    )
+    await route(getReq('/api/items'), noParams) // no viewport → mobile default
+    await route(getReq('/api/items?viewport=mobile'), noParams)
+    await route(getReq('/api/items?viewport=tablet'), noParams)
+    await route(getReq('/api/items?viewport=desktop'), noParams)
+    expect(captured).toEqual(['4', '4', '6', '12'])
+  })
+
+  it('viewport=tablet without opts.tabletLimit → falls back to limit', async () => {
+    const route = createListRoute({
+      upstream: '/v1/donation/charities',
+      backendItemSchema: BackendItemForTest,
+      toClientItem: (b): ClientItem => ({
+        id: b.id,
+        name: b.name,
+        description: b.description,
+        categories: [],
+      }),
+      limit: 10, // no tabletLimit / desktopLimit set
+    })
+    let captured: string | null = null
+    mockBackend(
+      'get',
+      'http://backend.test/v1/donation/charities',
+      async (req) => {
+        captured = new URL(req.url).searchParams.get('limit')
+        return HttpResponse.json({
+          items: [],
+          pageInfo: { nextCursor: null, hasMore: false },
+        })
+      },
+    )
+    await route(getReq('/api/charities?viewport=tablet'), noParams)
+    expect(captured).toBe('10')
+  })
+
+  it('per-route opts.limit overrides the default 10', async () => {
+    // Spec 002 §1.3 v0.3 — donation tab uses limit=5, item tab limit=4.
+    const routeWithLimit = createListRoute({
+      upstream: '/v1/donation/donation-projects',
+      backendItemSchema: BackendItemForTest,
+      toClientItem: (b): ClientItem => ({
+        id: b.id,
+        name: b.name,
+        description: b.description,
+        categories: [],
+      }),
+      limit: 5,
+    })
+    let capturedUrl: URL | undefined
+    mockBackend(
+      'get',
+      'http://backend.test/v1/donation/donation-projects',
+      async (req) => {
+        capturedUrl = new URL(req.url)
+        return HttpResponse.json({
+          items: [],
+          pageInfo: { nextCursor: null, hasMore: false },
+        })
+      },
+    )
+    const res = await routeWithLimit(getReq('/api/donations'), noParams)
+    expect(res.status).toBe(200)
+    expect(capturedUrl?.searchParams.get('limit')).toBe('5')
   })
 
   it('returns nextCursor=null on the last page', async () => {
