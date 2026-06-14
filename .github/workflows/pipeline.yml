@@ -260,10 +260,8 @@ jobs:
       - name: Substitute task definition placeholders
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
         run: |
           sed -i "s|REPLACE_ACCOUNT_ID|${AWS_ACCOUNT_ID}|g" "$TASK_DEFINITION"
-          sed -i "s|REPLACE_ALLOWED_ORIGINS|${ALLOWED_ORIGINS}|g" "$TASK_DEFINITION"
 
       - name: Render task definition (inject image)
         id: render
