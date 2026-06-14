@@ -6,7 +6,7 @@
   - BFF：`src/app/api/{charities,donations,items}/route.ts` + `src/lib/api/createListRoute.ts`
   - 資料層：`src/lib/schemas/list.ts`、`src/lib/api/client.ts`、`src/lib/query/list.ts`
   - Mock fixtures：`src/lib/mock/{charity,donation,item}-fixtures.ts`、`src/lib/mock/makeListHandler.ts`、`src/lib/mock/index.ts`
-  - Page 資料 prefetch：`src/app/charities/page.tsx`（含 `?tab=` 處理）
+  - Page 資料 prefetch：`src/app/donation/page.tsx`（含 `?tab=` 處理）
   - Provider：`src/app/providers.tsx`、`src/app/layout.tsx`
   - Hooks：`src/lib/hooks/useDebouncedValue.ts`、`src/lib/hooks/useUrlSync.ts`、`src/lib/hooks/useScrollPercentSentinel.ts`
 - **依賴**：
@@ -50,7 +50,7 @@
 | **搜尋 debounce 300ms** | 與 architecture.md §3 對齊 |
 | **TanStack Query `staleTime: 30_000`** | 30s 內回到同 q 直接 cache hit |
 | **Server-side prefetch 只預載 activeTab 第一頁** | TTFB 縮短一個 round trip；其他 tab 等切換時才打 |
-| **`activeTab='charity'` 是 default，不寫入 URL** | URL `/charities` 而非 `/charities?tab=charity` 較乾淨 |
+| **`activeTab='charity'` 是 default，不寫入 URL** | URL `/donation` 而非 `/donation?tab=charity` 較乾淨 |
 
 ---
 
@@ -555,10 +555,10 @@ registerMock('/v1/items', itemListHandler)
 
 ## 5. Server-side data prefetch
 
-`/charities` page 只 SSR-prefetch **activeTab** 的第一頁；其他 tab 等切換時 client 端首次 fetch。
+`/donation` page 只 SSR-prefetch **activeTab** 的第一頁；其他 tab 等切換時 client 端首次 fetch。
 
 ```ts
-// src/app/charities/page.tsx (資料邊界；UI 樹見 spec 003 §3)
+// src/app/donation/page.tsx (資料邊界；UI 樹見 spec 003 §3)
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query'
 import { fetchListPage } from '@/lib/api/client'
 import { RESOURCE_KEYS, type ResourceKey } from '@/lib/schemas/list'
@@ -766,7 +766,7 @@ useUrlSync({
 
 `activeTab === 'charity'`（default）→ URL 不帶 `?tab=`。
 `selectedCategory === null`（「全部」）→ URL 不帶 `?category=`。
-都不帶時 URL 為 `/charities`。
+都不帶時 URL 為 `/donation`。
 
 ### 7.3 `useScrollPercentSentinel`（**取代 v0.1 IntersectionObserver-rootMargin**）
 

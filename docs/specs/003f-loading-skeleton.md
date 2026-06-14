@@ -168,7 +168,7 @@ function ItemCardSkeleton() {
 |---|---|
 | [003j ResourceInfiniteList](./003j-charity-list.md) status === `pending` | `<LoadingSkeleton variant={resource} count={6} />` |
 | 同上 isFetchingNextPage | `<LoadingSkeleton variant={resource} count={2} />` |
-| `src/app/charities/loading.tsx` | `<LoadingSkeleton variant="charity" count={6} />`（default tab 是 charity）|
+| `src/app/donation/loading.tsx` | `<LoadingSkeleton variant="charity" count={6} />`（default tab 是 charity）|
 
 ---
 

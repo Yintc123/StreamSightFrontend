@@ -14,7 +14,7 @@
 
 ## 1. 目的
 
-定義 `/charities` 頁面的 UI 層：頁面組合、13 個元件 anatomy（design system + 11 UI + 2 features）、設計 token、RWD、e2e。**不**處理任何 schema / fetch / hook 邏輯（屬 [spec 002](./002-list-data.md)）。
+定義 `/donation` 頁面的 UI 層：頁面組合、13 個元件 anatomy（design system + 11 UI + 2 features）、設計 token、RWD、e2e。**不**處理任何 schema / fetch / hook 邏輯（屬 [spec 002](./002-list-data.md)）。
 
 ---
 
@@ -70,16 +70,16 @@
 
 ## 3. 頁面組合（page composition）
 
-`/` 重導 `/charities`；`/charities` 用 spec 002 §5 的 RSC prefetch + HydrationBoundary 包 shell：
+`/` 重導 `/donation`；`/donation` 用 spec 002 §5 的 RSC prefetch + HydrationBoundary 包 shell：
 
 ```tsx
 // src/app/page.tsx
 import { redirect } from 'next/navigation'
-export default function Home() { redirect('/charities') }
+export default function Home() { redirect('/donation') }
 ```
 
 ```tsx
-// src/app/charities/page.tsx  （資料邊界詳見 spec 002 §5）
+// src/app/donation/page.tsx  （資料邊界詳見 spec 002 §5）
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query'
 import { fetchListPage } from '@/lib/api/client'
 import { RESOURCE_KEYS, type ResourceKey } from '@/lib/schemas/list'
@@ -146,8 +146,8 @@ export default async function Page({
 
 ### 3.1 `loading.tsx` / `error.tsx`
 
-- `src/app/charities/loading.tsx`：渲染 `<TopNav />` + `<SearchBar value="" disabled />` + `<TabsRow active="charity" onTabChange={()=>{}} />` + `<LoadingSkeleton count={6} />`，避免 layout shift
-- `src/app/charities/error.tsx`：渲染 page chrome + `<InlineError onRetry={reset} />`
+- `src/app/donation/loading.tsx`：渲染 `<TopNav />` + `<SearchBar value="" disabled />` + `<TabsRow active="charity" onTabChange={()=>{}} />` + `<LoadingSkeleton count={6} />`，避免 layout shift
+- `src/app/donation/error.tsx`：渲染 page chrome + `<InlineError onRetry={reset} />`
 
 ---
 
@@ -180,10 +180,10 @@ export default async function Page({
 
 | # | 案例 | 期望 |
 |---|---|---|
-| 1 | 載入 `/` | 跳 `/charities`；第一屏看到至少 5 張 charity row card（含 logo 縮圖 + 名稱 + 描述） |
+| 1 | 載入 `/` | 跳 `/donation`；第一屏看到至少 5 張 charity row card（含 logo 縮圖 + 名稱 + 描述） |
 | 2 | 輸入「動物保護」 | 等 ~400ms 後 URL 變 `?q=動物保護`、卡片只剩相關 |
 | 3 | 輸入「zxq」 | 顯示「查無相關資料」illustration + 副標 |
-| 4 | 按「取消」 | URL 回乾淨 `/charities`、卡片回完整列表 |
+| 4 | 按「取消」 | URL 回乾淨 `/donation`、卡片回完整列表 |
 | 5 | 捲動到距底 ≤10% | 第二頁 10 張卡片接在後面（fixture 至少 25 筆） |
 | 6 | 重新整理 `?q=動物保護` | 仍顯示過濾後的卡片（refresh 保留搜尋） |
 | 7 | 點擊「捐款專案」tab | URL 變 `?tab=donation`；顯示 donation 列表；charity 那組 hook 不再打網路（spy network） |
@@ -227,8 +227,8 @@ export default async function Page({
 
 ### 6.2 整合
 
-- [ ] `/` → `/charities` 跳轉
-- [ ] `/charities` 預設顯示 charity tab；`/charities?tab=donation` 直接顯示 donation tab
+- [ ] `/` → `/donation` 跳轉
+- [ ] `/donation` 預設顯示 charity tab；`/donation?tab=donation` 直接顯示 donation tab
 - [ ] SSR 預載 activeTab 第一頁，hydrate 後不重打網路（用 spec 002 prefetch）
 - [ ] 視覺對齊 Figma `1:2226`（all）/ `1:2247`（searching）/ `1:2213`（no result）
 - [ ] 切 tab 行為符合 §5 case 7-9（lazy fetch、cache hit、URL sync）
@@ -244,7 +244,7 @@ export default async function Page({
 
 - 純展示元件（003b–003h、003e1/e2/e3、003k/l/m）：默認 server-renderable。`<SearchBar>` 與三個卡片元件（內部 state：input ref / image errored）+ `<FilterButton>` / `<CategoryMenu>` / `<TabsRow>`（互動 handler）需 `'use client'`
 - features（003i、003j）：一律 `'use client'`（hook 消費）
-- Page (`src/app/charities/page.tsx`)：Server Component，做 RSC prefetch
+- Page (`src/app/donation/page.tsx`)：Server Component，做 RSC prefetch
 
 ### 7.2 元件 vs feature 命名
 

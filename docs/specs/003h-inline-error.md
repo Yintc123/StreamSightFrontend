@@ -61,7 +61,7 @@ export function InlineError({
 |---|---|
 | [003j CharityList](./003j-charity-list.md) status === `error`（first page 失敗） | `message={error.message}`、`onRetry={refetch}` |
 | 同上 fetch-next-page 失敗（已有 cached 資料） | `message="載入下一頁失敗"`、`onRetry={fetchNextPage}` — 接在 sentinel 處而非取代列表 |
-| `src/app/charities/error.tsx`（Next 16 error boundary） | `onRetry={reset}` |
+| `src/app/donation/error.tsx`（Next 16 error boundary） | `onRetry={reset}` |
 
 ---
 
