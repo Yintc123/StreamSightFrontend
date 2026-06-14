@@ -1,8 +1,8 @@
 # Spec 003e2：DonationProjectCard
 
-- **狀態**：Draft（v0.2 — 截圖補件後修正：banner 改紅色半透明 overlay + 補 +N 規格 + 補 a11y 與測試）
+- **狀態**：Draft（v0.3 — cover image fallback 改為本地 mock SVG，封裝在共用 hook）
 - **路徑**：`src/components/ui/DonationProjectCard.tsx`
-- **依賴**：[003a Design System](./003a-design-system.md)、[002 §3.2 `Donation` schema](./002-list-data.md#3-schemas--srclibschemaslistts)、[003e Cards (index)](./003e-charity-card.md) §4 共同約定
+- **依賴**：[003a Design System](./003a-design-system.md)、[002 §3.2 `Donation` schema](./002-list-data.md#3-schemas--srclibschemaslistts)、[003e Cards (index)](./003e-charity-card.md) §4 共同約定、[003e4 Image Fallback](./003e4-image-fallback.md)
 - **Figma 對應**：IMG_4875（捐款專案 tab 列表卡片）
 - **複用性**：中
 
@@ -61,8 +61,7 @@ type DonationProjectCardProps = { item: Donation }
 |---|---|---|
 | Container（`<Link>`） | `<article>` 外、`<Link>` 內 | `<article>` `bg-surface-card rounded-xl overflow-hidden shadow-sm hover:shadow-md`<br>`<Link>` `flex flex-col w-full max-w-[345px] mx-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand rounded-xl` |
 | Image wrap | `<div>` | `relative w-full aspect-[16/9]` |
-| Cover image | `<img>` | `w-full h-full object-cover` |
-| Cover fallback | `<div>` | `absolute inset-0 bg-black/5 flex items-center justify-center text-ink-A`；中央放 `<HeartGlyph aria-hidden />` 或文字「無圖片」 |
+| Cover image | `<img>` | `w-full h-full object-cover`；src 由 [003e4 `useImageWithFallback`](./003e4-image-fallback.md#31-useimagewithfallbackprimary-fallback) 決定（缺/載入失敗 → 本地 mock SVG） |
 | **CharityName overlay** | `<div>` | `absolute inset-x-0 bottom-0 bg-brand-overlay text-white text-[13px] leading-5 px-3 py-1 truncate` |
 | Body | `<div>` | `flex flex-col gap-1 px-3 py-3` |
 | Title | `<h2>` | `text-base font-semibold text-ink-AAA leading-6 line-clamp-1` |
@@ -77,31 +76,33 @@ type DonationProjectCardProps = { item: Donation }
 
 ### 3.1 `<img>` 與 fallback
 
+cover image 永遠渲染 `<img>` —— src 缺失或 onError 時，hook 自動切到本地 mock SVG（漸層 + 愛心 glyph），詳見 [003e4](./003e4-image-fallback.md)。
+
 ```tsx
-<div className="relative w-full aspect-[16/9]">
-  {hasCover ? (
+const { src, onError } = useImageWithFallback(
+  item.coverImageUrl,
+  pickFallbackImage('donation', item.id),
+)
+
+return (
+  <div className="relative w-full aspect-[16/9]">
     <img
-      src={item.coverImageUrl}
+      src={src}
       alt=""                          /* 標題已表達主題 */
       loading="lazy"
       decoding="async"
-      onError={() => setImgFailed(true)}
+      onError={onError}
       className="w-full h-full object-cover"
     />
-  ) : (
-    <div
-      className="absolute inset-0 bg-black/5 flex items-center justify-center text-ink-A"
-      aria-hidden
-    >
-      <HeartGlyph className="w-10 h-10" />
+    <div className="absolute inset-x-0 bottom-0 bg-brand-overlay text-white
+                    text-[13px] leading-5 px-3 py-1 truncate">
+      {item.charityName}
     </div>
-  )}
-  <div className="absolute inset-x-0 bottom-0 bg-brand-overlay text-white
-                  text-[13px] leading-5 px-3 py-1 truncate">
-    {item.charityName}
   </div>
-</div>
+)
 ```
+
+> 不再需要 `useState(imgFailed)` + conditional render；`<img>` 永遠在 DOM，src 由 hook 切換。
 
 ### 3.2 Categories `+N` 渲染規則
 
@@ -146,8 +147,8 @@ type DonationProjectCardProps = { item: Donation }
 
 | 條件 | 行為 |
 |---|---|
-| `coverImageUrl` `undefined` | 不渲染 `<img>`；渲染 fallback `<div>`；overlay 依然疊在 fallback 底部 |
-| `coverImageUrl` 載入失敗 | `onError` → 切 fallback `<div>` |
+| `coverImageUrl` `undefined` / 空字串 | `<img src>` 直接用 mock SVG（[003e4](./003e4-image-fallback.md)）；overlay 依然疊在 img 底部 |
+| `coverImageUrl` 載入失敗（404/CORS/network） | `<img onError>` → src 切到 mock SVG |
 | `charityName` 超長 | overlay 內 `truncate`（單行） |
 | `name`（title）超長 | `line-clamp-1` |
 | `description` 超長 | `line-clamp-2` |
@@ -172,7 +173,8 @@ type DonationProjectCardProps = { item: Donation }
 | # | 案例 | 期望 |
 |---|---|---|
 | 1 | 渲染 cover image | `<img src={coverImageUrl} alt="">` 在 DOM |
-| 2 | `coverImageUrl` `undefined` | 不渲染 `<img>`；渲染 fallback `<div aria-hidden>`（含 HeartGlyph） |
+| 2a | `coverImageUrl` `undefined` | `<img>` 仍渲染；src 為 `/mock-images/donation/[1-6].svg` |
+| 2b | `coverImageUrl` `onError` | src 切到 `/mock-images/donation/[1-6].svg` |
 | 3 | 渲染 charityName overlay | overlay `<div>` 內含 `item.charityName`；`bg-brand-overlay text-white` |
 | 4 | charityName 超長 | overlay `<div>` 含 `truncate` class |
 | 5 | 渲染 h2 title | `screen.getByRole('heading', { level: 2 })` 為 `item.name` |
@@ -201,3 +203,4 @@ type DonationProjectCardProps = { item: Donation }
 |---|---|---|
 | 0.1 | 2026-06-14 | 初版：誤判 charityName 為圖片下方淺色 banner（`bg-brand-soft`） |
 | 0.2 | 2026-06-14 | 截圖 IMG_4875 重新判讀：charityName 是**圖片底部紅色半透明 overlay 白字**；banner 規格改為 `absolute inset-x-0 bottom-0 bg-brand-overlay text-white`；補 `+N` chip 完整渲染規則與文字（純 `+{N}`）；補 HeartGlyph category chip 前置 icon；補完整 13 個測試案例；撤回 `bg-brand-soft`（[003a v0.3](./003a-design-system.md#9-變更紀錄)） |
+| 0.3 | 2026-06-14 | cover image fallback 由「conditional `<div>` + HeartGlyph」改為「`<img>` 永遠渲染、src 由 [003e4 `useImageWithFallback`](./003e4-image-fallback.md) 切到本地 mock SVG」；移除 `useState(imgFailed)` + conditional render，hook 封裝；測試 #2 拆 2a / 2b 涵蓋缺值與 onError 兩條路徑 |

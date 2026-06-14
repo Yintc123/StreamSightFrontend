@@ -1,6 +1,6 @@
 # Spec 003e1：CharityCard
 
-- **狀態**：Draft（v0.2 — 截圖補件補 fallback DOM / a11y / 完整測試）
+- **狀態**：Draft（v0.3 — 確認 charity logo fallback 維持首字塊，不採用 mock SVG）
 - **路徑**：`src/components/ui/CharityCard.tsx`
 - **依賴**：[003a Design System](./003a-design-system.md)、[002 §3.2 `Charity` schema](./002-list-data.md#3-schemas--srclibschemaslistts)、[003e Cards (index)](./003e-charity-card.md) §4 共同約定
 - **Figma 對應**：IMG_4880（公益團體 tab 卡片背景）
@@ -39,6 +39,8 @@ type CharityCardProps = { item: Charity }
 > 對應資料：title = `item.name`、tagline = `item.description ?? ''`。`description` 缺 / 空字串時 **不渲染** `<p>`（不留空白行）。
 
 ### 3.1 Logo / fallback DOM
+
+> v0.3 註：CharityCard 不採用 [003e4](./003e4-image-fallback.md) 的 mock SVG 路線。理由：logo 屬品牌識別，泛用 mock 圖反而干擾辨識；首字塊（`AC` / `財` / `🌱`）視覺更接近「占位」直覺，也能保留 NPO 縮寫品牌感（IMG_4880 截圖中 ACC / ASGL 等本來就是字母縮寫風格）。
 
 「fallback」啟動的兩條路徑：
 - `item.logoUrl` 為 `undefined`、空字串、或不是有效 URL：**初始**就渲染 fallback `<div>`，不渲染 `<img>`
@@ -223,3 +225,4 @@ export function getCharityInitial(name: string): string {
 |---|---|---|
 | 0.1 | 2026-06-13 | 初版（row + logo + 1 行 tagline；fallback 文字「首字母」未明） |
 | 0.2 | 2026-06-14 | 截圖補件後補：fallback `<div>` 完整 DOM 與 className、`getCharityInitial` 純函式規格與 8 個測試案例、`description` 空字串不渲染 `<p>`、focus-visible 紅框、`<img>` 用 `loading="lazy"` |
+| 0.3 | 2026-06-14 | 與 donation/item 卡的「mock SVG fallback」（[003e4](./003e4-image-fallback.md)）路線分流：CharityCard **維持首字塊**，理由補在 §3.1 開頭。實作 / 測試不變 |

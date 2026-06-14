@@ -55,4 +55,3 @@ export function CharityCard({ item }: CharityCardProps) {
     </article>
   )
 }
-

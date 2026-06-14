@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { SaleItemCard } from './SaleItemCard'
 import type { Item } from '@/lib/schemas/list'
 
@@ -41,10 +41,21 @@ describe('SaleItemCard', () => {
     )
   })
 
-  it('coverImageUrl 缺 → fallback <div aria-hidden>', () => {
+  it('coverImageUrl 缺 → 渲染 mock fallback img（/mock-images/item/）', () => {
     const { container } = render(<SaleItemCard item={makeItem()} />)
-    expect(container.querySelector('img')).toBeNull()
-    expect(container.querySelector('[aria-hidden]')).toBeTruthy()
+    const img = container.querySelector('img')!
+    expect(img.getAttribute('src')).toMatch(/^\/mock-images\/item\/[1-6]\.svg$/)
+  })
+
+  it('cover image onError → src 切到 mock fallback', () => {
+    const { container } = render(
+      <SaleItemCard
+        item={makeItem({ coverImageUrl: 'https://broken/p.jpg' })}
+      />,
+    )
+    const img = container.querySelector('img')!
+    fireEvent.error(img)
+    expect(img.getAttribute('src')).toMatch(/^\/mock-images\/item\/[1-6]\.svg$/)
   })
 
   it('ribbon 渲染「公益標籤」白字 brand 紅底', () => {

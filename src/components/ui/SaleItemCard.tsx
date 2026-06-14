@@ -1,15 +1,18 @@
 'use client'
-import { useState } from 'react'
 import Link from 'next/link'
 import type { Item } from '@/lib/schemas/list'
+import { useImageWithFallback } from './useImageWithFallback'
+import { pickFallbackImage } from '@/lib/mock/fallback-images'
 
 type SaleItemCardProps = { item: Item }
 
 const priceFmt = new Intl.NumberFormat('zh-TW')
 
 export function SaleItemCard({ item }: SaleItemCardProps) {
-  const [imgFailed, setImgFailed] = useState(false)
-  const hasCover = !!item.coverImageUrl && !imgFailed
+  const { src, onError } = useImageWithFallback(
+    item.coverImageUrl,
+    pickFallbackImage('item', item.id),
+  )
 
   return (
     <article className="bg-surface-card rounded-xl overflow-hidden border border-line">
@@ -20,22 +23,15 @@ export function SaleItemCard({ item }: SaleItemCardProps) {
                    rounded-xl"
       >
         <div className="relative w-full aspect-square">
-          {hasCover ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={item.coverImageUrl}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              onError={() => setImgFailed(true)}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div
-              aria-hidden
-              className="absolute inset-0 bg-black/5 flex items-center justify-center text-ink-A"
-            />
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={onError}
+            className="w-full h-full object-cover"
+          />
           <div
             className="absolute top-2 left-0 px-2 py-[2px] bg-brand text-white
                        text-[11px] leading-4 rounded-r-md shadow-sm"

@@ -1,8 +1,9 @@
 'use client'
-import { useState } from 'react'
 import Link from 'next/link'
 import type { Donation } from '@/lib/schemas/list'
 import { CATEGORY_LABELS } from '@/lib/schemas/categories'
+import { useImageWithFallback } from './useImageWithFallback'
+import { pickFallbackImage } from '@/lib/mock/fallback-images'
 
 type DonationProjectCardProps = { item: Donation }
 
@@ -20,8 +21,10 @@ function HeartGlyph({ className }: { className?: string }) {
 }
 
 export function DonationProjectCard({ item }: DonationProjectCardProps) {
-  const [imgFailed, setImgFailed] = useState(false)
-  const hasCover = !!item.coverImageUrl && !imgFailed
+  const { src, onError } = useImageWithFallback(
+    item.coverImageUrl,
+    pickFallbackImage('donation', item.id),
+  )
   const cats = item.categories ?? []
   const visibleCats = cats.slice(0, 3)
   const overflow = cats.length - visibleCats.length
@@ -35,24 +38,15 @@ export function DonationProjectCard({ item }: DonationProjectCardProps) {
                    rounded-xl"
       >
         <div className="relative w-full aspect-[16/9]">
-          {hasCover ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={item.coverImageUrl}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              onError={() => setImgFailed(true)}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div
-              aria-hidden
-              className="absolute inset-0 bg-black/5 flex items-center justify-center text-ink-A"
-            >
-              <HeartGlyph className="w-10 h-10" />
-            </div>
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={onError}
+            className="w-full h-full object-cover"
+          />
           <div
             className="absolute inset-x-0 bottom-0 bg-brand-overlay text-white
                        text-[13px] leading-5 px-3 py-1 truncate"

@@ -52,7 +52,7 @@ describe('CharityCard', () => {
     expect(fallback.textContent).toBe('AC')
   })
 
-  it('<img> onError → 切到 fallback', () => {
+  it('<img> onError → 切到首字母 fallback', () => {
     const { container } = render(
       <CharityCard
         item={makeCharity({ logoUrl: 'https://broken.example/x.png' })}
