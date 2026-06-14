@@ -1,4 +1,8 @@
-name: CI
+name: Pipeline
+
+# Frontend CI + CD merged into a single workflow (same shape as backend's
+# pipeline.yml). Deploy job gates on lint-typecheck + test + e2e + build via
+# `needs:` and runs only on push/dispatch to main.
 
 on:
   push:
@@ -8,7 +12,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: pipeline-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -16,6 +20,18 @@ env:
   # pnpm version comes from package.json `packageManager` field — single source
   # of truth, also honored by Corepack locally. Don't pass `version:` to
   # pnpm/action-setup or it errors with ERR_PNPM_BAD_PM_VERSION.
+
+  # Deploy-only vars (consumed by the deploy job).
+  AWS_REGION: ap-southeast-2
+  ECR_REPOSITORY: jko_frontend
+  ECS_CLUSTER: warmhearted-crocodile-18gqvo-jko-cluster
+  ECS_SERVICE: REPLACE_AFTER_FIRST_DEPLOY
+  CONTAINER_NAME: jko-frontend
+  TASK_DEFINITION: .aws/task-definition.json
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   lint-typecheck:
@@ -189,3 +205,100 @@ jobs:
 
       - name: Build Next.js
         run: pnpm build
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Deploy to ECS Fargate (per ADR 008 / 010).
+  # Only on main + after all CI jobs pass.
+  # PRs skip (event != push), feature branches skip (ref != main).
+  # No migration step here — frontend has no DB schema. Just build → push
+  # → register → UpdateService.
+  # ───────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to ECS
+    needs: [lint-typecheck, test, e2e, build]
+    runs-on: ubuntu-latest
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push image
+        id: build
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          if aws ecr describe-images \
+               --repository-name "$ECR_REPOSITORY" \
+               --image-ids "imageTag=$IMAGE_TAG" \
+               --region "$AWS_REGION" >/dev/null 2>&1; then
+            echo "Image $IMAGE already in ECR, skipping build & push (idempotent re-run)"
+          else
+            docker build \
+              --build-arg BUILD_GIT_SHA="$IMAGE_TAG" \
+              --build-arg BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              --build-arg BUILD_VERSION="$IMAGE_TAG" \
+              -t "$IMAGE" .
+            docker push "$IMAGE"
+          fi
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Substitute task definition placeholders
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
+        run: |
+          sed -i "s|REPLACE_ACCOUNT_ID|${AWS_ACCOUNT_ID}|g" "$TASK_DEFINITION"
+          sed -i "s|REPLACE_ALLOWED_ORIGINS|${ALLOWED_ORIGINS}|g" "$TASK_DEFINITION"
+
+      - name: Render task definition (inject image)
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build.outputs.image }}
+
+      - name: Register task definition
+        id: register
+        env:
+          RENDERED: ${{ steps.render.outputs.task-definition }}
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "file://$RENDERED" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "Registered: $TASK_DEF_ARN"
+          echo "arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Update ECS service (rolling deploy)
+        env:
+          TASK_DEF_ARN: ${{ steps.register.outputs.arn }}
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "$TASK_DEF_ARN" \
+            --force-new-deployment >/dev/null
+
+          echo "::group::Waiting for service to stabilise"
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"
+          echo "::endgroup::"
+
+          echo "Deployment complete: $TASK_DEF_ARN"
