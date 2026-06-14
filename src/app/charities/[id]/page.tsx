@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import { TopNav } from '@/components/ui/TopNav'
 import { CATEGORY_LABELS } from '@/lib/schemas/categories'
 import { findCharityById } from '@/lib/mock/find-by-id'
-import { getCharityInitial } from '@/components/ui/CharityCard'
+import { getCharityInitial } from '@/components/ui/charity-initial'
 
 type PageProps = { params: Promise<{ id: string }> }
 
