@@ -23,6 +23,9 @@ for (const tier of ['mobile', 'tablet', 'desktop'] as const) {
 
     test(`公益團體 (charity) 欄數 - ${tier}`, async ({ page }) => {
       await page.goto('/donation')
+      // Wait for the first card to render before measuring grid — otherwise
+      // the spinner div (no grid) is what the selector hits.
+      await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible()
       const cols = await getGridCols(page, 'main > div > div:not([hidden])')
       const expected = { mobile: 1, tablet: 2, desktop: 3 }[tier]
       expect(cols).toBe(expected)
@@ -30,6 +33,7 @@ for (const tier of ['mobile', 'tablet', 'desktop'] as const) {
 
     test(`義賣商品 (item) 欄數 - ${tier}`, async ({ page }) => {
       await page.goto('/donation?tab=item')
+      await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible()
       const cols = await getGridCols(page, 'main > div > div:not([hidden])')
       const expected = { mobile: 2, tablet: 3, desktop: 4 }[tier]
       expect(cols).toBe(expected)
