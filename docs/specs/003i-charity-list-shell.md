@@ -1,6 +1,6 @@
 # Spec 003i：CharityListShell（feature）
 
-- **狀態**：Draft（v0.7 — 加 browse vs search 兩模式 layout（Figma 對齊：TabsRow 提到 filter 列之上、search 模式 FilterButton 隱藏 / SearchBar 在 TabsRow 之上）；新增 `isSearching` state）
+- **狀態**：Draft（v0.8 — search 模式 + 空 q 不渲染卡片，改顯示「請輸入關鍵字搜尋」EmptyState；對齊 iOS Mail / Apple HIG）
 - **路徑**：`src/components/features/CharityListShell.tsx`
 - **依賴**：
   - [003a Design System](./003a-design-system.md)
@@ -155,11 +155,26 @@ export function CharityListShell({
 
 | 動作 | 結果 |
 |---|---|
-| 點放大鏡 icon (browse) | `setIsSearching(true)` → SearchBar mount + autoFocus；FilterButton 從 DOM 消失 |
+| 點放大鏡 icon (browse) | `setIsSearching(true)` → SearchBar mount + autoFocus；FilterButton 從 DOM 消失；藍色「取消」按鈕**立即出現**（[003c v0.3](./003c-searchbar.md#5-變體) 取消鈕顯示規則） |
 | 點「取消」(search) | onCancel：`setDraft('')` + `setIsSearching(false)` → 回 browse 模式 |
 | `initialQ.length > 0`（URL 有 `?q=`） | `useState(initialQ.length > 0)` → 直接以 search 模式啟動，input 帶值 |
 | 切 tab | 兩模式都允許切 tab（tab 在 search 模式仍可見、可點） |
 | 開 CategoryMenu | 僅 browse 模式可達（search 模式無 FilterButton） |
+
+#### Search 模式 + 空 q 的 list 行為（v0.8 新增）
+
+進 search 模式但 `q === ''`（user 還沒打字）時，list 區域**不渲染卡片**，顯示 EmptyState「請輸入關鍵字搜尋」：
+
+```tsx
+if (isSearching && !q) {
+  return <EmptyState illustration="/figma/empty-no-data.png" title="請輸入關鍵字搜尋" />
+}
+```
+
+為什麼不渲染原始列表：
+- iOS Mail / Messages 進 search 模式預設清空畫面、僅顯示 recent searches 或 suggestion；本作業沒有 recent searches，用 EmptyState 替代
+- user 已表態「我要搜尋」→ 繼續看完整列表反而干擾，預設「等你打字」更專注
+- 對齊 Apple HIG「Search behavior」：search 模式 = filter / focus 模式，非「同時瀏覽 + 搜尋」
 
 #### 為什麼 SearchBar 不持有 isSearching state
 
@@ -342,6 +357,7 @@ FilterButton label 更新為「動物保護 ▼」
 | 0.5 | 2026-06-14 | 文案校正：所有 category key 範例從 `'animal'` 改為 [002 v0.4](./002-list-data.md) 的 `'animal_protection'`，label 範例「流浪動物」改「動物保護」對齊 002 §3.1 `CATEGORY_LABELS` |
 | 0.6 | 2026-06-14 | 新增 §10「上一頁狀態還原」設計：URL 持久化 tab/q/category + browser 自動 scroll restore；preview 階段以 `src/app/donation/PreviewShell.tsx` 暫代本元件，spec 002 §6 hooks 完成後改寫為本 spec 規格 |
 | 0.7 | 2026-06-14 | 加 browse vs search 兩模式 layout 對齊 Figma IMG_4875：(1) browse 模式 TabsRow 提到 FilterButton + 搜尋 icon 之上；(2) 點放大鏡 icon 進 search 模式 — FilterButton 完全消失、SearchBar 全寬 autoFocus 在 TabsRow 之上；(3) 取消按鈕回 browse + 清空 q；(4) `useState(initialQ.length > 0)` 讓 URL `?q=` 直接以 search 模式啟動；(5) 新 `<SearchIconButton>` 元件規格放 §3.4；(6) [003c v0.2](./003c-searchbar.md) SearchBar 加 `autoFocus` prop |
+| 0.8 | 2026-06-14 | (1) §3.4 Transition 表標注「進 search 模式後藍色取消按鈕**立即**出現」，對齊 [003c v0.3](./003c-searchbar.md#5-變體) 取消鈕顯示規則修正；(2) 新 §3.4「Search 模式 + 空 q 的 list 行為」— search 模式且 `q===''` 時 list 不渲染卡片、顯示 `<EmptyState title="請輸入關鍵字搜尋" />`，對齊 iOS Mail / Apple HIG search behavior；(3) `<ListPanel>` 多接 `isSearching` prop 控分支 |
 
 ---
 

@@ -49,7 +49,7 @@ export function SearchBar({
                      text-ink-AAA placeholder:text-ink-A focus:outline-none"
         />
       </div>
-      {value && (
+      {onCancel && (
         <button
           type="button"
           onClick={handleCancel}

@@ -16,13 +16,19 @@ describe('SearchBar', () => {
     expect(onChange).toHaveBeenLastCalledWith('a')
   })
 
-  it('value="" 時取消按鈕不渲染', () => {
-    render(<SearchBar value="" onChange={() => {}} />)
+  it('沒傳 onCancel → 取消按鈕不渲染（不管 value）', () => {
+    const { rerender } = render(<SearchBar value="" onChange={() => {}} />)
+    expect(screen.queryByRole('button', { name: '取消' })).toBeNull()
+    rerender(<SearchBar value="x" onChange={() => {}} />)
     expect(screen.queryByRole('button', { name: '取消' })).toBeNull()
   })
 
-  it('value="x" 時取消按鈕渲染', () => {
-    render(<SearchBar value="x" onChange={() => {}} />)
+  it('傳了 onCancel → 取消按鈕始終渲染（含 value=""）', () => {
+    const { rerender } = render(
+      <SearchBar value="" onChange={() => {}} onCancel={() => {}} />,
+    )
+    expect(screen.getByRole('button', { name: '取消' })).toBeInTheDocument()
+    rerender(<SearchBar value="foo" onChange={() => {}} onCancel={() => {}} />)
     expect(screen.getByRole('button', { name: '取消' })).toBeInTheDocument()
   })
 

@@ -108,9 +108,27 @@ export function PreviewShell({
         onClose={() => setMenuOpen(false)}
       />
       <div className="flex-1">
-        <ListPanel resource="charity" active={activeTab === 'charity'} items={filteredCharities} q={q} />
-        <ListPanel resource="donation" active={activeTab === 'donation'} items={filteredDonations} q={q} />
-        <ListPanel resource="item" active={activeTab === 'item'} items={filteredItems} q={q} />
+        <ListPanel
+          resource="charity"
+          active={activeTab === 'charity'}
+          items={filteredCharities}
+          q={q}
+          isSearching={isSearching}
+        />
+        <ListPanel
+          resource="donation"
+          active={activeTab === 'donation'}
+          items={filteredDonations}
+          q={q}
+          isSearching={isSearching}
+        />
+        <ListPanel
+          resource="item"
+          active={activeTab === 'item'}
+          items={filteredItems}
+          q={q}
+          isSearching={isSearching}
+        />
       </div>
       <BrandFooter />
     </div>
@@ -148,13 +166,25 @@ function ListPanel<T extends Charity | Donation | Item>({
   active,
   items,
   q,
+  isSearching,
 }: {
   resource: ResourceKey
   active: boolean
   items: T[]
   q: string
+  isSearching: boolean
 }) {
   if (!active) return <div hidden aria-hidden />
+
+  // search 模式 + 還沒打字：不渲染卡片，顯示提示（iOS Mail / Apple HIG 慣例）
+  if (isSearching && !q) {
+    return (
+      <EmptyState
+        illustration="/figma/empty-no-data.png"
+        title="請輸入關鍵字搜尋"
+      />
+    )
+  }
 
   if (items.length === 0) {
     return (
