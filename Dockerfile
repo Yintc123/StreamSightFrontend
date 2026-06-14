@@ -18,7 +18,10 @@ WORKDIR /app
 # (sharp's image processing, swc on alpine etc.).
 RUN apk add --no-cache libc6-compat
 
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml carries `onlyBuiltDependencies: [sharp]` (pnpm 11+
+# allow-build manifest). Without it pnpm enters its safer-default path and
+# either refuses to run native postinstalls or warns/errors during install.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable && \
     pnpm install --frozen-lockfile
 
