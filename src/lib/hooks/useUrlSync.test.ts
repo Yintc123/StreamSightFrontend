@@ -3,10 +3,12 @@ import { renderHook } from '@testing-library/react'
 
 const replaceMock = vi.fn()
 let currentSearch = ''
+const MOCK_PATHNAME = '/donation'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: replaceMock }),
   useSearchParams: () => new URLSearchParams(currentSearch),
+  usePathname: () => MOCK_PATHNAME,
 }))
 
 import { useUrlSync } from './useUrlSync'
@@ -40,7 +42,9 @@ describe('useUrlSync', () => {
     renderHook(() =>
       useUrlSync({ q: 'foo', tab: undefined, category: undefined }),
     )
-    expect(replaceMock).toHaveBeenCalledWith('?q=foo', { scroll: false })
+    expect(replaceMock).toHaveBeenCalledWith('/donation?q=foo', {
+      scroll: false,
+    })
   })
 
   it('tab + category 從空 URL 寫入', () => {
@@ -73,7 +77,7 @@ describe('useUrlSync', () => {
     renderHook(() =>
       useUrlSync({ q: '', tab: undefined, category: undefined }),
     )
-    expect(replaceMock).toHaveBeenCalledWith('', { scroll: false })
+    expect(replaceMock).toHaveBeenCalledWith('/donation', { scroll: false })
   })
 
   it('scroll: false 始終為 true（避免每次 URL 變動都 scroll-to-top）', () => {

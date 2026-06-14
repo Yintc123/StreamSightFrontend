@@ -34,6 +34,15 @@ test('切 tab → URL ?tab=item；直接訪問該 URL 也顯示同 tab', async (
   )
 })
 
+test('從 item tab 切回 charity（default）→ URL drop ?tab=', async ({ page }) => {
+  // 防呆 useUrlSync 在 default tab 時清不掉 querystring 的 regression
+  await page.goto('/donation?tab=item')
+  await page.getByRole('tab', { name: '公益團體' }).click()
+  await expect(page).not.toHaveURL(/[?&]tab=/)
+  await page.waitForTimeout(500)
+  await expect(page).not.toHaveURL(/[?&]tab=/)
+})
+
 test('進 item 詳情後返回 → 仍在義賣商品 tab', async ({ page }) => {
   await page.goto('/donation')
   await page.getByRole('tab', { name: '義賣商品' }).click()

@@ -1,6 +1,6 @@
 'use client'
 import { useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 /**
  * Spec 002 §7.2 — useUrlSync
@@ -23,6 +23,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 export function useUrlSync(params: Record<string, string | undefined>): void {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const depsValues = Object.values(params)
 
   useEffect(() => {
@@ -34,9 +35,11 @@ export function useUrlSync(params: Record<string, string | undefined>): void {
     const newQs = next.toString()
     const currentQs = searchParams.toString()
     if (newQs === currentQs) return // 已同步，避免無限 loop
-    router.replace(newQs ? `?${newQs}` : '', { scroll: false })
+    // 帶上 pathname：router.replace('') 不會清掉 querystring（保持 current URL），
+    // 必須用 `${pathname}` 才能真正 drop 全部 params。
+    router.replace(newQs ? `${pathname}?${newQs}` : pathname, { scroll: false })
     // params is a fresh object each render; flatten value-deps so the effect
     // only re-fires when an actual value changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, searchParams, ...depsValues])
+  }, [router, searchParams, pathname, ...depsValues])
 }
