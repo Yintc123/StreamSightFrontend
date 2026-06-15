@@ -38,7 +38,7 @@
 │      │ [   建立帳號   ] │        │ ← outline brand
 │      └─────────────────┘        │
 │                                 │
-│         我不想登入              │ ← link → /donation
+│         demo              │ ← link → /donation
 │                                 │
 └─────────────────────────────────┘
 ```
@@ -53,7 +53,7 @@
 | 帳號 / 密碼任一空 | 「登入後台」按鈕 `disabled` |
 | 兩欄都有值 + 按「登入後台」 | `POST /api/dev/login` → 200 → `router.push('/dashboard')`；非 200 → 顯示 inline `<p role="alert">登入失敗 (HTTP {code})</p>`、不跳轉 |
 | 按「建立帳號」 | `router.push('/admin')`，**不**打 API |
-| 按「我不想登入」 | `<Link href="/donation">`，普通 navigate |
+| 按「demo」 | `<Link href="/donation">`，普通 navigate |
 | 登入 in-flight | 按鈕文字「登入中…」、disabled，避免重複送出（`useTransition` 管 isPending） |
 
 > **帳密目前是 cosmetic** — `/api/dev/login` 不收 payload，client 端只做「非空」前端驗證。未來若接真實登入，這支 endpoint / hook 換掉即可，UI 不需動。
@@ -159,7 +159,7 @@ export function useSmartBack(fallback: string = '/'): () => void {
 |---|---|
 | `/ 顯示登入卡片 + skip link 可進 /donation` | header / 帳密欄 / 兩顆按鈕 / skip link → /donation |
 | `/donation 直接訪問按返回 → 跳 /（smart back fallback）` | §4.2 + §4.4 「直接訪問」列 |
-| `/ → 我不想登入 → /donation 按返回 → 回 /（smart back via router.back）` | §4.2 + §4.4 「站內 nav」列 |
+| `/ → demo → /donation 按返回 → 回 /（smart back via router.back）` | §4.2 + §4.4 「站內 nav」列 |
 
 > 原本「`/` redirects to /donation」的 e2e 改寫，因為 redirect 不再發生。
 
@@ -178,7 +178,7 @@ export function useSmartBack(fallback: string = '/'): () => void {
 - ~~**真實註冊 / 登入流程**：`/admin` 想接真註冊表單時要決定 `POST /api/auth/register` shape（backend 目前無此 endpoint）；本 spec 範圍只到 placeholder~~ → ✅ 已於 [spec 007](./007-register-page.md) 收斂（UI / BFF / backend contract 全套），等 backend 實作即可替換
 - **session 過期**：dashboard 沒做 session check；現在進 `/dashboard` 不會驗證 cookie 是否還有效。可加 RSC `await getSessionService().get()` → 沒 session 就 `redirect('/')`
 - **登入後 redirect 來源**：目前固定跳 `/dashboard`；如果想做「登入前嘗試訪問 X 頁，登入後跳回 X」，需要在 query 帶 `?next=`
-- **「我不想登入」UX**：底線連結比較像「skip link」風格；若評審覺得需要更明顯的「訪客模式」按鈕，可改成 outline button
+- **「demo」UX**：底線連結比較像「skip link」風格；若評審覺得需要更明顯的「訪客模式」按鈕，可改成 outline button
 
 ---
 
@@ -188,3 +188,4 @@ export function useSmartBack(fallback: string = '/'): () => void {
 |---|---|---|
 | 0.1 | 2026-06-15 | 初版：`/` 改首頁登入入口（取代 redirect），加 `LoginCard` + `/admin` / `/dashboard` placeholder；smoke e2e 同步改寫 |
 | 0.2 | 2026-06-15 | 新增 §4 Smart Back Navigation：`useInAppNav` Context（pathname diff in-memory tracking）+ `useSmartBack(fallback)` hook；TopNav 預設改用之（[003b v0.3](./003b-topnav.md)）；CharityListShell 拿掉手動 `onBack`；補 §4.4 行為矩陣 + §5.2/§5.3 測試清單 |
+| 0.3 | 2026-06-16 | skip link 文案「我不想登入」→「demo」（更直白表達訪客 / 展示模式；與作業繳交「附 demo 連結」的脈絡更一致）。`src/app/page.tsx`、`tests/e2e/smoke.spec.ts`、`docs/brief.md` §3、本 spec §2 ASCII + §3 行為表 + §4.4 / §6 行文同步 |

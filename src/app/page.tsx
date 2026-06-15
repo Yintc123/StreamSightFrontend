@@ -29,7 +29,7 @@ export default function HomePage() {
           className="text-sm leading-5 text-ink-link underline underline-offset-2
                      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand rounded"
         >
-          我不想登入
+          demo
         </Link>
       </main>
     </div>
