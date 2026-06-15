@@ -1,11 +1,13 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import type { Metadata } from 'next'
+import { ExpandableText } from '@/components/ui/ExpandableText'
+import { ShareIconButton } from '@/components/ui/ShareIconButton'
 import { TopNav } from '@/components/ui/TopNav'
 import { fetchCharityDetail } from '@/lib/api/getDetail'
 import { NotFoundError } from '@/lib/errors/NotFoundError'
 import type { CharityDetail } from '@/lib/schemas/detail'
 import { getCharityInitial } from '@/components/ui/charity-initial'
+import { RelatedProjects } from './RelatedProjects'
 
 type PageProps = { params: Promise<{ id: string }> }
 
@@ -29,14 +31,16 @@ export async function generateMetadata({
 }
 
 /**
- * Spec 004a — 公益團體介紹頁
+ * Spec 004a v0.2 — 公益團體介紹頁，對齊 Figma IMG_4881。
  *
- * RSC fetches backend via `fetchCharityDetail` (spec 004 §3 — "RSC fetch
- * backend"). 404 from upstream → `notFound()` → Next 404 page.
+ * Layout：紅 hero → 白色 panel（基本資料 + 描述 + 分類 + CTA in-card）
+ *        → 底部「捐款專案」cross-link 區。
  *
- * Detail-only fields (contactPhone / contactEmail / officialWebsite /
- * approvalNo) all render conditionally; backend optional values arrive as
- * undefined here (mapper drops nulls).
+ * 跟 v0.1 相比的差異（v0.2）：
+ *  - 描述用 <ExpandableText>（line-clamp-3 + 更多）
+ *  - 「直接捐款給團體」CTA 從 sticky 改為 in-card（Figma 設計如此）
+ *  - 「捐款專案」從文字 + link 改成真實 <DonationProjectCard> 列表
+ *  - TopNav 加 <ShareIconButton> accessory（UI only）
  */
 export default async function Page({ params }: PageProps) {
   const { id } = await params
@@ -45,7 +49,7 @@ export default async function Page({ params }: PageProps) {
 
   return (
     <div className="flex flex-col min-h-dvh bg-surface-page">
-      <TopNav title="公益團體介紹" />
+      <TopNav title="公益團體介紹" accessory={<ShareIconButton />} />
       <Hero name={charity.name} logoUrl={charity.logoUrl} />
       <div className="-mt-6 mx-3 bg-surface-card rounded-2xl shadow-sm relative z-10 p-5 space-y-5">
         <ContactInfo
@@ -54,15 +58,15 @@ export default async function Page({ params }: PageProps) {
           officialWebsite={charity.officialWebsite}
           approvalNo={charity.approvalNo}
         />
-        <Description text={charity.description} />
+        <ExpandableText text={charity.description} />
         {charity.categories.length > 0 && (
           <CategoryTags categories={charity.categories} />
         )}
+        <DirectDonateCta />
       </div>
-      <div className="flex-1 px-5 py-6">
-        <RelatedSection charityId={charity.id} />
+      <div className="flex-1">
+        <RelatedProjects charityId={charity.id} />
       </div>
-      <DirectDonateCta />
     </div>
   )
 }
@@ -161,14 +165,6 @@ function ContactInfo({
   )
 }
 
-function Description({ text }: { text: string }) {
-  return (
-    <section>
-      <p className="text-sm leading-6 text-ink-AAA">{text}</p>
-    </section>
-  )
-}
-
 function CategoryTags({
   categories,
 }: {
@@ -189,34 +185,15 @@ function CategoryTags({
   )
 }
 
-function RelatedSection({ charityId }: { charityId: string }) {
-  return (
-    <section>
-      <h2 className="text-base font-medium text-ink-AAA mb-3">捐款專案</h2>
-      <p className="text-sm text-ink-A">
-        看此團體的進行中專案,或瀏覽全部捐款項目。
-      </p>
-      <Link
-        href={`/donation?tab=donation&charityId=${charityId}`}
-        className="inline-block mt-2 text-sm text-ink-link"
-      >
-        看此團體的捐款專案 →
-      </Link>
-    </section>
-  )
-}
-
 function DirectDonateCta() {
   return (
-    <div className="sticky bottom-0 inset-x-0 bg-surface-card border-t border-line px-5 py-3 pb-[env(safe-area-inset-bottom)]">
-      <button
-        type="button"
-        className="w-full h-12 rounded-full bg-brand text-white text-base font-semibold
-                   focus-visible:outline focus-visible:outline-2
-                   focus-visible:outline-offset-2 focus-visible:outline-brand"
-      >
-        直接捐款給團體
-      </button>
-    </div>
+    <button
+      type="button"
+      className="w-full h-12 rounded-full bg-brand text-white text-base font-semibold
+                 focus-visible:outline focus-visible:outline-2
+                 focus-visible:outline-offset-2 focus-visible:outline-brand"
+    >
+      直接捐款給團體
+    </button>
   )
 }
