@@ -155,6 +155,7 @@ export async function RelatedProjects({ charityId }) {
 - **CTA 在 sticky 還是 in-card**：IMG_4881 是 in-card；v0.2 跟設計走。若使用者測試後反映「捲很長才看到捐款按鈕」，可改回 sticky 或加「滑到底再黏底」混合策略
 - **Related cards 排列**：v0.2 vertical stack；spec v0.1 寫「horizontal scroll」但 IMG_4881 看不太出來。橫向 scroll 對行動裝置 UX 不佳，目前先 vertical；之後設計確認再調
 - ~~**share icon 功能**：UI only，點擊 `console.log`。實作需決定 web share API（`navigator.share`）vs 自製分享 menu，目前無設計~~ → ✅ v0.3 解決：採 [Web Share API](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share) + clipboard fallback（不支援 / 拋非 AbortError → `navigator.clipboard.writeText` + sonner toast「已複製連結」；剪貼簿失敗 → toast「無法分享」；AbortError 視為使用者取消、靜默不 toast）。`<ShareIconButton>` 接 `url?` / `title?` / `text?` 三個 optional prop，未傳則 fallback `window.location.href` / `document.title`。caller `<ShareIconButton title={charity.name} />` 讓系統 share sheet 在訊息預覽中顯示團體名稱
+- **HTTPS deployment 要求**：`navigator.share` 與 `navigator.clipboard` 都是 [secure-context-only API](../../../docs/tech/secure-context-requirements.md)；prod 若走純 HTTP 兩個 API 都 undefined → 永遠落到 toast「無法分享」。localhost dev 因瀏覽器例外仍可用，所以本機測通不代表 prod 可用。長期解法只有上 HTTPS；不上 HTTPS 又想救「複製連結」的話可加 `document.execCommand('copy')` 三層 fallback（本期不做，見 [secure-context-requirements §5](../../../docs/tech/secure-context-requirements.md)）
 - **平行 fetch 優化**：charity + related 兩段 await sequential；可重構為 Promise.all 或 Suspense streaming，但對 demo 不關鍵
 - **Related 翻頁**：v0.2 fetch limit=10，沒有「看更多」按鈕；超過 10 筆團體無法看完所有專案。要的話可加「跳到 `/donation?tab=donation&charityId=...`」link（charity filter 還沒實作於 list 頁，scope 外）
 
