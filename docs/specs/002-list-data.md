@@ -41,7 +41,7 @@
 | 決策 | 理由 |
 |---|---|
 | **Per-tab `limit`**（v0.5；v0.2~0.4 為 10 統一） | 三 tab 卡片視覺密度不同（行高 / 16:9 / 2×square），mobile 寬度下每次取對應自然視覺節奏：charity **10**（row、單行高）、donation **5**（16:9 cover ≈ 半屏）、item **4**（2 欄正方 = 2 列）。預設仍 10，per-route 用 `opts.limit` 覆寫 |
-| **Viewport-aware limits**（v0.6；v0.7 擴 charity desktop） | item tab grid 隨寬度由 2 → 3 → 4 欄變化；單一 `limit:4` 在 tablet/desktop 偏稀。三檔分流：mobile **4**、tablet **6**（`md:grid-cols-3` × 2 列）、desktop **12**（`lg:grid-cols-4` × 3 列）。**v0.7 charity 加開 `desktopLimit:30`**（`lg:grid-cols-3` × 10 列）：mobile / tablet 仍 10（mobile 單欄 10 列；tablet md:grid-cols-2 = 5 列足），desktop 跳到 30 與 grid 寬度同步。donation 暫不擴（16:9 cover 圖在 desktop 仍偏稀但不影響功能，未來再評）。client `useViewport()` 用 2 個 matchMedia（`min-width:768px` / `min-width:1024px`）偵測 → 帶 `?viewport=mobile\|tablet\|desktop` → BFF 用對應 `opts.limit` / `tabletLimit` / `desktopLimit`。client 只宣告 viewport，不送任意 limit；數字仍在 spec 控制。SSR 預設 mobile，非 mobile 用戶首訪會多 1 次 fetch（接受） |
+| **Viewport-aware limits**（v0.6；v0.7 擴 charity desktop；v0.8 擴 donation tablet） | item tab grid 隨寬度由 2 → 3 → 4 欄變化；單一 `limit:4` 在 tablet/desktop 偏稀。三檔分流：mobile **4**、tablet **6**（`md:grid-cols-3` × 2 列）、desktop **12**（`lg:grid-cols-4` × 3 列）。**v0.7 charity 加開 `desktopLimit:30`**（`lg:grid-cols-3` × 10 列）。**v0.8 donation 加開 `tabletLimit:8`**（`md:grid-cols-2` × 4 列）：mobile 仍 5（單欄半屏 cover）、desktop 暫沿用 mobile 5（16:9 cover 在 3 欄仍 OK，未來再評）。client `useViewport()` 用 2 個 matchMedia（`min-width:768px` / `min-width:1024px`）偵測 → 帶 `?viewport=mobile\|tablet\|desktop` → BFF 用對應 `opts.limit` / `tabletLimit` / `desktopLimit`。client 只宣告 viewport，不送任意 limit；數字仍在 spec 控制。SSR 預設 mobile，非 mobile 用戶首訪會多 1 次 fetch（接受） |
 | **Scroll-percent sentinel**（5%~10% from bottom） | brief v0.3 規格；比「絕對 px」更貼近長頁面相對位置感 |
 | **Generic factory** 而非 3 個獨立 hook | 三 tab 契約對稱；3× 重複犯 spec 001a §4.4「禁止硬寫」精神。型別用 `ResourceKey` discriminator 保安全 |
 | **TanStack `enabled` 控制 lazy fetch** | 切到 tab 才打網路；30s `staleTime` 內回切 cache hit |
@@ -202,7 +202,8 @@ import { BackendDonationListItem } from '@/lib/schemas/list'
 export const GET = createListRoute({
   upstreamPath: '/v1/donations',
   backendItemSchema: BackendDonationListItem,
-  limit: 5, // v0.5 — 16:9 cover card 在 mobile 寬度下每張約半屏，5 筆 ≈ 2 屏
+  limit: 5,        // v0.5 — 16:9 cover card 在 mobile 寬度下每張約半屏，5 筆 ≈ 2 屏
+  tabletLimit: 8,  // v0.8 — tablet md:grid-cols-2 × 4 列；desktop 暫沿用 5
   project: (d) => ({
     id: d.id,
     name: d.name,
@@ -985,3 +986,4 @@ URL              ?tab=donation&q=foo&category=animal
 | 0.5 | 2026-06-14 | **Per-tab limit**：`createListRoute` 加 `opts.limit?: number`（default 10）；三條 route 各設 `charity=10` / `donation=5` / `item=4`，理由：mobile 寬度下卡片視覺密度不同（row / 16:9 / 2 欄 square），需要不同的 batch size 才不會「滑一下就 fetch」或「滑很久才 fetch」。對應 brief.md v0.7 同步更新 |
 | 0.6 | 2026-06-15 | **Viewport-aware limits**：item tab 在 `md:` / `lg:` grid 由 2 → 3 → 4 欄變化，單一 limit 不夠 → 加 `opts.tabletLimit` / `desktopLimit`；item 設 `limit:4 / tabletLimit:6 / desktopLimit:12`；`ListQuery` 加 `viewport: enum(['mobile','tablet','desktop']).optional()`；新增 `useViewport()` hook（兩個 matchMedia：`min-width:768px` + `min-width:1024px`，對齊 Tailwind `md:` / `lg:`，SSR 預設 mobile）；`useResourceListInfinite` 接 `viewport` 並寫入 queryKey 與 URL；CharityListShell 頂層呼叫 `useViewport()` 串給三個 hook。對應 brief.md v0.8 |
 | 0.7 | 2026-06-15 | **Charity desktop limit 擴 30**：charity tab 原本 mobile/tablet/desktop 都吃 mobile 10/page；desktop `lg:grid-cols-3` 下 10 筆只填 ~3 列，留白偏多。加 `desktopLimit: 30`（10 列 × 3 欄），讓桌機首屏即填滿 grid。tablet 仍 fallback 到 mobile 10（5 列 × 2 欄足夠首屏，不過度抓）。donation 暫不擴。`createListRoute` 行為不變（v0.6 已支援 `desktopLimit` fallback），純配置調整。新增 colocated `charities/route.test.ts` 4 個 viewport wiring case |
+| 0.8 | 2026-06-15 | **Donation tablet limit 擴 8**：donation tab tablet 寬度下 `md:grid-cols-2` × 4 列 = 8 筆，配合 16:9 cover 約半屏的視覺密度（mobile 仍 5、desktop 沿用 5 不擴）。`createListRoute` 行為不變。新增 colocated `donations/route.test.ts` 4 個 viewport wiring case |
