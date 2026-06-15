@@ -1,6 +1,6 @@
 # Spec 009b：`/checkout/purchase` 義賣商品確認頁
 
-- **狀態**：Draft（v0.4 — query / form / payload 全面對齊 [backend spec 021 / 022](../../../backend/docs/specs/022-donation-order-api.md)；quantity 上限 100；isAnonymous top-level）
+- **狀態**：Draft（v0.6 — 送出成功後 `router.replace` 導回 `/sale-items/:saleItemId`）
 - **路徑（規劃）**：
   - `src/app/checkout/purchase/page.tsx`（RSC）
   - `src/app/checkout/purchase/useReceiptInfoForm.ts` + `.test.ts`（v0.2 — pure logic hook）
@@ -296,13 +296,25 @@ export function useReceiptInfoForm(
   const shipping = 0
   const total = subtotal + shipping
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {    // v0.5 — async：要 await fetch
     if (!isValid) return
-    const payload = buildPayload(opts.query, opts.item, form, { subtotal, shipping, total })
-    // payload shape 對齊 BE 022 §4.3 SaleItemPurchaseBody，BFF 收到後可直接 forward 給
+    const payload = buildPayload(opts.query, opts.item, form)
+    // payload shape 對齊 BE 022 §4.3 SaleItemPurchaseBody，BFF 收到後 forward 給
     // POST /v1/donation/orders/sale-item-purchase
-    console.log('[checkout/purchase/confirm]', payload)
-    toast.success('已送出（demo 不接金流）')
+    try {
+      const res = await fetch('/api/checkout/purchase', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        toast.error('送出失敗，請稍後再試')
+        return
+      }
+      toast.success('已送出（demo 不接金流）')
+    } catch {
+      toast.error('送出失敗，請稍後再試')
+    }
   }
 
   return { form, dispatch, isValid, subtotal, shipping, total, handleSubmit }
@@ -512,3 +524,5 @@ function buildPayload(
 | 0.2 | 2026-06-15 | **抽 `useReceiptInfoForm` custom hook**：對齊 [008b v0.4](./008b-donation-settings-sheet.md) container / presentational 分層；hook 包 useReducer + isValid + subtotal/total 算 + handleSubmit + toast。三層 test plan：reducer R1~R3 / hook H1~H5 / component 5 個視覺 |
 | 0.3 | 2026-06-15 | **改用 [009c shared confirm UI](./009c-shared-confirm-ui.md) primitives**：整頁外殼換 `<ConfirmPageShell>`、明細 panel 換 `<ConfirmPanel>` + `<KeyValueList>`、disclaimer 換 `<DisclaimerBox>` + `DISCLAIMER_PLATFORM` const、姓名 label 換 `<RequiredLabel>`、sticky CTA 由 shell 內部接管。新增 §4.4 PurchaseDetailPanel + §6.4 ReceiptInfoFormPanel reference 完整 JSX；§7 由「sticky CTA spec」縮為「由 shell 接管」 |
 | 0.4 | 2026-06-15 | **query / form / payload 全面對齊 [backend 022 §4.3](../../../backend/docs/specs/022-donation-order-api.md)**（Option C）：(a) §2 Zod query 用 BE 命名 `saleItemId` / `quantity`，quantity 上限 99 → 100（對齊 BE 1-100）；(b) §1 與 009a 比較表加 BE endpoint 行；(c) §4 渲染 reference + Panel 元件 prop 全用 `quantity`；(d) §6.1 FormState 命名不變，Action `TOGGLE_ANONYMOUS` → `SET_ANONYMOUS(value)`（純對等 reducer，更易測 + checkbox onChange 直接傳 `e.target.checked`）；(e) §6.2 isValid 加 120 字上限；(f) §6.4 input `maxLength={120}` 對齊 BE；(g) §7.1 payload shape 完全對齊 BE 022 §4.3（`_endpoint` discriminator + `items: [{ saleItemId, quantity }]` array 包裝 + `donorName` / `isAnonymous` top-level；**不含** receiptOption / donationFrequency / billingDay / charityId，BE schema 不接受）；(h) §9 test cases 升級 R1-3 / H1-7 / page 4 個；(i) §10 OQ 補 BE 一致的「donorName 強制 non-empty」與 `note` 欄位差 |
+| 0.5 | 2026-06-15 | **handleSubmit 改 fetch BFF**：替換 v0.4 的 `console.log + toast.success` 為 `await fetch('/api/checkout/purchase', { method: 'POST', body: payload })`；2xx → toast.success；非 2xx 或 throw → `toast.error('送出失敗，請稍後再試')`。`useReceiptInfoForm` 變 async。Test 升級：H5 改驗 fetch 被呼叫 + body 形狀；新增 H8 (BFF 5xx)、H9 (network throw) 兩個錯誤路徑；component test 6 同樣驗 fetch call。對應 [spec 009 §5 BFF route](./009-checkout-confirm.md#5-bff-route-handlerv04-新)（`/api/checkout/purchase`）與 [spec 022 §4.3](../../../backend/docs/specs/022-donation-order-api.md)。本期不打 mock-confirm-payment |
+| 0.6 | 2026-06-15 | **送出成功 → 導回 sale-item detail page**：useReceiptInfoForm 加 `useRouter()`；handleSubmit 成功路徑加 `router.replace(/sale-items/${query.saleItemId})`。用 replace 不用 push（理由同 009a v0.6：confirm 頁不該留 history）。失敗不導頁。Test 升級：H5 加 `routerReplaceMock` 斷言；H8 / H9 加「失敗不導頁」反向斷言 |

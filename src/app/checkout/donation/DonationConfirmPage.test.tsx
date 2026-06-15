@@ -2,18 +2,25 @@
 // useDonorInfoForm has its own pure + hook tests; this file pins composition:
 // shell + detail panel + donor panel + sticky CTA.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { CharityDetail, DonationDetail } from '@/lib/schemas/detail'
 
 const toastSuccessMock = vi.fn()
 vi.mock('sonner', () => ({
-  toast: { success: (...args: unknown[]) => toastSuccessMock(...args) },
+  toast: {
+    success: (...args: unknown[]) => toastSuccessMock(...args),
+    error: vi.fn(),
+  },
 }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({
+    push: vi.fn(),
+    back: vi.fn(),
+    replace: vi.fn(),    // v0.5 — hook router.replace 導回 entry detail
+  }),
   usePathname: () => '/checkout/donation',
 }))
 
@@ -40,8 +47,19 @@ const PROJECT: DonationDetail = {
   categories: [],
 }
 
+const fetchMock = vi.fn<typeof fetch>()
 beforeEach(() => {
   toastSuccessMock.mockReset()
+  fetchMock.mockReset().mockResolvedValue(
+    new Response(
+      JSON.stringify({ data: { orderId: 'ord-1', status: 'PENDING' } }),
+      { status: 200 },
+    ),
+  )
+  vi.stubGlobal('fetch', fetchMock)
+})
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('DonationConfirmPage', () => {
@@ -136,6 +154,10 @@ describe('DonationConfirmPage', () => {
     )
     await userEvent.type(screen.getByLabelText(/捐款人姓名/), 'Alice')
     await userEvent.click(screen.getByRole('button', { name: '確認送出' }))
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/checkout/donation',
+      expect.objectContaining({ method: 'POST' }),
+    )
     expect(toastSuccessMock).toHaveBeenCalledTimes(1)
   })
 

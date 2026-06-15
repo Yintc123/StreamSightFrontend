@@ -1,13 +1,49 @@
 // Spec 009a v0.4 §8 — three-tier tests for useDonorInfoForm.
 // R1-R3 reducer pure, H1-H8 hook integration.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 
 const toastSuccessMock = vi.fn()
+const toastErrorMock = vi.fn()
 vi.mock('sonner', () => ({
-  toast: { success: (...args: unknown[]) => toastSuccessMock(...args) },
+  toast: {
+    success: (...args: unknown[]) => toastSuccessMock(...args),
+    error: (...args: unknown[]) => toastErrorMock(...args),
+  },
 }))
+
+const routerReplaceMock = vi.fn()
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: routerReplaceMock, push: vi.fn() }),
+}))
+
+// Each test installs its own fetch behavior via mockFetch(...).
+const fetchMock = vi.fn<typeof fetch>()
+beforeEach(() => {
+  toastErrorMock.mockReset()
+  routerReplaceMock.mockReset()
+  fetchMock.mockReset()
+  vi.stubGlobal('fetch', fetchMock)
+})
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+function mockFetchOk() {
+  fetchMock.mockResolvedValue(
+    new Response(
+      JSON.stringify({ data: { orderId: 'ord-1', status: 'PENDING' } }),
+      { status: 200 },
+    ),
+  )
+}
+function mockFetchError(status: number) {
+  fetchMock.mockResolvedValue(new Response('err', { status }))
+}
+function mockFetchThrow() {
+  fetchMock.mockRejectedValue(new TypeError('network down'))
+}
 
 import type { CharityDetail, DonationDetail } from '@/lib/schemas/detail'
 import {
@@ -58,6 +94,7 @@ const VALID_QUERY: DonationCheckoutQuery = {
 beforeEach(() => {
   toastSuccessMock.mockReset()
 })
+
 
 // ─── R1-R3 reducer pure tests ─────────────────────────────────────
 
@@ -127,17 +164,21 @@ describe('useDonorInfoForm (hook integration)', () => {
     expect(result.current.isValid).toBe(false)
   })
 
-  it('H5: handleSubmit (CHARITY) → toast.success + payload._endpoint = charity-donation + charityId 對齊', () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  it('H5: handleSubmit (CHARITY, BFF 200) → fetch POST /api/checkout/donation + body 對齊 BE 022 §4.1 + toast.success', async () => {
+    mockFetchOk()
     const { result } = renderHook(() =>
       useDonorInfoForm({ query: VALID_QUERY, target: CHARITY_TARGET }),
     )
     act(() => result.current.dispatch({ type: 'SET_DONOR_NAME', value: ' Alice ' }))
-    act(() => result.current.handleSubmit())
+    await act(async () => {
+      await result.current.handleSubmit()
+    })
 
-    expect(toastSuccessMock).toHaveBeenCalledTimes(1)
-    expect(consoleSpy).toHaveBeenCalledTimes(1)
-    const [, payload] = consoleSpy.mock.calls[0] as [string, Record<string, unknown>]
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/checkout/donation')
+    expect(init.method).toBe('POST')
+    const payload = JSON.parse(init.body as string) as Record<string, unknown>
     expect(payload._endpoint).toBe('/v1/donation/orders/charity-donation')
     expect(payload.charityId).toBe(CHARITY_ID)
     expect(payload.donorName).toBe('Alice')                    // trimmed
@@ -146,11 +187,15 @@ describe('useDonorInfoForm (hook integration)', () => {
     expect(payload.donationFrequency).toBe('RECURRING')
     expect(payload.billingDay).toBe('DAY_16')
     expect(payload.amountTwd).toBe(500)
-    consoleSpy.mockRestore()
+
+    expect(toastSuccessMock).toHaveBeenCalledTimes(1)
+    expect(toastErrorMock).not.toHaveBeenCalled()
+    // v0.6 — 成功後 router.replace 回 entry detail page（CHARITY → /charities/:id）
+    expect(routerReplaceMock).toHaveBeenCalledWith(`/charities/${CHARITY_ID}`)
   })
 
-  it('H6: handleSubmit (DONATION_PROJECT) → payload._endpoint = project-donation + donationProjectId', () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  it('H6: handleSubmit (DONATION_PROJECT) → payload._endpoint = project-donation + donationProjectId + 導回 /donation-projects/:id', async () => {
+    mockFetchOk()
     const projectQuery: DonationCheckoutQuery = {
       ...VALID_QUERY,
       targetType: 'DONATION_PROJECT',
@@ -159,27 +204,33 @@ describe('useDonorInfoForm (hook integration)', () => {
       useDonorInfoForm({ query: projectQuery, target: PROJECT_TARGET }),
     )
     act(() => result.current.dispatch({ type: 'SET_DONOR_NAME', value: 'Bob' }))
-    act(() => result.current.handleSubmit())
-    const [, payload] = consoleSpy.mock.calls[0] as [string, Record<string, unknown>]
+    await act(async () => {
+      await result.current.handleSubmit()
+    })
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const payload = JSON.parse(init.body as string) as Record<string, unknown>
     expect(payload._endpoint).toBe('/v1/donation/orders/project-donation')
     expect(payload.donationProjectId).toBe(CHARITY_ID)
     expect('charityId' in payload).toBe(false)
-    consoleSpy.mockRestore()
+    expect(routerReplaceMock).toHaveBeenCalledWith(
+      `/donation-projects/${CHARITY_ID}`,
+    )
   })
 
-  it('H7: handleSubmit (!isValid) → toast 不被叫', () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  it('H7: handleSubmit (!isValid) → fetch 不被叫、toast 不被叫', async () => {
     const { result } = renderHook(() =>
       useDonorInfoForm({ query: VALID_QUERY, target: CHARITY_TARGET }),
     )
-    act(() => result.current.handleSubmit())
+    await act(async () => {
+      await result.current.handleSubmit()
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
     expect(toastSuccessMock).not.toHaveBeenCalled()
-    expect(consoleSpy).not.toHaveBeenCalled()
-    consoleSpy.mockRestore()
+    expect(toastErrorMock).not.toHaveBeenCalled()
   })
 
-  it('H8: donationFrequency=ONE_TIME → payload 不含 billingDay 欄位（BE 規約）', () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  it('H8: donationFrequency=ONE_TIME → payload 不含 billingDay 欄位（BE 規約）', async () => {
+    mockFetchOk()
     const oneTimeQuery: DonationCheckoutQuery = {
       targetType: 'CHARITY',
       targetId: CHARITY_ID,
@@ -190,10 +241,40 @@ describe('useDonorInfoForm (hook integration)', () => {
       useDonorInfoForm({ query: oneTimeQuery, target: CHARITY_TARGET }),
     )
     act(() => result.current.dispatch({ type: 'SET_DONOR_NAME', value: 'C' }))
-    act(() => result.current.handleSubmit())
-    const [, payload] = consoleSpy.mock.calls[0] as [string, Record<string, unknown>]
+    await act(async () => {
+      await result.current.handleSubmit()
+    })
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const payload = JSON.parse(init.body as string) as Record<string, unknown>
     expect(payload.donationFrequency).toBe('ONE_TIME')
     expect('billingDay' in payload).toBe(false)
-    consoleSpy.mockRestore()
+  })
+
+  it('H9 (v0.5): BFF 5xx → toast.error「送出失敗」，toast.success 不被叫', async () => {
+    mockFetchError(500)
+    const { result } = renderHook(() =>
+      useDonorInfoForm({ query: VALID_QUERY, target: CHARITY_TARGET }),
+    )
+    act(() => result.current.dispatch({ type: 'SET_DONOR_NAME', value: 'A' }))
+    await act(async () => {
+      await result.current.handleSubmit()
+    })
+    expect(toastErrorMock).toHaveBeenCalledWith('送出失敗，請稍後再試')
+    expect(toastSuccessMock).not.toHaveBeenCalled()
+    // 失敗不導頁
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
+  it('H10 (v0.5): fetch 拋 network 錯 → 同樣 toast.error', async () => {
+    mockFetchThrow()
+    const { result } = renderHook(() =>
+      useDonorInfoForm({ query: VALID_QUERY, target: CHARITY_TARGET }),
+    )
+    act(() => result.current.dispatch({ type: 'SET_DONOR_NAME', value: 'A' }))
+    await act(async () => {
+      await result.current.handleSubmit()
+    })
+    expect(toastErrorMock).toHaveBeenCalledWith('送出失敗，請稍後再試')
+    expect(routerReplaceMock).not.toHaveBeenCalled()
   })
 })

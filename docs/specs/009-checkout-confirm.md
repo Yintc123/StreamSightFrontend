@@ -1,6 +1,6 @@
 # Spec 009：結帳確認頁（捐款 / 購買，index）
 
-- **狀態**：Draft（v0.3 — query params / Zod schema / payload 全面對齊 [backend spec 021 / 022](../../../backend/docs/specs/022-donation-order-api.md)）
+- **狀態**：Draft（v0.4 — 「確認送出」實際 POST 到 BFF → BE 建單；不再 console.log placeholder）
 - **建立日期**：2026-06-15
 - **Figma 對應**：IMG_4888（charity 直捐確認）/ IMG_4889（donation 確認）/ IMG_4890（item 購買確認）
 
@@ -146,15 +146,51 @@ TopNav + 紅 hero + `<form>` + sticky CTA 整套外殼實作於 [`<ConfirmPageSh
 | **Form state 用 useReducer + raw/parsed 拆兩欄**（對齊 [008b v0.2](./008b-donation-settings-sheet.md)）| 009a / 009b | 兩頁都有 controlled input（姓名、收據抬頭等）需要避免 ghost-reset |
 | **整 form 用 `<form onSubmit>` + button `type="submit"`**（對齊 [008b §4.5](./008b-donation-settings-sheet.md)）| 009a / 009b | Enter / iOS Done 鍵自動 submit、SR friendly |
 | **「下次扣款日期」client-side 計算**（v0.1）→ **改 client display-only，BE create 時 server 算為準**（v0.3）| 009a | 規約對齊 [BE 021 §7.7 computeNextChargeAt](../../../backend/docs/specs/021-donation-order-data-model.md)（UTC + 嚴格 `<` 當天視為已過）；FE confirm 頁顯示先用同 BE 規則的 client 函式避免 demo 階段顯示與 BE 寫入錯位；接 BE 真打 endpoint 後改用 response `nextChargeAt` 為準 |
-| **送出 = `console.log(payload) + toast.success`** | 009a / 009b | brief.md 不接金流；未來 → `router.push('/checkout/payment/...')` |
+| **送出 = `POST /api/checkout/{donation,purchase}` → BFF forwards to BE 022 §4.1-4.3** (v0.4) | 009a / 009b / [BFF route](#5-bff-route-handler-v04) | brief.md「不接金流」靠 BE 022 §2.3 mock-payment 設計達成：本期只到「BE 建單成 PENDING」這步，不打 confirm-payment；未來付款選擇頁可再接 |
+| **送出成功 → `router.replace` 回 entry detail page** (v0.5) | 009a / 009b | charity `targetType=CHARITY` → `/charities/:targetId`；project → `/donation-projects/:targetId`；sale-item → `/sale-items/:saleItemId`。**用 replace 而非 push** — confirm 頁完成任務後不該留在 history，否則使用者按返回會回到一個「已送出」的死頁面，甚至能再點一次重複送單。失敗時不導頁、只留在 confirm 頁顯示 toast.error 讓使用者重試 |
 | **smart back fallback `/`** | 三頁 TopNav 都用 default | direct URL / refresh 後返回鈕回首頁 |
 | **enum / payload / URL 命名一律對齊 backend** (v0.3)：`DonationFrequency` / `BillingDay` / `ReceiptOption` / `OrderSubjectType` 直接沿用 [BE 021 §5 Prisma enum](../../../backend/docs/specs/021-donation-order-data-model.md)；payload field 名（`donorName` / `amountTwd` / `isAnonymous` / `saleItemId` / `quantity` / `note`）直接沿用 [BE 022 §4 body](../../../backend/docs/specs/022-donation-order-api.md) | 009a / 009b / 008b / 008c | 採 Option C 對齊；BFF route handler 收到 FE payload 後可直接 forward 給 BE，**不需 mapping 層**；未來換 BFF / 接金流時 server-side 只需補欄位、不需重新對欄位 |
 
 ---
 
-## 5. 008b/008c 「下一步」要修改的點
+## 5. BFF Route handler（v0.4 新）
 
-這次新增 009 後，[008b §5.2](./008b-donation-settings-sheet.md) 的 submit handler、[008c §5.2](./008c-purchase-qty-sheet.md) 的 submit handler 從 `console.log + onClose()` 改為 `router.push(...) + onClose()`：
+`src/app/api/checkout/donation/route.ts` + `src/app/api/checkout/purchase/route.ts`，兩條 POST。職責：
+
+1. **Zod 驗 body**：對齊 BE 022 body shape；其中 `_endpoint` 為 FE-side discriminator（discriminatedUnion） + 兩條 refine（RECURRING ↔ billingDay 強制 / 互斥對應）
+2. **Strip `_endpoint`**：BE TypeBox `additionalProperties: false`，留著會 400
+3. **`backendFetch` POST 給 BE 對應 endpoint**
+4. **回傳 `{ data: { orderId, status } }`** — FE confirm 頁只用這兩個欄位（未來付款頁可能要 orderId 串 confirm-payment）
+5. **CSRF**：`csrfExempt: true`，跟 dev-login 同 pattern——BE 端 endpoint 本身 unauth，FE 沒 session token 可帶
+6. **錯誤透傳**：4xx / 5xx 透過既有 `toErrorResponse` 包裝（spec 005 / 006）
+
+```ts
+// 對齊 BE 022 §4.1 / §4.2 — discriminated union body
+const Body = z.discriminatedUnion('_endpoint', [
+  CharityDonationBody,       // _endpoint='/v1/donation/orders/charity-donation' + charityId
+  ProjectDonationBody,       // _endpoint='/v1/donation/orders/project-donation' + donationProjectId
+]).refine(...).refine(...)   // billingDay cross-field
+
+export const POST = createRoute({
+  csrfExempt: true,
+  bodySchema: Body,
+  handler: async ({ body, requestId }) => {
+    const { _endpoint, ...forwardBody } = body
+    const { data } = await backendFetch(_endpoint, { method: 'POST', body: forwardBody, requestId })
+    return okResponse({ orderId: data.id, status: data.status })
+  },
+})
+```
+
+Sale-item route 同 pattern、body schema 更簡單（無 receiptOption / donationFrequency / billingDay）。
+
+**Mock 對應**：`src/lib/mock/orders-mock.ts` 註冊三條 `/v1/donation/orders/*` dispatcher，USE_MOCK=1 跑也走得通。返回 `{ id, status: 'PENDING' }`（不模 BE 完整 OrderResponse，因為 FE 只用 orderId / status）。
+
+---
+
+## 6. 008b/008c 「下一步」要修改的點
+
+> v0.4 — 不變動 sheet handleSubmit 本身（仍是 `router.push` 到 confirm 頁），只是 confirm 頁的「確認送出」改打 BFF 而非 console.log。下面 sheet handler reference 沿用 v0.3 內容：
 
 ```ts
 // 008b — DonationSettingsSheet（v0.3 — query params 全用 BE enum）
@@ -182,11 +218,9 @@ const handleSubmit = () => {
 }
 ```
 
-> v0.1 spec 009 暫沒寫 e2e；接 008b/c 後手動測「sheet → 下一步 → confirm 頁 → 各欄位顯示正確」走通即可。
-
 ---
 
-## 6. 開放問題（跨 spec）
+## 7. 開放問題（跨 spec）
 
 - **送出後的下一步**：v0.1 `console.log + toast`。未來接金流 → 信用卡 / Apple Pay / Line Pay 選擇頁；或拉到第三方 redirect（藍新 / 綠界）。三條路線都會改寫 §5 submit handler
 - **ReceiptOption 對應 Figma 顯示**：[BE 022 §4.1](../../../backend/docs/specs/022-donation-order-api.md) 定義 5 個 enum 值（`NONE` / `INDIVIDUAL` / `CORPORATE` / `GOVERNMENT_DONATION` / `DEFER`），但 Figma 4888 只展示 default `都不需要`（= `NONE`），未拉開 dropdown。v0.3 FE 預設提供完整 5 個 option 字串 mapping（見 [009a §5.2](./009a-donation-confirm.md)），未來 design / PM 補完 Figma 後再對齊
@@ -197,10 +231,12 @@ const handleSubmit = () => {
 
 ---
 
-## 7. 變更紀錄
+## 8. 變更紀錄
 
 | 版本 | 日期 | 變更 |
 |---|---|---|
 | 0.1 | 2026-06-15 | 初版：IMG_4888-4890 規劃為「結帳確認頁」family；拆 index + 009a + 009b；定義 routing / Zod query schema / payload contract；shared panel anatomy；列出 008b/c 需配套修改的 submit handler |
 | 0.2 | 2026-06-15 | **抽 [009c shared confirm UI](./009c-shared-confirm-ui.md) primitives**：`<ConfirmPageShell>` / `<ConfirmPanel>` / `<KeyValueList>` / `<DisclaimerBox>` / `<RequiredLabel>` / `<StickyConfirmCta>` 六件；§3 共通 anatomy 從 inline className 改為 primitive reference；新增 §3.0「整頁外殼」與 §3.5「Disclaimer 字串」兩節。對齊 008a BottomSheet「UI primitive vs business form 分 spec」慣例 |
 | 0.3 | 2026-06-15 | **enum / payload / URL 全面對齊 backend spec 021 / 022**（Option C）：(a) §2 routing 兩條 path 對應到 BE 三條 endpoint（charity / project 共用 `/checkout/donation`、sale-item 走 `/checkout/purchase`）；(b) Zod 兩個 query schema 改用 BE enum 值（`CHARITY/DONATION_PROJECT` / `ONE_TIME/RECURRING` / `DAY_6/16/26`）+ `amountTwd` (1〜1_000_000) / `quantity` (1〜100)；(c) §4 共同決策表新增「enum / payload 命名一律對齊 backend」總綱；「下次扣款日期」改為 client display-only、BE create 時 server 算為準；(d) §5 008b/c submit handler 範例同步改用 BE 命名；(e) §6 開放問題對齊 BE 022 已決策的部分（receiptOption 5 值、isAnonymous 不做 server masking、無 server-side phone/email/address）|
+| 0.4 | 2026-06-15 | **接通 BFF → BE**：「確認送出」不再是 `console.log + toast` placeholder，改為 `POST /api/checkout/{donation,purchase}` → BFF Zod 驗 body → strip `_endpoint` → `backendFetch` 對應 BE 022 §4.1/§4.2/§4.3 endpoint → 回 `{ orderId, status }`。brief.md「不接金流」靠 BE 022 §2.3 mock-payment 設計：本期只到 BE 建單成 `PENDING` 這步，不打 `confirm-payment`（留給未來付款選擇頁）。新增 §5 BFF route handler 章節 + §6 sheet handler reference；§4 共同決策「送出」條目改寫；§7 開放問題刪除 `console.log` 相關項。新增檔案：`src/app/api/checkout/donation/route.ts(+test)` / `src/app/api/checkout/purchase/route.ts(+test)` / `src/lib/mock/orders-mock.ts` + 3 個 USE_MOCK dispatcher 註冊；009a / 009b hook 改打 fetch，失敗一律 `toast.error('送出失敗，請稍後再試')` |
+| 0.5 | 2026-06-15 | **送出成功 → router.replace 回 entry detail page**：捐款 charity 來源回 `/charities/:targetId`、project 來源回 `/donation-projects/:targetId`、sale-item 來源回 `/sale-items/:saleItemId`。用 `replace`（非 push）避免使用者按返回回到「已送出」的死頁面或重複送單。失敗不導頁、留在 confirm 頁顯示 toast.error。useDonorInfoForm / useReceiptInfoForm 加 `useRouter()`；hook test 新增「成功後 router.replace 被叫」斷言、「失敗不導頁」斷言；spec 009 §4 共同決策表新增此條 |

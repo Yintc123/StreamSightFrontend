@@ -1,17 +1,24 @@
 // Spec 009b v0.4 §9.3 — PurchaseConfirmPage integration tests.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ItemDetail } from '@/lib/schemas/detail'
 
 const toastSuccessMock = vi.fn()
 vi.mock('sonner', () => ({
-  toast: { success: (...args: unknown[]) => toastSuccessMock(...args) },
+  toast: {
+    success: (...args: unknown[]) => toastSuccessMock(...args),
+    error: vi.fn(),
+  },
 }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({
+    push: vi.fn(),
+    back: vi.fn(),
+    replace: vi.fn(),    // v0.5 — hook router.replace 導回 entry detail
+  }),
   usePathname: () => '/checkout/purchase',
 }))
 
@@ -29,8 +36,19 @@ const ITEM: ItemDetail = {
   categories: [],
 }
 
+const fetchMock = vi.fn<typeof fetch>()
 beforeEach(() => {
   toastSuccessMock.mockReset()
+  fetchMock.mockReset().mockResolvedValue(
+    new Response(
+      JSON.stringify({ data: { orderId: 'ord-1', status: 'PENDING' } }),
+      { status: 200 },
+    ),
+  )
+  vi.stubGlobal('fetch', fetchMock)
+})
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('PurchaseConfirmPage', () => {
@@ -113,6 +131,10 @@ describe('PurchaseConfirmPage', () => {
     )
     await userEvent.type(screen.getByLabelText(/捐款人姓名/), 'Alice')
     await userEvent.click(screen.getByRole('button', { name: '確認送出' }))
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/checkout/purchase',
+      expect.objectContaining({ method: 'POST' }),
+    )
     expect(toastSuccessMock).toHaveBeenCalledTimes(1)
   })
 })

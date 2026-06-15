@@ -9,6 +9,7 @@
 // before forwarding.
 
 import { useReducer, type Dispatch } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { ItemDetail } from '@/lib/schemas/detail'
 
@@ -87,6 +88,7 @@ const DONOR_NAME_MAX = 120
 export function useReceiptInfoForm(
   opts: UseReceiptInfoFormOpts,
 ): UseReceiptInfoFormReturn {
+  const router = useRouter()
   const [form, dispatch] = useReducer(reducer, DEFAULT_FORM)
   const trimmed = form.donorName.trim()
   const isValid =
@@ -98,11 +100,25 @@ export function useReceiptInfoForm(
   const shipping = 0
   const total = subtotal + shipping
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isValid) return
     const payload = buildPayload(opts.query, form)
-    console.log('[checkout/purchase/confirm]', payload)
-    toast.success('已送出（demo 不接金流）')
+    try {
+      const res = await fetch('/api/checkout/purchase', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        toast.error('送出失敗，請稍後再試')
+        return
+      }
+      toast.success('已送出（demo 不接金流）')
+      // router.replace — confirm 頁送出後不該留在 history（同 009a 邏輯）。
+      router.replace(`/sale-items/${opts.query.saleItemId}`)
+    } catch {
+      toast.error('送出失敗，請稍後再試')
+    }
   }
 
   return { form, dispatch, isValid, subtotal, shipping, total, handleSubmit }

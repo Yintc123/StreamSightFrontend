@@ -1,6 +1,6 @@
 # Spec 009a：`/checkout/donation` 捐款確認頁
 
-- **狀態**：Draft（v0.4 — query params / form state / payload 全面對齊 [backend spec 021 / 022](../../../backend/docs/specs/022-donation-order-api.md)；receiptOption 升級為 5 值；nextChargeAt 計算規則對齊 BE）
+- **狀態**：Draft（v0.6 — 送出成功後 `router.replace` 導回 entry detail page）
 - **路徑（規劃）**：
   - `src/app/checkout/donation/page.tsx`（RSC）
   - `src/app/checkout/donation/useDonorInfoForm.ts` + `.test.ts`（v0.2 — pure logic hook）
@@ -22,7 +22,7 @@
 2. **捐款人基本資料**表單（收據開立方式 dropdown + 姓名 input + disclaimer）
 3. **送出按鈕**（sticky bottom，validated 才 enabled）
 
-送出 = `console.log(完整 payload) + toast.success('已送出') + （未來 router.push 付款頁）`。
+送出 = **`POST /api/checkout/donation` → BFF Zod 驗 + 轉發到 BE 022 §4.1 (CHARITY) 或 §4.2 (DONATION_PROJECT) 對應 endpoint → BE 建單 PENDING → 回 `{ orderId, status }`**（v0.5；本期不打 mock-confirm-payment，依 brief.md「不接金流」）。失敗一律 `toast.error('送出失敗，請稍後再試')`；2xx → `toast.success('已送出（demo 不接金流）')`。
 
 ---
 
@@ -344,16 +344,26 @@ export function useDonorInfoForm(
   const trimmedName = form.donorName.trim()
   const isValid = trimmedName.length > 0 && form.donorName.length <= 120
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {     // v0.5 — async：要 await fetch
     if (!isValid) return
     const payload = buildPayload(opts.query, opts.target, form)
-    // payload shape 完全對齊 BE 022 §4.1 CharityDonationBody 或 §4.2 ProjectDonationBody，
-    // BFF 收到後可依 targetType 直接 forward 給對應 endpoint。
-    console.log('[checkout/donation/confirm]', payload)
-    toast.success('已送出（demo 不接金流）')
-    // 未來：依 query.targetType 路由：
-    //   CHARITY → POST /v1/donation/orders/charity-donation
-    //   DONATION_PROJECT → POST /v1/donation/orders/project-donation
+    // payload shape 完全對齊 BE 022 §4.1 / §4.2；BFF 看 `_endpoint` discriminator
+    // 決定送 /charity-donation 或 /project-donation
+    try {
+      const res = await fetch('/api/checkout/donation', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        toast.error('送出失敗，請稍後再試')
+        return
+      }
+      toast.success('已送出（demo 不接金流）')
+    } catch {
+      // network failure / abort — 同等 UX
+      toast.error('送出失敗，請稍後再試')
+    }
   }
 
   return { form, dispatch, isValid, handleSubmit }
@@ -568,3 +578,5 @@ E2E 後續可加，本 v0.1 不強制。
 | 0.2 | 2026-06-15 | **抽 `useDonorInfoForm` custom hook**：對齊 [008b v0.4](./008b-donation-settings-sheet.md) container / presentational 分層；hook 包 useReducer + isValid + handleSubmit + sonner toast。三層 test plan：reducer R1~R3 / hook H1~H5 / component 4 個視覺 |
 | 0.3 | 2026-06-15 | **改用 [009c shared confirm UI](./009c-shared-confirm-ui.md) primitives**：整頁外殼換 `<ConfirmPageShell>`、明細 panel 換 `<ConfirmPanel>` + `<KeyValueList>`、disclaimer 換 `<DisclaimerBox>` + `DISCLAIMER_PLATFORM` const、必填 label 換 `<RequiredLabel>`、sticky CTA 由 shell 內部接管。移除 §4.3 / §5.1 / §6 inline className；新增 §5.7 `<DonorInfoFormPanel>` reference 完整 JSX |
 | 0.4 | 2026-06-15 | **query / form / payload 全面對齊 [backend 022](../../../backend/docs/specs/022-donation-order-api.md)**（Option C）：(a) §2 Zod query 用 BE enum 值（`CHARITY`/`DONATION_PROJECT`、`ONE_TIME`/`RECURRING`、`DAY_6/16/26`、`amountTwd` 1-1_000_000）+ ONE_TIME/RECURRING ↔ billingDay 雙 refine；(b) §4.2 `computeNextChargeDate` → `computeNextChargeAt`，規約對齊 BE 021 §7.7（UTC + 嚴格 `<`），解 client/server 錯位每月 3 天的 bug；(c) §4.3 渲染 reference 全用 BE 命名；(d) §5.2 `RECEIPT_TYPES` 中文 3 值 → `RECEIPT_OPTIONS` 對齊 BE `ReceiptOption` 完整 5 值（NONE/INDIVIDUAL/CORPORATE/GOVERNMENT_DONATION/DEFER）+ value/label 分離；(e) §5.3 donorName `maxLength={120}` 對齊 BE；(f) §5.4 FormState `receiptType` → `receiptOption`、Action 同步 rename；(g) §5.5 isValid 加 120 字上限；(h) §6.1 payload shape 完全對齊 BE 022 §4.1/§4.2 body（discriminated union `_endpoint` + `charityId` vs `donationProjectId` + `isAnonymous=false` hardcode）；(i) §8 test cases 升級 R1/H1~H8/component 4/page 6 個；(j) §9 OQ 補 `isAnonymous` UI 缺口 + `note` 欄位差 + receiptOption 5 值 sync |
+| 0.5 | 2026-06-15 | **handleSubmit 改 fetch BFF**：替換 v0.4 的 `console.log + toast.success` 為 `await fetch('/api/checkout/donation', { method: 'POST', body: payload })`；2xx → toast.success；非 2xx 或 throw → `toast.error('送出失敗，請稍後再試')`。`useDonorInfoForm` 變 async。Test 升級：H5 改驗 fetch 被呼叫 + body 形狀；新增 H9 (BFF 5xx)、H10 (network throw) 兩個錯誤路徑；component test 5 同樣驗 fetch call。對應 [spec 009 §5 BFF route](./009-checkout-confirm.md#5-bff-route-handlerv04-新)（`/api/checkout/donation`）與 [spec 022 §4.1/4.2](../../../backend/docs/specs/022-donation-order-api.md)。本期不打 mock-confirm-payment（留給未來付款頁），brief.md「不接金流」靠「BE 建單只到 PENDING」達成 |
+| 0.6 | 2026-06-15 | **送出成功 → 導回 entry detail page**：useDonorInfoForm 加 `useRouter()`；handleSubmit 成功路徑加 `router.replace(entryUrl(query))`，依 targetType 計算：CHARITY → `/charities/${targetId}`、DONATION_PROJECT → `/donation-projects/${targetId}`。**用 replace 而非 push**：confirm 頁完成任務後不該留 history（避免「按返回又看到已送出頁 / 又能再點送出」）。失敗時不導頁，留在 confirm 頁顯示 toast.error 讓使用者重試。Test 升級：H5 / H6 加 `routerReplaceMock` 斷言；H9 / H10 加「失敗不導頁」反向斷言 |
