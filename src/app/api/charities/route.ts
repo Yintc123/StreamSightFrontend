@@ -15,4 +15,8 @@ export const GET = createListRoute({
   toClientItem: toClientCharity,
   // Spec 002 §1.3 v0.3 — charity row layout, 10/page at mobile width.
   limit: 10,
+  // Spec 002 §1.3 v0.7 — desktop lg:grid-cols-3 × 10 rows.
+  // No tabletLimit override: md:grid-cols-2 still serves 10/page acceptably
+  // (5 rows of 2 cards); jumping straight to 30 only when 3-col grid kicks in.
+  desktopLimit: 30,
 })
