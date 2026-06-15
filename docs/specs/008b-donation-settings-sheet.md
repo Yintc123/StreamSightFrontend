@@ -1,6 +1,6 @@
 # Spec 008b：`<DonationSettingsSheet>` 捐款設定 sheet
 
-- **狀態**：Draft（v0.5 — enum / payload 全面對齊 backend spec 021 / 022 命名，移除 mapping 層）
+- **狀態**：Draft（v0.6 — 點 preset 自動帶入 input；自訂金額 < min preset 顯示紅字提示 + gate submit）
 - **路徑（規劃）**：
   - `src/app/checkout/useDonationSettingsForm.ts` + `.test.ts`（v0.4 — pure logic hook）
   - `src/app/checkout/DonationSettingsSheet.tsx` + `.test.tsx`（v0.4 起為純 UI；charity / donation 兩個詳情頁共用）
@@ -146,7 +146,7 @@ function reducer(state: FormState, action: Action): FormState {
 
 | 互動 | dispatch | UI 行為 |
 |---|---|---|
-| 點 preset 100 / 500 / 1000 | `{type:'SET_PRESET', value}` | amount.source='preset'；input 顯示清空（raw=''）；對應 preset selected |
+| 點 preset 100 / 500 / 1000 | `{type:'SET_PRESET', value}` | amount.source='preset'；**input 自動帶入該金額 `raw=String(value)`**（v0.6）；對應 preset selected |
 | input onChange（任何字串） | `{type:'SET_INPUT', raw}` | raw 一律保留；amount 視 parseAmount 結果可能 null |
 | 點 RECURRING / ONE_TIME segmented | `{type:'SET_FREQUENCY', donationFrequency}` | ONE_TIME 額外清 billingDay |
 | 點扣款日 6/16/26 pill | `{type:'SET_BILLING_DAY', billingDay}` | billingDay 切換 |
@@ -416,15 +416,20 @@ Component 內部完全沒有 `useReducer` / `useEffect` / `useRouter` — 邏輯
 
 ## 5. 驗證 / 「下一步」
 
-### 5.1 enabled 條件
+### 5.1 enabled 條件（v0.6 — 加最小金額 gate）
 
 ```ts
 const isValid =
   form.amount !== null &&
+  form.amount.value >= MIN_PRESET_AMOUNT &&             // v0.6 — 最小金額 = preset 最小值
   (form.donationFrequency === 'ONE_TIME' || form.billingDay !== null)
 ```
 
 > ONE_TIME 不需 billingDay；RECURRING 三條件都要（對應 BE 022 §4.1 INVALID_BILLING_DAY 規約）。
+>
+> **v0.6 — 最小金額**：`MIN_PRESET_AMOUNT = Math.min(...PRESET_AMOUNTS)`（目前 100）。`PRESET_AMOUNTS` 從 component 提升到 `useDonationSettingsForm.ts` export，讓 hook（isValid）跟 component（min hint + preset 渲染）共用一份 source of truth。
+>
+> **UI 行為**：自訂金額被 `parseAmount` 接受但 `value < MIN_PRESET_AMOUNT` 時，input 下方出現紅色提示「本專案最低捐款金額為 {MIN_PRESET_AMOUNT}」（`<p role="alert" className="text-brand text-xs">`），同時 input 帶 `aria-invalid` + `aria-describedby`。空 input / 非數字 input 不顯示此提示（屬於另一種「沒輸入有效金額」狀態，UI 已透過 disabled submit 表達）。
 
 ### 5.2 Submit payload（v0.5 — 對齊 BE 022 body）
 
@@ -489,7 +494,7 @@ onClose()
 | # | 案例 | 期望 |
 |---|---|---|
 | R1 | `reducer(DEFAULT_FORM, {type:'SET_FREQUENCY', donationFrequency:'ONE_TIME'})` | billingDay 自動變 null |
-| R2 | SET_PRESET → state.amount = {source:'preset', value}；amountInputRaw='' | OK |
+| R2 | SET_PRESET → state.amount = {source:'preset', value}；**amountInputRaw=String(value)**（v0.6 — 自動帶入 input） | OK |
 | R3 | SET_INPUT "100" → amount = {source:'input', value:100}；raw="100" | OK |
 | R4 | SET_INPUT "00" → amount=null；raw="00"（**raw 保留**，不被清空） | 解 ghost-reset |
 | R5 | SET_INPUT "1,500" → amount.value=1500（parseAmount strip 逗號）；raw="1,500" | OK |
@@ -505,6 +510,8 @@ onClose()
 | H1 | 初始 hook → isValid=false、form=DEFAULT_FORM（donationFrequency='RECURRING'） | OK |
 | H2 | dispatch SET_PRESET 100 + 預設 RECURRING + billingDay 仍 null → isValid=false | OK |
 | H3 | dispatch SET_BILLING_DAY 'DAY_16' + SET_PRESET 100 → isValid=true | OK |
+| H3b (v0.6) | SET_INPUT "50" (< MIN_PRESET_AMOUNT) + DAY_6 → isValid=false（金額未達 min） | OK |
+| H3c (v0.6) | SET_INPUT "100" (= MIN_PRESET_AMOUNT) + DAY_6 → isValid=true | OK |
 | H4 | dispatch SET_FREQUENCY 'ONE_TIME' + SET_PRESET 100 → isValid=true（不需 day） | OK |
 | H5 | handleSubmit (isValid) → routerPush called with URL 包含 `targetType=CHARITY` + `donationFrequency=RECURRING` + `billingDay=DAY_16` + `amountTwd=100` + onClose called | mock router |
 | H6 | handleSubmit (!isValid) → routerPush **not** called（雙重保險） | OK |
@@ -521,6 +528,10 @@ UI 渲染端，可大幅縮減（邏輯已在 hook test 覆蓋）：
 | 1 | 渲染 sheet header + 三個 section（捐款類型 / 扣款日期 / 扣款金額）+ submit button | OK |
 | 2 | RECURRING → 扣款日期 section 渲染；ONE_TIME → 扣款日期 section unmount | UI 條件渲染 |
 | 3 | 點 preset 100 → 該 pill 渲染為 selected 樣式（`border-2 border-ink-AAA`）| 視覺 |
+| 3b (v0.6) | 點 preset → input value 跟著變成該金額字串（"500" / "1000"） | 自動帶入 |
+| 5b (v0.6) | 自訂金額 50 → 顯示「本專案最低捐款金額為 100」紅字 + submit disabled | min hint |
+| 5c (v0.6) | 自訂金額 100 → 不顯示紅字 | 等於 min 不算違反 |
+| 5d (v0.6) | 空 input → 不顯示紅字（只有 disabled submit） | UI 不打擾 |
 | 4 | input value 等於 form.amountInputRaw（受控） | bug 5 regression guard |
 | 5 | submit button 在 isValid=false 時 disabled / true 時 enabled | 視覺 |
 | 6 | 在 input 按 Enter → form submit handler 被叫 | form semantic |
@@ -546,3 +557,4 @@ UI 渲染端，可大幅縮減（邏輯已在 hook test 覆蓋）：
 | 0.3 | 2026-06-15 | submit handler 從 `console.log` 改為 `router.push('/checkout/donation?...')`，串接 [009a confirm 頁](./009a-donation-confirm.md) |
 | 0.4 | 2026-06-15 | **抽 `useDonationSettingsForm` custom hook**：把 useReducer call site + useEffect reset + isValid + handleSubmit + router.push 整合層搬出 component；component 變純 UI 層、零 React hook 呼叫（除了 hook 本身）。三層 test plan：reducer R1~R7 pure / hook H1~H7 integration / component 6 個視覺。pattern 對齊 [008 index §5 v0.6 共同決策](./008-donation-checkout-sheets.md#5-共同決策跨-spec-一次說清楚) |
 | 0.5 | 2026-06-15 | **enum / payload / URL 全面對齊 backend spec 021 / 022**（Option C）：(a) `DonationType: 'monthly'\|'oneTime'` → `DonationFrequency: 'ONE_TIME'\|'RECURRING'`；(b) `ChargeDay: 6\|16\|26` (int) → `BillingDay: 'DAY_6'\|'DAY_16'\|'DAY_26'` (string enum)；(c) `target.type: 'charity'\|'donation'` → `'CHARITY'\|'DONATION_PROJECT'`（對應 BE OrderSubjectType）；(d) Payload field rename `amount` → `amountTwd`；(e) Action rename `SET_TYPE/SET_DAY` → `SET_FREQUENCY/SET_BILLING_DAY`；(f) `parseAmount` 加上限 `<= 1_000_000`；(g) DEFAULT_FORM `donationFrequency` 預設改 `RECURRING`（同義對齊原 `monthly` default）；(h) router.push query params 用 BE enum 值。BFF 收到 form payload 後可直接 forward 給 BE 022 endpoint，無需 mapping 層 |
+| 0.6 | 2026-06-15 | **UX 強化兩條**：(a) 點 preset 不再清空 input；改為 `raw = String(value)` 自動帶入「請輸入金額」欄位（行為更直覺、preset / input 視覺一致）；(b) 引入**最小金額 gate**：`PRESET_AMOUNTS` 跟 `MIN_PRESET_AMOUNT` 從 component 升到 hook 模組 export；`isValid` 加 `>= MIN_PRESET_AMOUNT` 條件；當 input 已 parse 出 `value < MIN_PRESET_AMOUNT` 時 input 下方渲染紅字 `<p role="alert" className="text-brand text-xs">本專案最低捐款金額為 {MIN_PRESET_AMOUNT}</p>`，並把 `aria-invalid` / `aria-describedby` 連到 input 上。空 input / 非數字 input 不顯示此 hint（不打擾）。新增 R2 改寫、H3b/H3c、component 3b/5b/5c/5d 共 7 個測試案例。對應 spec 008b §3.3 / §3.4 / §4.4 / §5.1 |

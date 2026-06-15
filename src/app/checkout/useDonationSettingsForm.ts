@@ -21,6 +21,19 @@ export type DonationFrequency = 'ONE_TIME' | 'RECURRING'
 export type BillingDay = 'DAY_6' | 'DAY_16' | 'DAY_26'
 export type PresetAmount = 100 | 500 | 1000
 
+/**
+ * Preset amount buttons + the derived "minimum donation" gate (v0.6).
+ * Smallest preset doubles as the lower bound on input-source amounts:
+ * typing 50 is parsed but rejected by isValid and shows a red hint in UI.
+ * Exported so the component can render the preset row + min hint message
+ * without re-declaring constants.
+ */
+export const PRESET_AMOUNTS: readonly PresetAmount[] = [100, 500, 1000]
+export const MIN_PRESET_AMOUNT: PresetAmount = PRESET_AMOUNTS.reduce(
+  (min, v) => (v < min ? v : min),
+  PRESET_AMOUNTS[0],
+)
+
 export type DonationTarget = {
   type: 'CHARITY' | 'DONATION_PROJECT'
   id: string
@@ -78,10 +91,13 @@ export function reducer(state: FormState, action: Action): FormState {
     case 'SET_BILLING_DAY':
       return { ...state, billingDay: action.billingDay }
     case 'SET_PRESET':
+      // v0.6 — auto-fill the input box with the picked preset value so the
+      // user sees the same number both in the chip and in the text field.
+      // (v0.5 used '' to keep the input empty, which felt detached.)
       return {
         ...state,
         amount: { source: 'preset', value: action.value },
-        amountInputRaw: '',
+        amountInputRaw: String(action.value),
       }
     case 'SET_INPUT': {
       const parsed = parseAmount(action.raw)
@@ -146,6 +162,7 @@ export function useDonationSettingsForm(
 
   const isValid =
     form.amount !== null &&
+    form.amount.value >= MIN_PRESET_AMOUNT &&
     (form.donationFrequency === 'ONE_TIME' || form.billingDay !== null)
 
   const handleSubmit = () => {

@@ -5,13 +5,14 @@
 
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import {
+  MIN_PRESET_AMOUNT,
+  PRESET_AMOUNTS,
   useDonationSettingsForm,
   type Action,
   type BillingDay,
   type DonationFrequency,
   type DonationTarget,
   type FormState,
-  type PresetAmount,
 } from './useDonationSettingsForm'
 
 type Props = {
@@ -30,8 +31,6 @@ const BILLING_DAYS: { value: BillingDay; label: string }[] = [
   { value: 'DAY_16', label: '每月 16 日' },
   { value: 'DAY_26', label: '每月 26 日' },
 ]
-
-const PRESET_AMOUNTS: PresetAmount[] = [100, 500, 1000]
 
 const priceFmt = new Intl.NumberFormat('zh-TW')
 
@@ -140,6 +139,12 @@ function AmountSection({
   form: FormState
   dispatch: React.Dispatch<Action>
 }) {
+  // v0.6 — below-min hint. Only triggers when the user has parsed a real
+  // number that's below MIN_PRESET_AMOUNT. Empty input / non-numeric stays
+  // silent (different kind of invalid, not a min-amount problem).
+  const showMinHint =
+    form.amount !== null && form.amount.value < MIN_PRESET_AMOUNT
+
   return (
     <section>
       <SectionHeading>扣款金額</SectionHeading>
@@ -178,8 +183,19 @@ function AmountSection({
           }
           className="flex-1 bg-transparent text-sm text-ink-AAA
                      placeholder:text-ink-A focus:outline-none"
+          aria-invalid={showMinHint || undefined}
+          aria-describedby={showMinHint ? 'amount-min-hint' : undefined}
         />
       </div>
+      {showMinHint && (
+        <p
+          id="amount-min-hint"
+          role="alert"
+          className="mt-2 text-xs text-brand"
+        >
+          本專案最低捐款金額為 {MIN_PRESET_AMOUNT}
+        </p>
+      )}
     </section>
   )
 }

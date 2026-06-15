@@ -12,7 +12,9 @@ vi.mock('next/navigation', () => ({
 
 import {
   DEFAULT_FORM,
+  MIN_PRESET_AMOUNT,
   parseAmount,
+  PRESET_AMOUNTS,
   reducer,
   useDonationSettingsForm,
   type DonationTarget,
@@ -58,14 +60,14 @@ describe('reducer (pure)', () => {
     expect(recurring.billingDay).toBeNull()
   })
 
-  it('R2: SET_PRESET → amount.source=preset、amountInputRaw=""（清 input 顯示）', () => {
-    // 先讓 raw 有值，確認 SET_PRESET 把它清掉
+  it('R2 (v0.6): SET_PRESET → amount.source=preset、amountInputRaw=String(value)（自動帶入 input）', () => {
+    // 先讓 raw 有值，確認 SET_PRESET **取代**它而非清空
     const withInput = reducer(DEFAULT_FORM, { type: 'SET_INPUT', raw: '999' })
     expect(withInput.amountInputRaw).toBe('999')
 
     const next = reducer(withInput, { type: 'SET_PRESET', value: 500 })
     expect(next.amount).toEqual({ source: 'preset', value: 500 })
-    expect(next.amountInputRaw).toBe('')
+    expect(next.amountInputRaw).toBe('500') // 自動帶入
   })
 
   it('R3: SET_INPUT "100" → amount={source:input,value:100}、raw="100"', () => {
@@ -108,6 +110,11 @@ describe('reducer (pure)', () => {
     expect(DEFAULT_FORM.billingDay).toBeNull()
     expect(DEFAULT_FORM.amount).toBeNull()
     expect(DEFAULT_FORM.amountInputRaw).toBe('')
+  })
+
+  it('PRESET_AMOUNTS / MIN_PRESET_AMOUNT: 對應 v0.6 引入的最小金額 gate', () => {
+    expect(PRESET_AMOUNTS).toEqual([100, 500, 1000])
+    expect(MIN_PRESET_AMOUNT).toBe(100)
   })
 })
 
@@ -183,6 +190,37 @@ describe('useDonationSettingsForm (hook integration)', () => {
         billingDay: 'DAY_16',
       })
       result.current.dispatch({ type: 'SET_PRESET', value: 100 })
+    })
+    expect(result.current.isValid).toBe(true)
+  })
+
+  it('H3b (v0.6): SET_INPUT "50" < MIN_PRESET → isValid=false（即使 day 已選）', () => {
+    const { result } = renderHook(() =>
+      useDonationSettingsForm({
+        open: true,
+        target: CHARITY_TARGET,
+        onClose: vi.fn(),
+      }),
+    )
+    act(() => {
+      result.current.dispatch({ type: 'SET_BILLING_DAY', billingDay: 'DAY_6' })
+      result.current.dispatch({ type: 'SET_INPUT', raw: '50' })
+    })
+    expect(result.current.form.amount?.value).toBe(50)
+    expect(result.current.isValid).toBe(false) // 50 < MIN_PRESET_AMOUNT (100)
+  })
+
+  it('H3c (v0.6): SET_INPUT "100" (= MIN_PRESET) → isValid=true', () => {
+    const { result } = renderHook(() =>
+      useDonationSettingsForm({
+        open: true,
+        target: CHARITY_TARGET,
+        onClose: vi.fn(),
+      }),
+    )
+    act(() => {
+      result.current.dispatch({ type: 'SET_BILLING_DAY', billingDay: 'DAY_6' })
+      result.current.dispatch({ type: 'SET_INPUT', raw: '100' })
     })
     expect(result.current.isValid).toBe(true)
   })

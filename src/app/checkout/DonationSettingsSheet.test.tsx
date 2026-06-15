@@ -59,6 +59,18 @@ describe('DonationSettingsSheet', () => {
     expect(preset100.className).toMatch(/border-ink-AAA/)
   })
 
+  it('3b (v0.6): 點 preset → 「請輸入金額」input 自動帶入該金額字串', async () => {
+    render(
+      <DonationSettingsSheet open onClose={vi.fn()} target={TARGET} />,
+    )
+    const input = screen.getByLabelText('自訂金額') as HTMLInputElement
+    expect(input.value).toBe('')
+    await userEvent.click(screen.getByRole('radio', { name: 'TWD 500' }))
+    expect(input.value).toBe('500')
+    await userEvent.click(screen.getByRole('radio', { name: 'TWD 1,000' }))
+    expect(input.value).toBe('1000')
+  })
+
   it('4: TWD input value 等於 form.amountInputRaw（受控；ghost-reset regression guard）', async () => {
     render(
       <DonationSettingsSheet open onClose={vi.fn()} target={TARGET} />,
@@ -81,6 +93,35 @@ describe('DonationSettingsSheet', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: '每月 16 日' }))
     expect(submit).toBeEnabled()
+  })
+
+  it('5b (v0.6): 自訂金額 < MIN_PRESET_AMOUNT (100) → 紅字提示「本專案最低捐款金額為 100」+ submit disabled', async () => {
+    render(
+      <DonationSettingsSheet open onClose={vi.fn()} target={TARGET} />,
+    )
+    const input = screen.getByLabelText('自訂金額') as HTMLInputElement
+    await userEvent.type(input, '50')
+
+    const hint = screen.getByText('本專案最低捐款金額為 100')
+    expect(hint).toBeInTheDocument()
+    expect(hint.className).toMatch(/text-brand/)
+    expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled()
+  })
+
+  it('5c (v0.6): 自訂金額 = 100 → 不顯示紅字提示', async () => {
+    render(
+      <DonationSettingsSheet open onClose={vi.fn()} target={TARGET} />,
+    )
+    const input = screen.getByLabelText('自訂金額') as HTMLInputElement
+    await userEvent.type(input, '100')
+    expect(screen.queryByText('本專案最低捐款金額為 100')).toBeNull()
+  })
+
+  it('5d (v0.6): 空 input → 不顯示提示（提示只在「真的低於 min」時出現）', () => {
+    render(
+      <DonationSettingsSheet open onClose={vi.fn()} target={TARGET} />,
+    )
+    expect(screen.queryByText('本專案最低捐款金額為 100')).toBeNull()
   })
 
   it('6: 在 input 按 Enter → submit handler 觸發（form semantic）', async () => {
