@@ -24,6 +24,11 @@ import { findCharityById, findDonationById, findItemById } from './find-by-id'
 import { ITEM_FIXTURES } from './item-fixtures'
 import { makeDetailHandler } from './makeDetailHandler'
 import { makeListHandler } from './makeListHandler'
+import {
+  charityDonationHandler,
+  projectDonationHandler,
+  saleItemPurchaseHandler,
+} from './orders-mock'
 
 // —— List endpoints ——
 registerMock(
@@ -62,4 +67,20 @@ registerMock(
     (i) => adaptItemDetail(i, findCharityById(i.charityId)),
     'sale-item',
   ),
+)
+
+// —— Order create endpoints (spec 022 §4.1-4.3) ——
+// Mock just returns { id, status: 'PENDING' } — the BFF /api/checkout/*
+// routes only need orderId + status from the response.
+registerMock(
+  '/v1/donation/orders/charity-donation',
+  charityDonationHandler,
+)
+registerMock(
+  '/v1/donation/orders/project-donation',
+  projectDonationHandler,
+)
+registerMock(
+  '/v1/donation/orders/sale-item-purchase',
+  saleItemPurchaseHandler,
 )
