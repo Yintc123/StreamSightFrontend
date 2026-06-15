@@ -13,15 +13,26 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { Item } from '@/lib/schemas/list'
 
 export const DEFAULT_QUANTITY = 1
 export const MIN_QUANTITY = 1
 export const MAX_QUANTITY = 100
 
+/**
+ * Minimal sale-item shape this flow needs. Intentionally narrower than
+ * `Item` (list schema) / `ItemDetail` so both can satisfy it: list pages
+ * call through with the flat shape, detail page passes the nested-charity
+ * shape — purchase only reads id / name / priceTwd from either.
+ */
+export type PurchaseItem = {
+  id: string
+  name: string
+  priceTwd: number
+}
+
 export type UsePurchaseQtyFormOpts = {
   open: boolean
-  item: Item
+  item: PurchaseItem
   onClose: () => void
 }
 

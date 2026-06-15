@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { CtaIsland } from '@/app/checkout/CtaIsland'
 import { CharityLogo } from '@/components/ui/CharityLogo'
 import { FallbackImage } from '@/components/ui/FallbackImage'
 import { TopNav } from '@/components/ui/TopNav'
@@ -75,7 +76,7 @@ export default async function Page({ params }: PageProps) {
           {item.content || item.description}
         </p>
       </section>
-      <DonateCta />
+      <CtaIsland kind="purchase" item={item} label="立即捐款" sticky />
     </div>
   )
 }
@@ -184,17 +185,3 @@ function CategoryTags({
   )
 }
 
-function DonateCta() {
-  return (
-    <div className="sticky bottom-0 inset-x-0 bg-surface-card border-t border-line px-5 py-3 pb-[env(safe-area-inset-bottom)]">
-      <button
-        type="button"
-        className="w-full h-12 rounded-full bg-brand text-white text-base font-semibold
-                   focus-visible:outline focus-visible:outline-2
-                   focus-visible:outline-offset-2 focus-visible:outline-brand"
-      >
-        立即捐款
-      </button>
-    </div>
-  )
-}
