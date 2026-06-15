@@ -1,12 +1,13 @@
 # Spec 008b：`<DonationSettingsSheet>` 捐款設定 sheet
 
-- **狀態**：Draft（v0.4 — 拆 `useDonationSettingsForm` hook，container/presentational 分層）
+- **狀態**：Draft（v0.5 — enum / payload 全面對齊 backend spec 021 / 022 命名，移除 mapping 層）
 - **路徑（規劃）**：
   - `src/app/checkout/useDonationSettingsForm.ts` + `.test.ts`（v0.4 — pure logic hook）
   - `src/app/checkout/DonationSettingsSheet.tsx` + `.test.tsx`（v0.4 起為純 UI；charity / donation 兩個詳情頁共用）
 - **依賴**：
   - [008a BottomSheet](./008a-bottom-sheet.md) — UI primitive
   - 既有 design system tokens（[003a](./003a-design-system.md)）
+  - **Backend enum source**（[backend spec 021 §5](../../../backend/docs/specs/021-donation-order-data-model.md) / [022 §4](../../../backend/docs/specs/022-donation-order-api.md)）：`DonationFrequency` / `BillingDay` / `OrderSubjectType` 一律從 Prisma 產出，FE 沿用同名同值，避免 BFF mapping 層
 - **使用方**：
   - [008 §4.1](./008-donation-checkout-sheets.md) charity detail（CTA「直接捐款給團體」）
   - [008 §4.2](./008-donation-checkout-sheets.md) donation detail（CTA「立即捐款」）
@@ -33,7 +34,7 @@
 └──────────────────┴──────────────────┘
   (黑色右下角勾標 = 選中態；對齊 IMG_4885)
 
-扣款日期                                  ← 只在 donationType = 'monthly' 顯示
+扣款日期                                  ← 只在 donationFrequency = 'RECURRING' 顯示
 ┌──────────┬──────────┬──────────┐
 │ 每月 6 日 │ 每月 16 日│ 每月 26 日│  ← 3 個 pill 按鈕，3 選 1
 └──────────┴──────────┴──────────┘
@@ -51,13 +52,16 @@
 
 ---
 
-## 3. State model（v0.2 — useReducer + amountInputRaw）
+## 3. State model（v0.2 — useReducer + amountInputRaw；v0.5 — 全面對齊 BE enum）
 
 ### 3.1 Type
 
+> v0.5：所有 form 欄位、enum 值、payload key 都直接沿用 [backend 021 §5 Prisma enum](../../../backend/docs/specs/021-donation-order-data-model.md) / [022 §4 body shape](../../../backend/docs/specs/022-donation-order-api.md) 的命名。BFF route handler 收到 form 後不需要做 enum mapping，可直接 forward 給 BE。
+
 ```ts
-type DonationType = 'monthly' | 'oneTime'   // 預設 'monthly'（4885 圖中已選）
-type ChargeDay = 6 | 16 | 26 | null         // 預設 null（無預選）
+// 對應 BE Prisma enum (021 §5)
+type DonationFrequency = 'ONE_TIME' | 'RECURRING'     // 預設 'RECURRING'（IMG_4885 已選「每月定期」）
+type BillingDay = 'DAY_6' | 'DAY_16' | 'DAY_26'        // RECURRING 必設；ONE_TIME 禁設
 
 // 「目前金額」帶 source 區分是 preset 還是 input。
 // 即使 input 打到 500，source='input' → preset 500 視覺仍未亮。
@@ -67,19 +71,21 @@ type AmountState =
   | null                                       // 未選 / input 不合規
 
 interface FormState {
-  donationType: DonationType
-  chargeDay: ChargeDay
+  donationFrequency: DonationFrequency
+  billingDay: BillingDay | null    // null = 未選；ONE_TIME 切換時 reducer 強制清為 null
   amount: AmountState              // 驗證後的 — 給 isValid / buildPayload 用
   amountInputRaw: string           // v0.2 — 使用者原始輸入字串，給 <input value> 用
 }
 
 const DEFAULT_FORM: FormState = {
-  donationType: 'monthly',
-  chargeDay: null,
+  donationFrequency: 'RECURRING',
+  billingDay: null,
   amount: null,
   amountInputRaw: '',
 }
 ```
+
+> Billing day pill UI label 「每月 6 / 16 / 26 日」由 view-layer 從 enum 對應顯示文字（`{ DAY_6: 6, DAY_16: 16, DAY_26: 26 }`）。enum 不存 int 是因為 BE Prisma 用字串 enum；DB 端 `DAY_6 / 16 / 26` 命名空間獨立、未來想加 `DAY_END_OF_MONTH` 不會撞號碼。
 
 **為何 `amountInputRaw` 跟 `amount` 拆開**：
 
@@ -92,28 +98,28 @@ const DEFAULT_FORM: FormState = {
 
 v0.2 拆兩個欄位：input value 永遠跟著 `amountInputRaw`（"00" 也保留顯示），`amount` 並行算 valid 但不影響 input 內容。
 
-### 3.2 Reducer pattern（v0.2 — 取代 v0.1 的 useState + setForm）
+### 3.2 Reducer pattern（v0.2 — 取代 v0.1 的 useState + setForm；v0.5 — Action 命名對齊 BE enum）
 
-form 有 4 條 cross-field transition（切 oneTime 清 chargeDay、點 preset 清 raw、input 改 raw 同步算 amount、reset）。用 `useReducer` 把每個 transition 集中、明示、好測：
+form 有 4 條 cross-field transition（切 ONE_TIME 清 billingDay、點 preset 清 raw、input 改 raw 同步算 amount、reset）。用 `useReducer` 把每個 transition 集中、明示、好測：
 
 ```ts
 type Action =
-  | { type: 'SET_TYPE'; donationType: DonationType }
-  | { type: 'SET_DAY'; chargeDay: 6 | 16 | 26 }
+  | { type: 'SET_FREQUENCY'; donationFrequency: DonationFrequency }
+  | { type: 'SET_BILLING_DAY'; billingDay: BillingDay }
   | { type: 'SET_PRESET'; value: 100 | 500 | 1000 }
   | { type: 'SET_INPUT'; raw: string }
   | { type: 'RESET' }
 
 function reducer(state: FormState, action: Action): FormState {
   switch (action.type) {
-    case 'SET_TYPE':
+    case 'SET_FREQUENCY':
       return {
         ...state,
-        donationType: action.donationType,
-        chargeDay: action.donationType === 'oneTime' ? null : state.chargeDay,
+        donationFrequency: action.donationFrequency,
+        billingDay: action.donationFrequency === 'ONE_TIME' ? null : state.billingDay,
       }
-    case 'SET_DAY':
-      return { ...state, chargeDay: action.chargeDay }
+    case 'SET_BILLING_DAY':
+      return { ...state, billingDay: action.billingDay }
     case 'SET_PRESET':
       return {
         ...state,
@@ -142,8 +148,8 @@ function reducer(state: FormState, action: Action): FormState {
 |---|---|---|
 | 點 preset 100 / 500 / 1000 | `{type:'SET_PRESET', value}` | amount.source='preset'；input 顯示清空（raw=''）；對應 preset selected |
 | input onChange（任何字串） | `{type:'SET_INPUT', raw}` | raw 一律保留；amount 視 parseAmount 結果可能 null |
-| 點 monthly / oneTime segmented | `{type:'SET_TYPE', donationType}` | oneTime 額外清 chargeDay |
-| 點扣款日 6/16/26 pill | `{type:'SET_DAY', chargeDay}` | chargeDay 切換 |
+| 點 RECURRING / ONE_TIME segmented | `{type:'SET_FREQUENCY', donationFrequency}` | ONE_TIME 額外清 billingDay |
+| 點扣款日 6/16/26 pill | `{type:'SET_BILLING_DAY', billingDay}` | billingDay 切換 |
 | open=true 觸發 effect | `{type:'RESET'}` | 整 form 回 DEFAULT_FORM |
 
 **Preset selected 條件**：
@@ -162,14 +168,17 @@ const isPresetSelected = (presetValue: 100 | 500 | 1000) =>
 />
 ```
 
-### 3.4 `parseAmount` 規則
+### 3.4 `parseAmount` 規則（v0.5 — 補 BE 上限）
 
 ```ts
+const AMOUNT_MIN = 1
+const AMOUNT_MAX = 1_000_000              // 對齊 BE 022 §4.1 amountTwd 上限
+
 function parseAmount(raw: string): number | null {
   const digitsOnly = raw.replace(/[^0-9]/g, '')   // 容錯「1,000」「TWD 500」
   if (!digitsOnly) return null
   const n = parseInt(digitsOnly, 10)
-  return n >= 1 ? n : null
+  return n >= AMOUNT_MIN && n <= AMOUNT_MAX ? n : null
 }
 ```
 
@@ -204,9 +213,16 @@ useEffect(() => {
 import { useEffect, useReducer } from 'react'
 import { useRouter } from 'next/navigation'
 
+// 對應 BE OrderSubjectType（021 §5）的 CHARITY / DONATION_PROJECT 兩值
+// SALE_ITEM 走 008c PurchaseQtySheet，這個 sheet 不會收到
+export type DonationTarget = {
+  type: 'CHARITY' | 'DONATION_PROJECT'
+  id: string                              // uuid
+}
+
 export type UseDonationSettingsFormOpts = {
   open: boolean
-  target: DonationTarget                 // { type: 'charity' | 'donation'; id: string }
+  target: DonationTarget
   onClose: () => void
 }
 
@@ -229,17 +245,17 @@ export function useDonationSettingsForm(
 
   const isValid =
     form.amount !== null &&
-    (form.donationType === 'oneTime' || form.chargeDay !== null)
+    (form.donationFrequency === 'ONE_TIME' || form.billingDay !== null)
 
   const handleSubmit = () => {
     if (!isValid) return                  // 雙重保險；button disabled 已 gate
     const payload = buildPayload(form, opts.target)
     const params = new URLSearchParams({
-      targetType: payload.target.type,
+      targetType: payload.target.type,         // 'CHARITY' | 'DONATION_PROJECT'
       targetId: payload.target.id,
-      donationType: payload.donationType,
-      ...(payload.chargeDay !== null && { chargeDay: String(payload.chargeDay) }),
-      amount: String(payload.amount),
+      donationFrequency: payload.donationFrequency,
+      ...(payload.billingDay !== null && { billingDay: payload.billingDay }),
+      amountTwd: String(payload.amountTwd),
     })
     router.push(`/checkout/donation?${params.toString()}`)
     opts.onClose()
@@ -374,9 +390,7 @@ Component 內部完全沒有 `useReducer` / `useEffect` / `useRouter` — 邏輯
 <form
   onSubmit={(e) => {
     e.preventDefault()
-    if (!isValid) return    // 雙重保險；button disabled 已 gate
-    console.log('[checkout/donation]', buildPayload(form, target))
-    onClose()
+    handleSubmit()           // v0.4：router.push 串 009a confirm 頁；hook 內已 gate isValid
   }}
 >
   {/* segmented / pills / input */}
@@ -407,38 +421,40 @@ Component 內部完全沒有 `useReducer` / `useEffect` / `useRouter` — 邏輯
 ```ts
 const isValid =
   form.amount !== null &&
-  (form.donationType === 'oneTime' || form.chargeDay !== null)
+  (form.donationFrequency === 'ONE_TIME' || form.billingDay !== null)
 ```
 
-> oneTime 不需 chargeDay；monthly 三條件都要。
+> ONE_TIME 不需 billingDay；RECURRING 三條件都要（對應 BE 022 §4.1 INVALID_BILLING_DAY 規約）。
 
-### 5.2 Submit payload
+### 5.2 Submit payload（v0.5 — 對齊 BE 022 body）
 
 ```ts
+// 對齊 BE 022 §4.1 / §4.2 CharityDonationBody / ProjectDonationBody 部分子集。
+// 缺 donorName / receiptOption / isAnonymous（在 [009a confirm 頁](./009a-donation-confirm.md) 補；本 sheet 只收捐款設定）。
 type DonationSettingsPayload = {
-  target: { type: 'charity' | 'donation'; id: string }
-  donationType: 'monthly' | 'oneTime'
-  chargeDay: 6 | 16 | 26 | null   // oneTime 時必為 null
-  amount: number                   // 已驗證 >= 1 的整數
+  target: { type: 'CHARITY' | 'DONATION_PROJECT'; id: string }
+  donationFrequency: 'ONE_TIME' | 'RECURRING'
+  billingDay: 'DAY_6' | 'DAY_16' | 'DAY_26' | null   // ONE_TIME 時必為 null
+  amountTwd: number                                    // 已驗證 1 ~ 1_000_000
 }
 
-function buildPayload(form: FormState, target: Target): DonationSettingsPayload {
+function buildPayload(form: FormState, target: DonationTarget): DonationSettingsPayload {
   return {
     target,
-    donationType: form.donationType,
-    chargeDay: form.donationType === 'oneTime' ? null : form.chargeDay,
-    amount: form.amount!.value,    // isValid 已 guard
+    donationFrequency: form.donationFrequency,
+    billingDay: form.donationFrequency === 'ONE_TIME' ? null : form.billingDay,
+    amountTwd: form.amount!.value,    // isValid 已 guard；命名對齊 BE Order.amountTwd
   }
 }
 
-// handleSubmit (v0.3 — 串接 spec 009a confirm 頁):
+// handleSubmit (v0.5 — 串接 spec 009a confirm 頁，query 命名全用 BE enum):
 const payload = buildPayload(form, target)
 const params = new URLSearchParams({
-  targetType: payload.target.type,
+  targetType: payload.target.type,                      // 'CHARITY' | 'DONATION_PROJECT'
   targetId: payload.target.id,
-  donationType: payload.donationType,
-  ...(payload.chargeDay !== null && { chargeDay: String(payload.chargeDay) }),
-  amount: String(payload.amount),
+  donationFrequency: payload.donationFrequency,          // 'ONE_TIME' | 'RECURRING'
+  ...(payload.billingDay !== null && { billingDay: payload.billingDay }),  // 'DAY_6' | 'DAY_16' | 'DAY_26'
+  amountTwd: String(payload.amountTwd),
 })
 router.push(`/checkout/donation?${params.toString()}`)
 onClose()
@@ -454,7 +470,7 @@ onClose()
 
 - segmented + pill group 用 `<button role="radio">` 與 `<div role="radiogroup" aria-label="...">` 包起、`aria-checked` 表選中狀態
 - Amount input：`type="text" inputMode="numeric" pattern="[0-9]*"`、`aria-label="自訂金額"`
-- 切換 monthly → oneTime 時隱藏扣款日期 section（DOM 上 unmount，不是 `display:none`），SR 讀者能感知 section 數變化
+- 切換 RECURRING → ONE_TIME 時隱藏扣款日期 section（DOM 上 unmount，不是 `display:none`），SR 讀者能感知 section 數變化
 
 > 其餘 modal 級 a11y（focus trap / scroll lock / esc / role=dialog）由 [008a §6](./008a-bottom-sheet.md#6-a11y--鍵盤) 提供，本元件不重複。
 
@@ -472,7 +488,7 @@ onClose()
 
 | # | 案例 | 期望 |
 |---|---|---|
-| R1 | `reducer(DEFAULT_FORM, {type:'SET_TYPE', donationType:'oneTime'})` | chargeDay 自動變 null |
+| R1 | `reducer(DEFAULT_FORM, {type:'SET_FREQUENCY', donationFrequency:'ONE_TIME'})` | billingDay 自動變 null |
 | R2 | SET_PRESET → state.amount = {source:'preset', value}；amountInputRaw='' | OK |
 | R3 | SET_INPUT "100" → amount = {source:'input', value:100}；raw="100" | OK |
 | R4 | SET_INPUT "00" → amount=null；raw="00"（**raw 保留**，不被清空） | 解 ghost-reset |
@@ -486,11 +502,11 @@ onClose()
 
 | # | 案例 | 期望 |
 |---|---|---|
-| H1 | 初始 hook → isValid=false、form=DEFAULT_FORM | OK |
-| H2 | dispatch SET_PRESET 100 + 預設 monthly + chargeDay 仍 null → isValid=false | OK |
-| H3 | dispatch SET_DAY 16 + SET_PRESET 100 → isValid=true | OK |
-| H4 | dispatch SET_TYPE oneTime + SET_PRESET 100 → isValid=true（不需 day） | OK |
-| H5 | handleSubmit (isValid) → routerPush called with 正確 URL+params + onClose called | mock router |
+| H1 | 初始 hook → isValid=false、form=DEFAULT_FORM（donationFrequency='RECURRING'） | OK |
+| H2 | dispatch SET_PRESET 100 + 預設 RECURRING + billingDay 仍 null → isValid=false | OK |
+| H3 | dispatch SET_BILLING_DAY 'DAY_16' + SET_PRESET 100 → isValid=true | OK |
+| H4 | dispatch SET_FREQUENCY 'ONE_TIME' + SET_PRESET 100 → isValid=true（不需 day） | OK |
+| H5 | handleSubmit (isValid) → routerPush called with URL 包含 `targetType=CHARITY` + `donationFrequency=RECURRING` + `billingDay=DAY_16` + `amountTwd=100` + onClose called | mock router |
 | H6 | handleSubmit (!isValid) → routerPush **not** called（雙重保險） | OK |
 | H7 | opts.open false → true rerender → form 重置（即使 dispatch 過內容） | useEffect-on-open |
 
@@ -503,7 +519,7 @@ UI 渲染端，可大幅縮減（邏輯已在 hook test 覆蓋）：
 | # | 案例 | 期望 |
 |---|---|---|
 | 1 | 渲染 sheet header + 三個 section（捐款類型 / 扣款日期 / 扣款金額）+ submit button | OK |
-| 2 | monthly → 扣款日期 section 渲染；oneTime → 扣款日期 section unmount | UI 條件渲染 |
+| 2 | RECURRING → 扣款日期 section 渲染；ONE_TIME → 扣款日期 section unmount | UI 條件渲染 |
 | 3 | 點 preset 100 → 該 pill 渲染為 selected 樣式（`border-2 border-ink-AAA`）| 視覺 |
 | 4 | input value 等於 form.amountInputRaw（受控） | bug 5 regression guard |
 | 5 | submit button 在 isValid=false 時 disabled / true 時 enabled | 視覺 |
@@ -516,7 +532,7 @@ UI 渲染端，可大幅縮減（邏輯已在 hook test 覆蓋）：
 ## 8. 開放問題
 
 - **草稿保留**：v0.1 每次 open 都 reset；商業考量在「結帳放棄率」高時值得加 sessionStorage
-- **min/max amount**：v0.1 只擋 `< 1`，沒設上限（理論上一次 99999999 也通過）。真實金流應有合理上限，後續加
+- **min/max amount**：v0.5 起 `parseAmount` 上限改 `<= 1_000_000`（對齊 BE 022 §4.1 `amountTwd: Type.Integer({ minimum: 1, maximum: 1_000_000 })`），sheet 內 UI 不顯式提示但內部 gate 一致
 - **金額顯示格式**：preset 寫死「TWD 100 / 500 / 1,000」（最大有千分位）；自訂金額 input 不格式化（純數字）。若要 input 也顯示千分位，需額外 mask 邏輯，v0.1 不做
 
 ---
@@ -529,3 +545,4 @@ UI 渲染端，可大幅縮減（邏輯已在 hook test 覆蓋）：
 | 0.2 | 2026-06-15 | 三個 production 最佳實踐補完：(a) **`amountInputRaw` 跟 `amount` 拆兩欄**——解 v0.1 「使用者刪一個字、整欄被清空」的 ghost-reset bug；input value 永遠綁 raw，amount 並行算 valid；(b) **`useState` → `useReducer`**——4 條 cross-field transition 集中、pure function 可獨立 unit test、補 R1~R7 reducer tests；(c) **整 sheet body 用 `<form onSubmit>` + button `type="submit"`**——支援 input Enter submit / iOS Done 鍵、SR friendly、native disabled gate |
 | 0.3 | 2026-06-15 | submit handler 從 `console.log` 改為 `router.push('/checkout/donation?...')`，串接 [009a confirm 頁](./009a-donation-confirm.md) |
 | 0.4 | 2026-06-15 | **抽 `useDonationSettingsForm` custom hook**：把 useReducer call site + useEffect reset + isValid + handleSubmit + router.push 整合層搬出 component；component 變純 UI 層、零 React hook 呼叫（除了 hook 本身）。三層 test plan：reducer R1~R7 pure / hook H1~H7 integration / component 6 個視覺。pattern 對齊 [008 index §5 v0.6 共同決策](./008-donation-checkout-sheets.md#5-共同決策跨-spec-一次說清楚) |
+| 0.5 | 2026-06-15 | **enum / payload / URL 全面對齊 backend spec 021 / 022**（Option C）：(a) `DonationType: 'monthly'\|'oneTime'` → `DonationFrequency: 'ONE_TIME'\|'RECURRING'`；(b) `ChargeDay: 6\|16\|26` (int) → `BillingDay: 'DAY_6'\|'DAY_16'\|'DAY_26'` (string enum)；(c) `target.type: 'charity'\|'donation'` → `'CHARITY'\|'DONATION_PROJECT'`（對應 BE OrderSubjectType）；(d) Payload field rename `amount` → `amountTwd`；(e) Action rename `SET_TYPE/SET_DAY` → `SET_FREQUENCY/SET_BILLING_DAY`；(f) `parseAmount` 加上限 `<= 1_000_000`；(g) DEFAULT_FORM `donationFrequency` 預設改 `RECURRING`（同義對齊原 `monthly` default）；(h) router.push query params 用 BE enum 值。BFF 收到 form payload 後可直接 forward 給 BE 022 endpoint，無需 mapping 層 |

@@ -1,6 +1,6 @@
 # Spec 008：捐款 / 購買 bottom-sheet 結帳（index）
 
-- **狀態**：Draft（v0.6 — Container/Presentational 分層：每個 sheet 拆 hook + UI component）
+- **狀態**：Draft（v0.7 — enum / payload / URL 全面對齊 backend spec 021 / 022，避免 BFF mapping 層）
 - **建立日期**：2026-06-15
 - **Figma 對應**：IMG_4885（charity 捐款設定）/ IMG_4886（donation 捐款設定，內容同 4885）/ IMG_4887（sale-item 購買數量）
 
@@ -52,7 +52,7 @@ v0.1～v0.3 把通用 UI primitive（modal 機制 / focus trap / 動畫）、兩
 | `/donation-projects/:id` | 「立即捐款」 | `<DonationSettingsSheet>` | [008b](./008b-donation-settings-sheet.md) |
 | `/sale-items/:id` | 「立即捐款」 | `<PurchaseQtySheet>` | [008c](./008c-purchase-qty-sheet.md) |
 
-DonationSettingsSheet 在 charity / donation 兩種 target 共用同一份元件，差別只在 caller 傳的 `target.type`（會體現在 [008b submit payload](./008b-donation-settings-sheet.md#52-submit-payload)）。
+DonationSettingsSheet 在 charity / donation 兩種 target 共用同一份元件，差別只在 caller 傳的 `target.type`（`'CHARITY'` vs `'DONATION_PROJECT'`，對齊 BE OrderSubjectType；見 [008b submit payload](./008b-donation-settings-sheet.md#52-submit-payload)）。
 
 ---
 
@@ -66,7 +66,8 @@ DonationSettingsSheet 在 charity / donation 兩種 target 共用同一份元件
 
 ```tsx
 // src/app/checkout/CtaIsland.tsx ('use client')
-type DonationTarget = { type: 'charity' | 'donation'; id: string }
+// v0.7 — type 對齊 BE OrderSubjectType（CHARITY / DONATION_PROJECT / SALE_ITEM）
+type DonationTarget = { type: 'CHARITY' | 'DONATION_PROJECT'; id: string }
 
 type CtaIslandProps = {
   label: string
@@ -113,8 +114,8 @@ export function CtaIsland(props: CtaIslandProps) {
 
 | Detail page | 現況 CTA placeholder | 取代為 |
 |---|---|---|
-| charity | **in-card** static button `<DirectDonateCta>`（[004a v0.2 §3](./004a-charity-detail.md)） | `<CtaIsland kind="donation" target={{type:'charity', id}} label="直接捐款給團體" />`（sticky=false） |
-| donation | **sticky bottom** `<DonateCta>` 的 `<div className="sticky bottom-0 ...">` | `<CtaIsland kind="donation" target={{type:'donation', id}} label="立即捐款" sticky />` |
+| charity | **in-card** static button `<DirectDonateCta>`（[004a v0.2 §3](./004a-charity-detail.md)） | `<CtaIsland kind="donation" target={{type:'CHARITY', id}} label="直接捐款給團體" />`（sticky=false） |
+| donation | **sticky bottom** `<DonateCta>` 的 `<div className="sticky bottom-0 ...">` | `<CtaIsland kind="donation" target={{type:'DONATION_PROJECT', id}} label="立即捐款" sticky />` |
 | item | **sticky bottom** `<DonateCta>` 同上 | `<CtaIsland kind="purchase" item={item} label="立即捐款" sticky />` |
 
 > v0.4 spec 008 不改 CTA 的「位置」（sticky vs in-card），只改 CTA 的「行為」（從 `console.log` placeholder 改為打開 sheet）。位置策略由 [spec 004a/b/c](./004-detail-pages.md) 決定。
@@ -135,6 +136,7 @@ export function CtaIsland(props: CtaIslandProps) {
 | **三層 test plan**（v0.6）：reducer pure → hook integration → component visual | 同上 | 「能在底層測就不要拉到上層」；pure function 跑最快、component test 只覆蓋視覺整合不重複邏輯 |
 | **a11y modal level**（focus trap / scroll lock / esc / role=dialog）由 BottomSheet 提供 | [008a §6](./008a-bottom-sheet.md#6-a11y--鍵盤) | sheet body spec 不重複 |
 | **a11y form level**（radio group / aria-label）由 sheet body 提供 | [008b §6](./008b-donation-settings-sheet.md#6-a11y) / [008c §6](./008c-purchase-qty-sheet.md#6-a11y) | BottomSheet 不知道 form 內容 |
+| **enum / payload 命名一律對齊 backend** (v0.7)：`DonationFrequency` / `BillingDay` / `ReceiptOption` / `OrderSubjectType` 直接沿用 [BE 021 §5 Prisma enum](../../../backend/docs/specs/021-donation-order-data-model.md)；payload field 名（`donorName` / `amountTwd` / `isAnonymous` / `saleItemId` / `quantity`）直接沿用 [BE 022 §4 body](../../../backend/docs/specs/022-donation-order-api.md) | [008b §3.1](./008b-donation-settings-sheet.md) / [008c §3.1](./008c-purchase-qty-sheet.md) / [009 §2](./009-checkout-confirm.md) | 採 Option C 對齊；BFF route handler 收到 FE payload 後可直接 forward 給 BE，**不需 mapping 層**；未來換 BFF / 接金流時 server-side 只需補 donorName / receiptOption / isAnonymous 等欄位、不需重新對欄位 |
 
 ---
 
@@ -143,13 +145,13 @@ export function CtaIsland(props: CtaIslandProps) {
 `tests/e2e/checkout.spec.ts` 規劃：
 
 - charity detail 點「直接捐款給團體」→ sheet 出現 + 標題「捐款設定」
-- 完整 fill（monthly + 6 日 + 100）→「下一步」可點
+- 完整 fill（RECURRING + DAY_6 + amountTwd=100）→「下一步」可點
 - 點 X / esc / backdrop 都能關 sheet
-- item detail 點「立即捐款」→ 標題「購買數量」+ qty 預設 1 + 總計正確
+- item detail 點「立即捐款」→ 標題「購買數量」+ quantity 預設 1 + 總計正確
 - 點 + 三次 → 總計 = `priceTwd * 4`
 - 開 sheet → 不關閉、refresh → form 不保留（v0.1 不存草稿）
 
-需要 backend mock dispatcher 提供穩定的 charity / donation / item id。
+需要 backend mock dispatcher 提供穩定的 charity / donation / item id（uuid v4）。
 
 ---
 
@@ -173,3 +175,4 @@ export function CtaIsland(props: CtaIslandProps) {
 | 0.4 | 2026-06-15 | **拆 spec**：v0.3 的 810 行依「UI primitive vs business form」分為 008（index，本檔）+ [008a](./008a-bottom-sheet.md) BottomSheet + [008b](./008b-donation-settings-sheet.md) DonationSettings + [008c](./008c-purchase-qty-sheet.md) PurchaseQty。CtaIsland integration 留在本檔 §4。對齊 [003e](./003e-charity-card.md) cards 系列拆 spec 慣例 |
 | 0.5 | 2026-06-15 | **production 最佳實踐補完**：(1) [008a v0.2](./008a-bottom-sheet.md) BottomSheet 用 React **Portal**（`createPortal(tree, document.body)` + `mounted` SSR guard），避免未來 ancestor `transform/filter` 偷走 `fixed` 定位；(2) [008b v0.2](./008b-donation-settings-sheet.md) DonationSettings 改 **`useReducer`** + **`amountInputRaw` 拆兩欄**，解使用者刪字時 ghost-reset bug；(3) [008b](./008b-donation-settings-sheet.md) / [008c v0.2](./008c-purchase-qty-sheet.md) 整 sheet body 包 **`<form onSubmit>`**、submit button `type="submit"`，支援 Enter / iOS Done 鍵 submit。index §5 共同決策表加 4 條 cross-spec 規則 |
 | 0.6 | 2026-06-15 | **Container / Presentational 分層**：[008b v0.4](./008b-donation-settings-sheet.md) `useDonationSettingsForm` + [008c v0.4](./008c-purchase-qty-sheet.md) `usePurchaseQtyForm` + [009a v0.2](./009a-donation-confirm.md) `useDonorInfoForm` + [009b v0.2](./009b-purchase-confirm.md) `useReceiptInfoForm` 四個 custom hook 把 React 整合層從 component 移出；component 變純 UI（純 props → JSX、零 useReducer/useEffect/useRouter 呼叫）。對應 test plan 升級為三層：reducer pure / hook integration / component visual。index §5 共同決策表加 2 條 |
+| 0.7 | 2026-06-15 | **enum / payload / URL 全面對齊 backend spec 021 / 022**（Option C）：[008b v0.5](./008b-donation-settings-sheet.md) + [008c v0.5](./008c-purchase-qty-sheet.md) 同步改寫；CtaIsland 的 `target.type` 從 `'charity'\|'donation'` 改為 `'CHARITY'\|'DONATION_PROJECT'`（對齊 BE OrderSubjectType）；§4.2 detail page 取代規則同步；§5 共同決策表新增一條「enum / payload 命名一律對齊 backend」總綱；§6 e2e 規劃描述更新為 BE 命名 |
