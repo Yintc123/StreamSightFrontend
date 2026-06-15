@@ -68,9 +68,9 @@ export default async function Page({ params }) {
 | 區塊 | 元件 |
 |---|---|
 | TopNav | [003b](./003b-topnav.md)，accessory = 分享 icon |
-| Cover | `<img src={coverImageUrl} alt={name} className="w-full aspect-[4/3] object-cover" />`；缺 → fallback |
+| Cover | `<FallbackImage primary={coverImageUrl} fallback={pickFallbackImage('donation', id)} alt={name} className="w-full aspect-[4/3] object-cover" />`；缺 / onError → picsum（[003e4 §4](./003e4-image-fallback.md#4-使用方式card-整合)） |
 | Title block | `<h1>` + 字號（grey） |
-| 主辦團體 card | `<CharityChip charity />` — logo + 名稱 + 「查看團體 ›」`<Link href={`/charities/${charity.id}`} replace>` ([§lateral nav 規則 004 §3.1](./004-detail-pages.md#31-橫向關聯導航策略v02-新增)) |
+| 主辦團體 card | `<CharityChip charity />` — logo（[`<CharityLogo>`](./003e4-image-fallback.md#43-charity-logo初始字塊-fallback--charitylogo)：缺/onError → `getCharityInitial(name)` 首字塊）+ 名稱 + 「查看團體 ›」`<Link href={`/charities/${charity.id}`} replace>` ([§lateral nav 規則 004 §3.1](./004-detail-pages.md#31-橫向關聯導航策略v02-新增)) |
 | Categories tags | `<CategoryTags categories />` |
 | 專案內容 | `<section><h2>專案內容</h2><div className="prose">{content}</div></section>` |
 | Sticky CTA | `<StickyCta label="立即捐款" />` |
@@ -79,7 +79,7 @@ export default async function Page({ params }) {
 
 ## 5. 邊界
 
-- coverImageUrl 缺 → fallback bg + icon
+- coverImageUrl 缺 / 載入失敗 → Picsum 真照片（與列表 [003e2](./003e2-donation-project-card.md) 共用 [003e4](./003e4-image-fallback.md) `FallbackImage`，seed = `donation-<id>`，640×360）
 - approvalNo 任一缺 → 該行不渲染
 - content 為空字串 → 不渲染「專案內容」section（但通常 backend 會保證有）
 - categories 空 → tag 區不渲染
@@ -92,4 +92,4 @@ export default async function Page({ params }) {
 - 缺 raisingApprovalNo → 該行不出現
 - 點主辦團體 chip → 跳 `/charities/:id`
 - CTA only `console.log`
-- coverImageUrl onError → fallback
+- coverImageUrl onError → 切到 picsum URL（同列表卡片行為）

@@ -1,9 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { CharityLogo } from '@/components/ui/CharityLogo'
+import { FallbackImage } from '@/components/ui/FallbackImage'
 import { TopNav } from '@/components/ui/TopNav'
 import { fetchDonationDetail } from '@/lib/api/getDetail'
 import { NotFoundError } from '@/lib/errors/NotFoundError'
+import { pickFallbackImage } from '@/lib/mock/fallback-images'
 import type { DonationDetail } from '@/lib/schemas/detail'
 
 type PageProps = { params: Promise<{ id: string }> }
@@ -42,7 +45,11 @@ export default async function Page({ params }: PageProps) {
   return (
     <div className="flex flex-col min-h-dvh bg-surface-page">
       <TopNav title="捐款專案介紹" />
-      <Cover coverImageUrl={donation.coverImageUrl} alt={donation.name} />
+      <Cover
+        coverImageUrl={donation.coverImageUrl}
+        fallback={pickFallbackImage('donation', donation.id)}
+        alt={donation.name}
+      />
       <div className="mx-3 -mt-4 bg-surface-card rounded-2xl shadow-sm relative z-10 p-5 space-y-4">
         <h1 className="text-base font-semibold text-ink-AAA leading-7">
           {donation.name}
@@ -67,21 +74,19 @@ export default async function Page({ params }: PageProps) {
   )
 }
 
-function Cover({ coverImageUrl, alt }: { coverImageUrl?: string; alt: string }) {
-  if (!coverImageUrl) {
-    return (
-      <div
-        aria-hidden
-        className="w-full aspect-[4/3] bg-black/5 flex items-center justify-center text-ink-A"
-      >
-        <span className="text-sm">無封面圖片</span>
-      </div>
-    )
-  }
+function Cover({
+  coverImageUrl,
+  fallback,
+  alt,
+}: {
+  coverImageUrl?: string
+  fallback: string
+  alt: string
+}) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={coverImageUrl}
+    <FallbackImage
+      primary={coverImageUrl}
+      fallback={fallback}
       alt={alt}
       className="w-full aspect-[4/3] object-cover"
     />
@@ -134,16 +139,7 @@ function CharityChip({
           className="w-10 h-10 rounded-md bg-brand/10 text-brand
                      flex items-center justify-center text-sm font-medium shrink-0 overflow-hidden"
         >
-          {charity.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={charity.logoUrl}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            charity.name[0]
-          )}
+          <CharityLogo name={charity.name} logoUrl={charity.logoUrl} />
         </div>
         <div className="text-sm text-ink-AAA line-clamp-1">{charity.name}</div>
       </div>

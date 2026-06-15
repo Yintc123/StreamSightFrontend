@@ -1,9 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { CharityLogo } from '@/components/ui/CharityLogo'
+import { FallbackImage } from '@/components/ui/FallbackImage'
 import { TopNav } from '@/components/ui/TopNav'
 import { fetchItemDetail } from '@/lib/api/getDetail'
 import { NotFoundError } from '@/lib/errors/NotFoundError'
+import { pickFallbackImage } from '@/lib/mock/fallback-images'
 import type { ItemDetail } from '@/lib/schemas/detail'
 
 type PageProps = { params: Promise<{ id: string }> }
@@ -43,7 +46,11 @@ export default async function Page({ params }: PageProps) {
   return (
     <div className="flex flex-col min-h-dvh bg-surface-page">
       <TopNav title="義賣商品" />
-      <CoverWithRibbon coverImageUrl={item.coverImageUrl} alt={item.name} />
+      <CoverWithRibbon
+        coverImageUrl={item.coverImageUrl}
+        fallback={pickFallbackImage('item', item.id)}
+        alt={item.name}
+      />
       <div className="px-5 py-5 space-y-4 bg-surface-card">
         <div>
           <h1 className="text-base font-semibold text-ink-AAA leading-7">
@@ -75,28 +82,21 @@ export default async function Page({ params }: PageProps) {
 
 function CoverWithRibbon({
   coverImageUrl,
+  fallback,
   alt,
 }: {
   coverImageUrl?: string
+  fallback: string
   alt: string
 }) {
   return (
     <div className="relative w-full aspect-square">
-      {coverImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={coverImageUrl}
-          alt={alt}
-          className="w-full h-full object-cover"
-        />
-      ) : (
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-black/5 flex items-center justify-center text-ink-A"
-        >
-          <span className="text-sm">無商品圖片</span>
-        </div>
-      )}
+      <FallbackImage
+        primary={coverImageUrl}
+        fallback={fallback}
+        alt={alt}
+        className="w-full h-full object-cover"
+      />
       {/* spec 004c — detail ribbon (雙語版): */}
       <div className="absolute top-3 left-0 px-3 py-1 bg-brand text-white rounded-r-md shadow">
         <div className="text-sm font-semibold leading-tight">公益義賣</div>
@@ -154,16 +154,7 @@ function CharityChip({
           className="w-10 h-10 rounded-md bg-brand/10 text-brand
                      flex items-center justify-center text-sm font-medium shrink-0 overflow-hidden"
         >
-          {charity.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={charity.logoUrl}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            charity.name[0]
-          )}
+          <CharityLogo name={charity.name} logoUrl={charity.logoUrl} />
         </div>
         <div className="text-sm text-ink-AAA line-clamp-1">{charity.name}</div>
       </div>

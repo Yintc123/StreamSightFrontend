@@ -1,11 +1,14 @@
 # Spec 003e4：Image Fallback（共用基礎建設）
 
-- **狀態**：Draft（v0.3 — 補 §1.1 圖片資料來源表）
+- **狀態**：Draft（v0.5 — 詳細頁 CharityChip 套 `CharityLogo` 對齊列表）
 - **路徑**：
   - `src/components/ui/useImageWithFallback.ts`
+  - `src/components/ui/FallbackImage.tsx`（v0.4 新增）
+  - `src/components/ui/CharityLogo.tsx`（v0.5 新增）
+  - `src/components/ui/charity-initial.ts`
   - `src/lib/mock/fallback-images.ts`
 - **依賴**：[003e Cards (index)](./003e-charity-card.md)、[003e2](./003e2-donation-project-card.md)、[003e3](./003e3-sale-item-card.md)
-- **建立日期**：2026-06-14（v0.1）/ 2026-06-15（v0.2、v0.3）
+- **建立日期**：2026-06-14（v0.1）/ 2026-06-15（v0.2、v0.3、v0.4、v0.5）
 
 ---
 
@@ -171,7 +174,9 @@ export function pickFallbackImage(kind: FallbackKind, id: string): string
 
 ## 4. 使用方式（card 整合）
 
-[003e2](./003e2-donation-project-card.md) / [003e3](./003e3-sale-item-card.md) 內：
+### 4.1 列表卡片（Client Component）
+
+[003e2](./003e2-donation-project-card.md) / [003e3](./003e3-sale-item-card.md) 是 client component，直接用 hook：
 
 ```tsx
 const { src, onError } = useImageWithFallback(
@@ -192,6 +197,69 @@ return (
 ```
 
 > 不再需要 `useState(imgFailed)` + conditional render — `<img>` 永遠渲染，src 由 hook 決定。
+
+### 4.2 詳細頁 Cover（RSC）
+
+[004b](./004b-donation-project-detail.md) / [004c](./004c-sale-item-detail.md) 是 RSC，不能直接用 hook（`useState` 只能在 client）。包一層 `<FallbackImage>` client wrapper：
+
+```tsx
+// src/components/ui/FallbackImage.tsx ('use client')
+export function FallbackImage({ primary, fallback, alt, className, width, height }) {
+  const { src, onError } = useImageWithFallback(primary, fallback)
+  return <img src={src} alt={alt} onError={onError} loading="lazy" decoding="async" className={className} width={width} height={height} />
+}
+```
+
+RSC 端：
+
+```tsx
+// donation-projects/[id]/page.tsx
+<FallbackImage
+  primary={donation.coverImageUrl}
+  fallback={pickFallbackImage('donation', donation.id)}
+  alt={donation.name}
+  className="w-full aspect-[4/3] object-cover"
+/>
+
+// sale-items/[id]/page.tsx
+<FallbackImage
+  primary={item.coverImageUrl}
+  fallback={pickFallbackImage('item', item.id)}
+  alt={item.name}
+  className="w-full h-full object-cover"
+/>
+```
+
+> `pickFallbackImage` 是 pure function、可在 RSC 預先算好 URL 後當 prop 傳給 client wrapper，picsum URL 選擇仍在 server-side。Client wrapper 只負責 failed-state flip。
+
+### 4.3 charity logo（初始字塊 fallback）— `<CharityLogo>`
+
+charity logo（列表 [003e1](./003e1-charity-card.md) + 詳細頁 Hero + 詳細頁 `<CharityChip>`）fallback 走「首字塊」而非 URL，不接 `FallbackImage`。為了讓 RSC 也能 onError swap，抽出 `<CharityLogo>` client component（v0.5）：
+
+```tsx
+// src/components/ui/CharityLogo.tsx ('use client')
+export function CharityLogo({ name, logoUrl }: { name: string; logoUrl?: string }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const hasLogo = !!logoUrl && !imgFailed
+  return hasLogo ? (
+    <img src={logoUrl} alt="" loading="lazy" decoding="async"
+         onError={() => setImgFailed(true)}
+         className="w-full h-full object-cover" />
+  ) : (
+    <>{getCharityInitial(name)}</>
+  )
+}
+```
+
+只渲染內容（img 或 initial 文字），**外層容器（尺寸 / 背景 / flex 置中）由 caller 提供**——保留 64×64（card）/ 40×40（chip）/ 96×96（hero）的尺寸彈性。
+
+| Caller | 外層 | 用途 |
+|---|---|---|
+| [003e1 CharityCard](./003e1-charity-card.md) | `w-16 h-16 rounded-[9px] border bg-brand/10 ...` | 列表 64×64 |
+| [004a charity detail Hero](./004a-charity-detail.md) | `w-24 h-24 rounded-full bg-white ...` | 詳細頁 96×96（_v0.5 待 CharityCard / Hero 改用_） |
+| [004b](./004b-donation-project-detail.md) / [004c](./004c-sale-item-detail.md) `<CharityChip>` | `w-10 h-10 rounded-md bg-brand/10 ...` | 詳細頁關聯團體 chip 40×40（_v0.5 已套用_） |
+
+> v0.5 範圍：只把 `CharityChip`（在 donation/item 詳細頁內定義）的 logo 改用 `CharityLogo`。CharityCard / Hero 維持原 inline 實作（功能已等價，重構是 cosmetic，暫不動）。
 
 ---
 
@@ -242,3 +310,5 @@ return (
 | 0.1 | 2026-06-14 | 初版：抽出 `useImageWithFallback` + `pickFallbackImage` + 12 張本地 mock SVG（donation 6 / item 6，djb2 hash 池）；charity 維持首字母 fallback |
 | 0.2 | 2026-06-15 | Fallback 來源改 Picsum Photos seed URL（`/seed/<kind>-<id>/W/H`）：視覺品質高 / 無限不撞圖 / 仍 deterministic；移除本地 SVG 池 + `FALLBACK_POOL_SIZE` + hash 函式；補 §2.5 已知不足（1×1 placeholder 不觸發 fallback） |
 | 0.3 | 2026-06-15 | 補 §1.1「圖片資料來源（per tab × per mode）」：列出三 tab 在 `USE_MOCK=1` / `USE_MOCK=0` 下的 primary URL 來源 + fallback 對應、LocalStack S3 URL pattern、placeholder workaround；前面只描述 fallback 策略，缺 primary 來源說明 |
+| 0.4 | 2026-06-15 | 詳細頁 Cover 套同款 fallback：新增 `<FallbackImage>` client wrapper（thin `<img>` + `useImageWithFallback`），donation/item 詳細頁的 `Cover` / `CoverWithRibbon` 改用之；`pickFallbackImage` 在 RSC 預算 URL 後當 prop 傳入；charity Hero / CharityChip 維持首字塊（範圍 user-confirmed）；§4 拆 4.1 列表 / 4.2 詳細 / 4.3 charity 例外 |
+| 0.5 | 2026-06-15 | 新增 `<CharityLogo>` client component（內含 onError handler，fallback 為 `getCharityInitial(name)`），donation/item 詳細頁的 `<CharityChip>` 內聯 logo 邏輯改用之，對齊 [003e1 CharityCard](./003e1-charity-card.md) 處理方式（原本 chip 是 `charity.name[0]` 取單字、無 onError）。CharityCard / 詳細頁 Hero 雖等價但未重構（行為已正確、cosmetic refactor 留待後續）；§4.3 更新並列出三個 caller 的容器規格 |

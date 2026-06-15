@@ -65,10 +65,10 @@ export default async function Page({ params }) {
 | 區塊 | 元件 |
 |---|---|
 | TopNav | [003b](./003b-topnav.md)，標題「義賣商品」（IMG_4882 標題列字樣），accessory = 分享 |
-| Cover + ribbon | `<SaleItemHero coverImageUrl name />` — 圖 + 絲帶 banner overlay（「公益義賣 SHOP FOR CHANGE」） |
+| Cover + ribbon | `<CoverWithRibbon coverImageUrl name fallback={pickFallbackImage('item', id)} />` — `<FallbackImage>` + 絲帶 banner overlay（「公益義賣 SHOP FOR CHANGE」）；缺 / onError → picsum（[003e4 §4](./003e4-image-fallback.md#4-使用方式card-整合)） |
 | 商品名 + 價格 | `<div><h1 className="text-base font-semibold">{name}</h1><p className="text-lg font-bold text-red-500">TWD {千分位}</p></div>` |
 | 字號區 | `<ApprovalNoList raisingApprovalNo reliefApprovalNo />` |
-| 主辦團體 chip | 同 004b §4 `<CharityChip>`；用 `<Link href replace>` ([004 §3.1 lateral nav](./004-detail-pages.md#31-橫向關聯導航策略v02-新增)) |
+| 主辦團體 chip | 同 004b §4 `<CharityChip>`（logo 用 [`<CharityLogo>`](./003e4-image-fallback.md#43-charity-logo初始字塊-fallback--charitylogo)，缺/onError → 首字塊）；用 `<Link href replace>` ([004 §3.1 lateral nav](./004-detail-pages.md#31-橫向關聯導航策略v02-新增)) |
 | Categories | `<CategoryTags />` |
 | 商品說明 | `<section><h2>商品說明</h2><div className="prose">{content}</div></section>` |
 | Sticky CTA | `<StickyCta label="立即捐款" />` |
@@ -77,7 +77,7 @@ export default async function Page({ params }) {
 
 ## 5. 邊界
 
-- coverImageUrl 缺 → fallback bg
+- coverImageUrl 缺 / 載入失敗 → Picsum 真照片（與列表 [003e3](./003e3-sale-item-card.md) 共用 [003e4](./003e4-image-fallback.md) `FallbackImage`，seed = `item-<id>`，400×400）
 - 任一字號缺 → 該行不渲染
 - `priceTwd = 0` → 顯示「TWD 0」（不擋）
 - categories 空 → tag 區不渲染
