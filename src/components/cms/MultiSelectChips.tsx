@@ -38,9 +38,11 @@ export function MultiSelectChips<T extends string>({
                 onChange(Array.from(next) as T[])
               }}
               className={[
-                'h-8 px-3 rounded-full text-xs leading-5',
+                'h-8 px-3 rounded-full text-xs leading-5 transition-colors',
+                // Selected: solid brand red + white text + ring for stronger
+                // visual lift; unselected: faint grey with hover affordance.
                 on
-                  ? 'bg-brand text-white'
+                  ? 'bg-brand text-white font-medium ring-2 ring-brand/40 ring-offset-1'
                   : 'bg-black/5 text-ink-AA hover:bg-black/10',
                 disabled && 'opacity-50 cursor-not-allowed',
               ]

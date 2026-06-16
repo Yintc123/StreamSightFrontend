@@ -45,6 +45,42 @@ describe('CharityForm edit pre-fill', () => {
     expect(end.value).not.toBe('')
   })
 
+  it('initial categoryIds → 對應 chip 套 bg-brand（已選 highlight）', () => {
+    const initial: FormState = {
+      ...DEFAULT_FORM,
+      name: 'x',
+      description: 'd',
+      categoryIds: ['cat-1'],
+    }
+    render(
+      <CharityForm
+        mode="edit"
+        id="x"
+        initial={initial}
+        categories={[
+          {
+            id: 'cat-1',
+            key: 'child_care' as const,
+            displayName: '兒少照護',
+            displayOrder: 0,
+          },
+          {
+            id: 'cat-2',
+            key: 'animal_protection' as const,
+            displayName: '動物保護',
+            displayOrder: 0,
+          },
+        ]}
+      />,
+    )
+    const selected = document.querySelector(
+      'button[aria-pressed="true"]',
+    ) as HTMLButtonElement
+    expect(selected).not.toBeNull()
+    expect(selected.textContent).toBe('兒少照護')
+    expect(selected.className).toMatch(/bg-brand/)
+  })
+
   it('publishStartAt/End empty initial → empty inputs', () => {
     render(
       <CharityForm
