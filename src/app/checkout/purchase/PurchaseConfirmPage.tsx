@@ -12,6 +12,10 @@ import {
   DisclaimerBox,
   DISCLAIMER_PLATFORM,
 } from '@/components/ui/DisclaimerBox'
+import {
+  ReminderNote,
+  REMINDER_DONOR_NAME,
+} from '@/components/ui/ReminderNote'
 import { RequiredLabel } from '@/components/ui/RequiredLabel'
 import type { ItemDetail } from '@/lib/schemas/detail'
 import type { PurchaseDraft } from './draft-store'
@@ -144,6 +148,8 @@ function ReceiptInfoFormPanel({
         />
         <span>我要匿名捐款</span>
       </label>
+
+      <ReminderNote className="mt-4">{REMINDER_DONOR_NAME}</ReminderNote>
     </ConfirmPanel>
   )
 }

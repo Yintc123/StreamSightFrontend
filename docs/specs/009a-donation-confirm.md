@@ -1,16 +1,16 @@
 # Spec 009a：`/checkout/donation` 捐款確認頁
 
-- **狀態**：Draft（v0.11 — BE 022 contract audit fixes：§9 OQ `note` 欄位段落改寫，補 BFF schema 對齊 + 未來補 UI checklist；form / payload 行為無變動）
+- **狀態**：Draft（v0.12 — 加 `<ReminderNote>` 到 Panel 2 底部，參考 IMG_4891）
 - **路徑（規劃）**：
   - `src/app/checkout/donation/page.tsx`（RSC）
   - `src/app/checkout/donation/useDonorInfoForm.ts` + `.test.ts`（v0.2 — pure logic hook）
   - `src/app/checkout/donation/DonorInfoForm.tsx` + `.test.tsx`（v0.2 起為純 UI）
 - **依賴**：
   - [009 index §2 routing](./009-checkout-confirm.md#2-routing) — 接收 query params
-  - [009c shared confirm UI](./009c-shared-confirm-ui.md) — `<ConfirmPageShell>` / `<ConfirmPanel>` / `<KeyValueList>` / `<DisclaimerBox>` / `<RequiredLabel>` 等 primitive
+  - [009c shared confirm UI](./009c-shared-confirm-ui.md) — `<ConfirmPageShell>` / `<ConfirmPanel>` / `<KeyValueList>` / `<DisclaimerBox>` / `<RequiredLabel>` / `<ReminderNote>` 等 primitive
   - 既有 RSC fetcher：`fetchCharityDetail` / `fetchDonationDetail`（[004 §3](./004-detail-pages.md)）
   - [008b v0.2 reducer pattern](./008b-donation-settings-sheet.md#32-reducer-patternv02--取代-v01-的-usestate--setform)（form state 套路）
-- **Figma 對應**：IMG_4888（charity 直接捐款）+ IMG_4889（donation 專案捐款，layout 完全相同）
+- **Figma 對應**：IMG_4888（charity 直接捐款）+ IMG_4889（donation 專案捐款，layout 完全相同）+ IMG_4891（v0.12 Panel 2 底部小提醒）
 
 ---
 
@@ -234,7 +234,10 @@ function DonationDetailPanel({ query, target }: {
 │  │ 請填寫姓名                    │    │  ← <input> text
 │  └─────────────────────────────┘    │
 │                                       │
-│  (其他欄位 — 截圖未拉到底，TBD)        │
+│  ☐ 我要匿名捐款                       │  ← v0.8 checkbox
+│                                       │
+│  ❗ 小提醒：送出前請再次確認您填寫的    │  ← v0.12 ReminderNote (IMG_4891)
+│     姓名是否正確。若資料有誤將無法申報。│
 └──────────────────────────────────────┘
 ```
 
@@ -282,6 +285,22 @@ const RECEIPT_OPTIONS: { value: ReceiptOption; label: string }[] = [
 ### 5.3 捐款人姓名 input
 
 `<input type="text" maxLength={120}>`，required（client 端非空驗證；長度上限對齊 [BE 022 §4.1 donorName 1-120 字](../../../backend/docs/specs/022-donation-order-api.md)）。
+
+### 5.3a 卡內小提醒（v0.12 — 參考 IMG_4891）
+
+實作於 [`<ReminderNote>`](./009c-shared-confirm-ui.md#27-remindernote--卡內-inline-提醒v02-新增)；預設文案 `REMINDER_DONOR_NAME` 同檔 export：
+
+```tsx
+import { ReminderNote, REMINDER_DONOR_NAME } from '@/components/ui/ReminderNote'
+
+<ReminderNote className="mt-4">{REMINDER_DONOR_NAME}</ReminderNote>
+```
+
+文案內容：「送出前請再次確認您填寫的姓名是否正確。若資料有誤將無法申報。」
+
+**位置**：Panel 2 的最後一個元素（匿名 checkbox 下方、conditional render 之外）。即使收據方式未選、姓名 input 尚未出現也常駐顯示，避免使用者誤以為填完才會看到此提醒。
+
+**文案差異說明**：IMG_4891 原文為「姓名與**身分證字號**是否正確」，但本頁實際只蒐集 `donorName`（身分證字號預設來自 JKOS 帳戶 KYC，本頁不編輯）。文案收斂為僅「姓名」，避免使用者找不到「身分證字號」欄位的混淆 UX。設計補上身分證字號 input 時可同步把「與身分證字號」加回 `REMINDER_DONOR_NAME` const。
 
 ### 5.4 Form state（reducer，對齊 [008b §3.2](./008b-donation-settings-sheet.md)；v0.4 — 命名對齊 BE）
 
@@ -390,6 +409,7 @@ export function useDonorInfoForm(
 ```tsx
 import { ConfirmPanel } from '@/components/ui/ConfirmPanel'
 import { DisclaimerBox, DISCLAIMER_PLATFORM } from '@/components/ui/DisclaimerBox'
+import { ReminderNote, REMINDER_DONOR_NAME } from '@/components/ui/ReminderNote'
 import { RequiredLabel } from '@/components/ui/RequiredLabel'
 
 type DonorInfoFormPanelProps = {
@@ -412,16 +432,24 @@ export function DonorInfoFormPanel({ form, dispatch }: DonorInfoFormPanelProps) 
         {RECEIPT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
 
-      <RequiredLabel htmlFor="donorName" className="mb-2">捐款人姓名</RequiredLabel>
-      <input
-        id="donorName"
-        type="text"
-        maxLength={120}                        // 對齊 BE 022 §4.1 donorName 上限
-        placeholder="請填寫姓名"
-        value={form.donorName}
-        onChange={(e) => dispatch({ type: 'SET_DONOR_NAME', value: e.target.value })}
-        className="w-full h-12 rounded-lg border border-line bg-surface-card px-3 text-sm text-ink-AAA placeholder:text-ink-A focus:border-2 focus:border-ink-AAA focus:outline-none"
-      />
+      {/* v0.9 — 收據未選不顯示姓名 input；v0.12 — 不論是否選收據都掛小提醒在 panel 底部 */}
+      {form.receiptOption !== null && (
+        <>
+          <RequiredLabel htmlFor="donorName" className="mb-2">捐款人姓名</RequiredLabel>
+          <input
+            id="donorName"
+            type="text"
+            maxLength={120}                        // 對齊 BE 022 §4.1 donorName 上限
+            placeholder="請填寫姓名"
+            value={form.donorName}
+            onChange={(e) => dispatch({ type: 'SET_DONOR_NAME', value: e.target.value })}
+            className="w-full h-12 rounded-lg border border-line bg-surface-card px-3 text-sm text-ink-AAA placeholder:text-ink-A focus:border-2 focus:border-ink-AAA focus:outline-none"
+          />
+          {/* 匿名 checkbox 詳見 §5.8 v0.8 */}
+        </>
+      )}
+
+      <ReminderNote className="mt-4">{REMINDER_DONOR_NAME}</ReminderNote>
     </ConfirmPanel>
   )
 }
@@ -596,3 +624,4 @@ E2E 後續可加，本 v0.1 不強制。
 | 0.9 | 2026-06-15 | **收據開立方式預設未選 → 姓名 input 條件渲染**：FormState `receiptOption` 從 `ReceiptOption` 改為 `ReceiptOption \| null`，DEFAULT_FORM 改 `null`；`DEFAULT_RECEIPT_OPTION` const 移除。Action `SET_RECEIPT_OPTION` value 也允許 null（使用者反悔選 placeholder）。`<select>` 新增 placeholder option（value=""、disabled、「請選擇收據開立方式」）；當 state 是 null 時 select 顯示 placeholder。**捐款人姓名 input + 匿名 checkbox 整段在 `receiptOption !== null` 時才條件渲染**（避免姓名先填、收據未選的 mismatch UX）。`isValid` + `buildPayload` 都加上「receiptOption !== null」gate；buildPayload 在斷言點做 type narrow。Test 升級：R6/R7 reducer pure、H1/H2 預期改、H2b/H3/H4/H5/H6/H8/H9/H10/H11 都先 dispatch SET_RECEIPT_OPTION；component test 4/4b/5/5b/5c/6 改成「先 selectOption 再 type」的流程；test 6 斷言 `<select>` 共 6 個 options（5 BE enum + 1 placeholder） |
 | 0.10 | 2026-06-16 | **`_endpoint` cutover 到 `/user/v1/donation/orders/*`**（對齊 [backend spec 023 §2.4](../../../backend/docs/specs/023-api-routing-versioning.md)）：§6.1 payload `DonationConfirmPayload` 兩個 discriminator 字面值（`charity-donation` / `project-donation`）、`buildPayload` 範例、§8.2 Hook integration test H5 / H6 斷言全部從 `/v1/donation/orders/*` 改 `/user/v1/donation/orders/*`。BE 022 body shape 本身無變動；FE 端只是 discriminator 字面值跟著 BE wire path 走。 |
 | 0.11 | 2026-06-16 | **BE 022 contract audit fixes**（隨 [spec 009 v0.8](./009-checkout-confirm.md)）：本 spec 對應更新 §9 OQ「`note` 欄位」改寫為較完整的「BE 接受但 UI 未開」說明 + 補上 BFF schema 也未帶 note 的事實 + 未來補 UI 的 3-點 checklist。本 spec 描述的 form state / payload / response 行為皆無變動（變動都在 BFF route + mock + 加入 6 個 BFF test），故 §5 / §6 / §8 文案不需改。 |
+| 0.12 | 2026-06-16 | **新增 §5.3a 卡內小提醒**（參考 IMG_4891）：Panel 2 底部常駐 `<ReminderNote>{REMINDER_DONOR_NAME}</ReminderNote>`，文案「送出前請再次確認您填寫的姓名是否正確。若資料有誤將無法申報。」放在 conditional render 之外（即收據未選也顯示）。圖中原文「姓名與身分證字號」收斂為僅「姓名」對齊本頁實際可編輯欄位；身分證字號目前由 JKOS 帳戶 KYC 提供、本頁不蒐集。§5.7 panel reference JSX 同步加 import + 元素；ASCII layout 加 checkbox + reminder 兩行。Primitive 新增於 [009c v0.2 §2.7](./009c-shared-confirm-ui.md#27-remindernote--卡內-inline-提醒v02-新增)。Form state / payload / submit 行為無變動 |

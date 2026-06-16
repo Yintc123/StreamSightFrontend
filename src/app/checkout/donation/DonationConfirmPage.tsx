@@ -13,6 +13,10 @@ import {
   DisclaimerBox,
   DISCLAIMER_PLATFORM,
 } from '@/components/ui/DisclaimerBox'
+import {
+  ReminderNote,
+  REMINDER_DONOR_NAME,
+} from '@/components/ui/ReminderNote'
 import { RequiredLabel } from '@/components/ui/RequiredLabel'
 import type { DonationDetail } from '@/lib/schemas/detail'
 import { computeNextChargeAt, fmtDate } from './computeNextChargeAt'
@@ -169,6 +173,8 @@ function DonorInfoFormPanel({
           </label>
         </>
       )}
+
+      <ReminderNote className="mt-4">{REMINDER_DONOR_NAME}</ReminderNote>
     </ConfirmPanel>
   )
 }
