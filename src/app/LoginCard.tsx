@@ -28,7 +28,11 @@ export function LoginCard() {
     setError(null)
     startTransition(async () => {
       try {
-        const res = await fetch('/api/dev/login', { method: 'POST' })
+        const res = await fetch('/api/dev/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ identifier: username, password }),
+        })
         if (!res.ok) {
           setError(`登入失敗 (HTTP ${res.status.toString()})`)
           return

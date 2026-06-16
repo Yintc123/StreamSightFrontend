@@ -1,17 +1,19 @@
-// Spec 011 §3.4 (v0.2) — dev login now bridges to BE auth so the issued
-// session carries a real admin JWT, not a fake string. Without this the
-// CMS routes 401 the moment they call BE admin endpoints.
+// Spec 011 §3.4 (v0.3) — dev login bridges to BE auth so the issued
+// session carries a real JWT. Accepts optional `{ identifier, password }`
+// body for caller-provided credentials (LoginCard form); falls back to
+// env DEV_ADMIN_USERNAME / DEV_ADMIN_PASSWORD when body is absent
+// (skip-login style API call / scripts).
 //
-// Flow mirrors /api/auth/register two-leg dance, but reads credentials
-// from env (defaults match BE prisma/seed.ts bootstrapAdmin):
 //   1. POST /auth/login  { identifier, password }  → tokens
-//   2. GET  /auth/me     Bearer ${access}          → user + role
+//   2. GET  /auth/me     Bearer ${access}          → user (role from JWT)
 //   3. getSessionService().create(...)
 //
-// Disabled in production / when ENABLE_DEV_LOGIN=0; csrfExempt=true so
-// the empty-body POST from the homepage skip-login button gets through.
+// Disabled in production / when ENABLE_DEV_LOGIN=0. csrfExempt=true —
+// unauthenticated anonymous POST has no session to defend.
 
 import 'server-only'
+import { z } from 'zod'
+
 import { createRoute } from '@/lib/api'
 import { backendFetch } from '@/lib/api/backend'
 import { decodeJwtPayload } from '@/lib/auth/decodeJwtPayload'
@@ -24,6 +26,14 @@ import {
   BackendMeResponse,
   BackendRegisterResponse as BackendLoginResponse,
 } from '@/lib/schemas/auth'
+
+// Optional body — both fields together or neither (env fallback).
+const LoginBody = z
+  .object({
+    identifier: z.string().min(1).max(254).optional(),
+    password: z.string().min(1).max(256).optional(),
+  })
+  .optional()
 
 const NO_STORE_HEADERS = {
   'content-type': 'application/json',
@@ -45,18 +55,21 @@ function resolveRole(
 
 export const POST = createRoute({
   csrfExempt: true,
-  handler: async ({ requestId }) => {
+  bodySchema: LoginBody,
+  handler: async ({ body, requestId }) => {
     if (env.NODE_ENV === 'production' || env.ENABLE_DEV_LOGIN !== '1') {
       throw new NotFoundError('dev login disabled')
     }
 
-    // Step 1 — BE /auth/login with seeded admin creds.
+    // Use caller-supplied credentials if both present; otherwise the
+    // env-seeded fallback (matches BE prisma/seed.ts bootstrapAdmin).
+    const identifier = body?.identifier ?? env.DEV_ADMIN_USERNAME
+    const password = body?.password ?? env.DEV_ADMIN_PASSWORD
+
+    // Step 1 — BE /auth/login
     const { data: rawTokens } = await backendFetch<unknown>('/auth/login', {
       method: 'POST',
-      body: {
-        identifier: env.DEV_ADMIN_USERNAME,
-        password: env.DEV_ADMIN_PASSWORD,
-      },
+      body: { identifier, password },
       requestId,
       passClientErrors: true,
     })
@@ -82,7 +95,7 @@ export const POST = createRoute({
     }
     const me = meParsed.data
 
-    // Step 3 — session.create with the REAL admin tokens.
+    // Step 3 — session.create with the real tokens.
     //
     // BE /auth/me does NOT return `role` (BE 008 §6.4 — role lives only
     // in the JWT claims per spec 007 §10.10). Decode the access token to
@@ -91,7 +104,7 @@ export const POST = createRoute({
     const now = Date.now()
     const accessTokenExpiresAt = now + tokens.accessExpiresIn * 1000
     const refreshTokenExpiresAt = now + tokens.refreshExpiresIn * 1000
-    const name = me.username ?? me.email ?? 'Admin'
+    const name = me.username ?? me.email ?? 'User'
     const role = resolveRole(me.role, tokens.accessToken)
     const user = { id: me.id, name }
 
