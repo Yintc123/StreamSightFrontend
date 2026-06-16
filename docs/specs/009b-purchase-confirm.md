@@ -515,7 +515,7 @@ function buildPayload(
 
 ## 10. 開放問題
 
-- **「我要匿名捐款」ⓘ icon 點開內容**：Figma 4890 沒給。實作時可暫用 `aria-label` 充當、未來補真實 tooltip / popover
+- ~~**「我要匿名捐款」ⓘ icon 點開內容**：Figma 4890 沒給。實作時可暫用 `aria-label` 充當、未來補真實 tooltip / popover~~ → ✅ 由 [009d 「匿名捐款」說明對話框](./009d-anonymous-info-dialog.md) 解：對應 IMG_4892 / IMG_4893，新增 `<InfoDialog>` 通用置中浮層 primitive + `<AnonymousInfoTrigger>` 業務組合。`<ReceiptInfoFormPanel>` checkbox label 內的 `<button>+<InfoIcon>` 占位（[§6.4 v0.4 reference JSX](#64-receiptinfoformpanel-referencepanel-3-內容)）替換為 `<AnonymousInfoTrigger />`
 - **匿名 vs 姓名必填**：v0.1 強制要姓名（收據用途）；商業 / 法務角度可能允許「完全匿名 = 不出收據」。等 PM 確認。BE 022 §4.3 不論 isAnonymous=true/false 都要求 `donorName` non-empty（BE side 一律 echo 原樣、由 UI 端決定是否顯示「匿名捐款者」）
 - **品項表的 SR semantic**：v0.1 用 `<div>` flex；未來考慮 table semantic 更標準
 - **多商品 / 多品項**：v0.1 假設單一 sku；BE 022 §4.3 + spec 021 也限定 `items` length 必須剛好 1（未來 cart 多 line 列為 BE OQ #3），FE 對齊一致

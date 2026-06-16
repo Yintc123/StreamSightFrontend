@@ -1,6 +1,6 @@
 # Spec 009：結帳確認頁（捐款 / 購買，index）
 
-- **狀態**：Draft（v0.10 — purchase CTA 文字 `確認送出` → `確認購買`；donation 維持「確認捐款」）
+- **狀態**：Draft（v0.11 — 加入 [009d 匿名捐款說明對話框](./009d-anonymous-info-dialog.md) 子 spec；009b §10 OQ「ⓘ 點開內容」標為已解）
 - **建立日期**：2026-06-15
 - **Figma 對應**：IMG_4888（charity 直捐確認）/ IMG_4889（donation 確認）/ IMG_4890（item 購買確認）
 
@@ -17,7 +17,8 @@
 | **009（本檔，index）** | routing、payload contract、page-level 共同決策、008b/c 串接點 |
 | [**009a DonationConfirm**](./009a-donation-confirm.md) | charity 直接捐款 + donation 專案捐款共用（4888 / 4889）：捐款明細 panel + 捐款人基本資料 panel（含 receipt type / 姓名）|
 | [**009b PurchaseConfirm**](./009b-purchase-confirm.md) | item 義賣商品購買（4890）：購買明細 panel + 捐款人資料 disclaimer panel + 收據資訊 panel（含姓名 / 匿名 checkbox）|
-| [**009c SharedConfirmUI**](./009c-shared-confirm-ui.md) | UI primitives：`<ConfirmPageShell>` / `<ConfirmPanel>` / `<KeyValueList>` / `<DisclaimerBox>` / `<RequiredLabel>` / `<StickyConfirmCta>`。009a / 009b 共用 |
+| [**009c SharedConfirmUI**](./009c-shared-confirm-ui.md) | UI primitives：`<ConfirmPageShell>` / `<ConfirmPanel>` / `<KeyValueList>` / `<DisclaimerBox>` / `<RequiredLabel>` / `<StickyConfirmCta>` / `<ReminderNote>`。009a / 009b 共用 |
+| [**009d AnonymousInfoDialog**](./009d-anonymous-info-dialog.md) | 匿名捐款 ⓘ 浮層（4892 trigger / 4893 dialog）：`<InfoDialog>` 通用置中 modal primitive + `<AnonymousInfoTrigger>` 業務組合 |
 
 v0.2 抽 009c：009a / 009b 排版高度相同（紅 hero + 白 panel + dl + disclaimer + sticky CTA），把這些固化成 ui primitive、business form 內容 caller 自接。對齊 008a BottomSheet「UI primitive vs business form 分 spec」慣例。
 
@@ -295,3 +296,4 @@ type CtaIslandProps = {
 | 0.8 | 2026-06-16 | **BE 022 contract audit fixes**（FE BFF 對齊 [backend spec 022](../../../backend/docs/specs/022-donation-order-api.md) §4.1/§4.2/§4.3 / §4.0）：(a) **Order response Zod 驗證**：兩條 `/api/checkout/*` route 改用 `BeOrderResponse = z.object({ id: z.string().uuid(), status: z.string().min(1) }).passthrough()` 驗 backend 201 body；非 uuid 或 缺 `id` / `status` → 502 `ContractViolationError`（取代原本的 TS cast `BeOrderResponse = { id, status }`，避免 BE 改 `id → orderId` 之類靜默失敗）；(b) **`isAnonymous` 對齊 BE TypeBox `Type.Optional(Type.Boolean())`**：BFF body Zod 從 `z.boolean()` (required) 改 `z.boolean().optional().default(false)`，未傳值的 client 也能通過 schema；(c) **mock orders handler 改用 `crypto.randomUUID()`**：原 `'chad0000-...'` / `'prod0000-...'` / `'saip0000-...'` 含非 hex 字元，加 `.uuid()` 驗證後會炸；改 `randomUUID()` 同時也更貼近 BE 真實行為；(d) 6 個新 BFF test：每條 route 各加「省略 isAnonymous → 仍 200」/「BE 回應缺 id → 502」/「BE 回應 id 非 uuid → 502」。Test 總數 746 → 752。 |
 | 0.9 | 2026-06-16 | **donation CTA 文字 `確認送出` → `確認捐款`**：v0.1 沿用 detail 頁紅 pill「確認送出」屬 generic 推斷；現對齊本 family hero「確認捐款資訊」與 donation flow 的「捐款」語意，明確化為「確認捐款」。**Purchase（009b）維持「確認送出」**：義賣商品購買語意更接近 generic 送出，且本頁實際是「填收據資訊 + 送出購買」，非「捐款」動作。改動範圍：§3.0 外殼範例 `ctaLabel`、§3.4 註解（從「沿用 detail」改為「caller 決定，差異化說明」）；009a v0.13 page + test 同步替換；009c v0.3 primitive prop 註解差異化（API 本身無變）。BFF / payload / submit 行為皆無變動 |
 | 0.10 | 2026-06-16 | **purchase CTA 文字 `確認送出` → `確認購買`**：v0.9 留下 donation/purchase 文字不對稱(「確認捐款」vs generic「確認送出」),purchase 改為「確認購買」對齊「義賣商品購買」語意。改動範圍:§3.4 註解 purchase 一側字串;009b v0.11 page + test 同步替換;009c v0.4 primitive prop 註解同步更新(API 本身無變)。BFF / payload / submit 行為皆無變動 |
+| 0.11 | 2026-06-16 | **加入 [009d「匿名捐款」說明對話框](./009d-anonymous-info-dialog.md) 子 spec**：對應 IMG_4892（trigger）+ IMG_4893（dialog 內容）。新規 `<InfoDialog>` 通用置中浮層 primitive（`src/components/ui/`）+ `<AnonymousInfoTrigger>` 業務組合（`src/app/checkout/`）+ `ANONYMOUS_INFO_TITLE` / `ANONYMOUS_INFO_BODY` 文案 const。§1 sub-spec 列表加 009d；009b §10 OQ「ⓘ icon 點開內容」標為 ✅ 解。Component 尚未實作，spec 規劃完整含 a11y / TDD 三層測試 plan / 整合到 009a 5.7 + 009b 6.4 checkbox label 的位點 |
