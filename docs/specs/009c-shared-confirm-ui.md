@@ -1,6 +1,6 @@
 # Spec 009c：confirm 頁共用 UI primitives
 
-- **狀態**：Draft（v0.1 — 從 009a / 009b 共用排版抽出）
+- **狀態**：Draft（v0.2 — 加 `<ReminderNote>` 第 7 個 primitive；參考 IMG_4891）
 - **建立日期**：2026-06-15
 - **路徑（規劃）**：
   - `src/components/ui/ConfirmPageShell.tsx` + `.test.tsx`
@@ -9,6 +9,7 @@
   - `src/components/ui/DisclaimerBox.tsx` + `.test.tsx`（內 export `DISCLAIMER_PLATFORM` 字串）
   - `src/components/ui/RequiredLabel.tsx` + `.test.tsx`
   - `src/components/ui/StickyConfirmCta.tsx` + `.test.tsx`
+  - `src/components/ui/ReminderNote.tsx` + `.test.tsx`（內 export `REMINDER_DONOR_NAME` 字串）
 - **依賴**：
   - 既有 design system tokens（[003a](./003a-design-system.md)）
   - 既有 [`<TopNav>`](./003b-topnav.md) + [`useSmartBack`](./005-homepage-auth.md#4-smart-back-navigation-v02-新增)
@@ -23,7 +24,7 @@
 
 009a / 009b 排版高度相同（紅底 hero + 多張白 panel + 置中 h2 + dl key-value row + disclaimer 灰盒 + sticky 紅 pill），v0.1 spec 各自 inline className → 同樣 Tailwind 字串散在兩份 spec、開發後再散在 6+ 個檔。
 
-抽 6 個 small primitives 把「共用視覺 + a11y pattern」固化在元件本身，business form 內容 caller 自接。
+抽 7 個 small primitives 把「共用視覺 + a11y pattern」固化在元件本身，business form 內容 caller 自接。
 
 對齊既有 `src/components/ui/` 慣例（`<CharityCard>` / `<SearchBar>` / `<TabsRow>` / `<BottomSheet>` 都是 small primitive）。
 
@@ -266,6 +267,60 @@ export function StickyConfirmCta({ label, isValid }: StickyConfirmCtaProps) {
 - `type="submit"` — 預設給 [`<ConfirmPageShell>`](#21-confirmpageshell--整頁外殼) 的 `<form>` 收到
 - 無 `onClick` prop — 行為固定由 form onSubmit 接管；caller 不該繞過
 
+### 2.7 `<ReminderNote>` — 卡內 inline 提醒（v0.2 新增）
+
+灰底 `<DisclaimerBox>` 的鄰居：DisclaimerBox 是「平台 disclaimer」（個資政策、長段法律語），ReminderNote 是「行為提醒」（送出前確認姓名、檢查資料）。視覺上 Disclaimer 為灰盒分塊、Reminder 為卡內 inline 行（白底、icon + 文字、無框）；不混用避免兩種灰盒上下相連。
+
+```ts
+type ReminderNoteProps = {
+  /** 提醒主文；caller 自帶以利將來 i18n */
+  children: ReactNode
+  className?: string              // 給 caller 微調 margin
+}
+
+/**
+ * 送出前確認姓名提醒 — 從 IMG_4891 抄錄。
+ * 圖中原文為「姓名與身分證字號」，本頁實際只蒐集姓名（身分證字號在 JKOS
+ * 帳戶 KYC），文案對齊本頁可編輯欄位避免使用者找「身分證字號」找不到。
+ */
+export const REMINDER_DONOR_NAME =
+  '送出前請再次確認您填寫的姓名是否正確。若資料有誤將無法申報。'
+```
+
+實作 reference：
+
+```tsx
+export function ReminderNote({ children, className = '' }: ReminderNoteProps) {
+  return (
+    <p
+      className={`flex items-start gap-2 text-xs text-ink-AA leading-5 ${className}`}
+    >
+      <ExclamationIcon />
+      <span>
+        <span className="text-ink-AAA">小提醒：</span>
+        {children}
+      </span>
+    </p>
+  )
+}
+
+function ExclamationIcon() {
+  // 實心黑圓 + 白色 ! — viewBox 16；w-4 h-4 mt-0.5 對齊行高
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16" className="w-4 h-4 mt-0.5 shrink-0 fill-ink-AAA">
+      <circle cx="8" cy="8" r="7.5" />
+      <rect x="7.1" y="3.6" width="1.8" height="5.6" fill="white" rx="0.4" />
+      <rect x="7.1" y="10.4" width="1.8" height="1.8" fill="white" rx="0.4" />
+    </svg>
+  )
+}
+```
+
+- 用 `<p>` 而非 `<div>` — SR 讀為段落而非 generic
+- 「小提醒：」label 寫死在 primitive 內（同 DisclaimerBox 文案 const 模式：文案結構固定、僅 body 變動）
+- icon `aria-hidden` — 純裝飾；文字本身已含「小提醒：」語義
+- caller 用 `className="mt-4"` 維持與上一個 form field 的垂直節律
+
 ---
 
 ## 3. 使用範例（compose 起來）
@@ -376,6 +431,16 @@ export function DonationConfirmPage({ query, target }) {
 | 2 | isValid=false → button disabled、className 含 `disabled:bg-black/10` | OK |
 | 3 | button type='submit'（不是 type='button'） | form 整合 |
 
+### 4.7 `ReminderNote.test.tsx`（v0.2 新增）
+
+| # | 案例 | 期望 |
+|---|---|---|
+| 1 | 渲染 children 在 `<p>` semantic 內 | OK |
+| 2 | 預設帶「小提醒：」前綴 | UI |
+| 3 | icon 帶 `aria-hidden="true"` | a11y |
+| 4 | `className` prop 合併到 `<p>` | OK |
+| 5 | `REMINDER_DONOR_NAME` 為非空字串 const | OK |
+
 ---
 
 ## 5. 開放問題
@@ -392,3 +457,4 @@ export function DonationConfirmPage({ query, target }) {
 | 版本 | 日期 | 變更 |
 |---|---|---|
 | 0.1 | 2026-06-15 | 初版：從 [009a v0.2](./009a-donation-confirm.md) §3–§6 與 [009b v0.2](./009b-purchase-confirm.md) §3–§7 inline 排版抽出 6 個 primitive；對齊 008a BottomSheet 「UI primitive vs business form 分 spec」慣例 |
+| 0.2 | 2026-06-16 | **新增 §2.7 `<ReminderNote>`**（卡內 inline 提醒）+ `REMINDER_DONOR_NAME` 文案 const；參考 IMG_4891（donation confirm 截圖）。文案中圖原文「姓名與身分證字號」對齊本頁實際可編輯欄位（僅姓名）做收斂；身分證字號預設來自 JKOS 帳戶 KYC，本頁不蒐集。Test §4.7（5 case）；§1 primitive 數量 6 → 7 |
