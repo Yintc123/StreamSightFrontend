@@ -30,6 +30,10 @@ const RawEnv = z
     APP_VERSION: z.string().default('0.0.0'),
     APP_COMMIT: z.string().optional(),
     ENABLE_DEV_LOGIN: z.enum(['0', '1']).default('0'),
+    // Spec 011 §3.4 — dev login posts these to BE /auth/login.
+    // Defaults match BE prisma/seed.ts bootstrapAdmin (admin / admin-dev-password-change-me).
+    DEV_ADMIN_USERNAME: z.string().default('admin'),
+    DEV_ADMIN_PASSWORD: z.string().default('admin-dev-password-change-me'),
     NEXT_PUBLIC_APP_NAME: z.string().default('JKODonation'),
   })
   .superRefine((env, ctx) => {

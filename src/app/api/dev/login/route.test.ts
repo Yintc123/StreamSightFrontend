@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { HttpResponse } from 'msw'
 
 const overrides = vi.hoisted(() => ({
   nodeEnv: 'test' as 'development' | 'test' | 'production',
@@ -13,7 +14,8 @@ vi.mock('@/lib/config', () => ({
     get ENABLE_DEV_LOGIN() {
       return overrides.enableDevLogin
     },
-    USE_MOCK: '1',
+    USE_MOCK: '0',
+    BACKEND_API_URL: 'http://backend.test',
     SESSION_SECRET: 'test-session-secret-must-be-32-chars-long',
     SESSION_COOKIE_NAME: 'jko_session',
     SESSION_TTL_SECONDS: 2_592_000,
@@ -21,6 +23,8 @@ vi.mock('@/lib/config', () => ({
     REDIS_KEY_PREFIX: 'jko-bff-test',
     APP_VERSION: '0.0.0-test',
     NEXT_PUBLIC_APP_NAME: 'JKODonation',
+    DEV_ADMIN_USERNAME: 'admin',
+    DEV_ADMIN_PASSWORD: 'admin-dev-password-change-me',
   },
 }))
 
@@ -34,10 +38,12 @@ vi.mock('@/lib/session/service', () => ({
     get: vi.fn().mockResolvedValue(null),
     create: createMock,
     touch: vi.fn().mockResolvedValue(undefined),
-    wasMutated: () => true, // create mutates
+    wasMutated: () => true,
   }),
 }))
 
+import { mockBackend } from '../../../../../tests/helpers/backend-mock'
+import { _resetMockRegistry } from '@/lib/mock/dispatch'
 import { POST } from './route'
 
 const noParams = { params: Promise.resolve({}) }
@@ -54,7 +60,38 @@ function postReq(origin = 'http://localhost:3000'): Request {
   } as unknown as Request
 }
 
+const ADMIN_ID = '00000000-0000-4000-8000-0000000000ad'
+
+function stubBeAuth(role = 0) {
+  mockBackend('post', 'http://backend.test/auth/login', () =>
+    HttpResponse.json(
+      {
+        accessToken: 'real.jwt.access',
+        refreshToken: 'real.jwt.refresh',
+        accessExpiresIn: 3 * 60 * 60,
+        refreshExpiresIn: 30 * 24 * 60 * 60,
+        tokenType: 'Bearer',
+      },
+      { status: 200 },
+    ),
+  )
+  mockBackend('get', 'http://backend.test/auth/me', () =>
+    HttpResponse.json(
+      {
+        id: ADMIN_ID,
+        username: 'admin',
+        email: null,
+        role,
+        createdAt: '2026-06-16T00:00:00.000Z',
+        updatedAt: '2026-06-16T00:00:00.000Z',
+      },
+      { status: 200 },
+    ),
+  )
+}
+
 beforeEach(() => {
+  _resetMockRegistry()
   overrides.nodeEnv = 'test'
   overrides.enableDevLogin = '1'
   createMock.mockClear().mockResolvedValue({
@@ -78,44 +115,49 @@ describe('POST /api/dev/login', () => {
     expect(res.status).toBe(404)
   })
 
-  it('development + ENABLE_DEV_LOGIN=1 → 200 + session payload', async () => {
+  it('happy path → BE /auth/login + /auth/me + session.create(role=ADMIN) + 200', async () => {
     overrides.nodeEnv = 'development'
     overrides.enableDevLogin = '1'
+    stubBeAuth(0)
     const res = await POST(postReq(), noParams)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.data.sessionId).toHaveLength(43)
     expect(body.data.csrfToken).toHaveLength(43)
-    expect(body.data.user).toBeDefined()
-    expect(typeof body.data.expiresAt).toBe('number')
+    expect(body.data.user.id).toBe(ADMIN_ID)
     expect(createMock).toHaveBeenCalledTimes(1)
+    const [args] = createMock.mock.calls[0]
+    expect((args as { role: number }).role).toBe(0)
+    expect((args as { tokens: { accessToken: string } }).tokens.accessToken).toBe(
+      'real.jwt.access',
+    )
   })
 
-  it('csrfExempt: POST without X-CSRF-Token still passes', async () => {
+  it('foreign Origin → 403', async () => {
     overrides.nodeEnv = 'development'
     overrides.enableDevLogin = '1'
-    // No X-CSRF-Token header set
-    const res = await POST(postReq(), noParams)
-    expect(res.status).toBe(200)
-  })
-
-  it('foreign Origin → 403 CSRF_INVALID (csrfExempt does not bypass origin)', async () => {
-    overrides.nodeEnv = 'development'
-    overrides.enableDevLogin = '1'
+    stubBeAuth()
     const res = await POST(postReq('http://evil.com'), noParams)
     expect(res.status).toBe(403)
   })
 
-  it('passes ttl values that match ADR 004 (3h access, 30d refresh)', async () => {
+  it('me.role !== 0 (e.g. seed didn\'t promote) → session stored as role=USER', async () => {
     overrides.nodeEnv = 'development'
     overrides.enableDevLogin = '1'
+    stubBeAuth(1)
+    await POST(postReq(), noParams)
+    const [args] = createMock.mock.calls[0]
+    expect((args as { role: number }).role).toBe(1)
+  })
+
+  it('ttl values match BE accessExpiresIn / refreshExpiresIn', async () => {
+    overrides.nodeEnv = 'development'
+    overrides.enableDevLogin = '1'
+    stubBeAuth(0)
     await POST(postReq(), noParams)
     const [args] = createMock.mock.calls[0]
     const { tokens } = args as {
-      tokens: {
-        accessTokenExpiresAt: number
-        refreshTokenExpiresAt: number
-      }
+      tokens: { accessTokenExpiresAt: number; refreshTokenExpiresAt: number }
     }
     const now = Date.now()
     const accessTtl = tokens.accessTokenExpiresAt - now
