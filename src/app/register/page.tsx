@@ -1,23 +1,21 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+
+import { RegisterCard } from './RegisterCard'
 
 export const metadata: Metadata = {
   title: '建立帳號 | JKODonation',
 }
 
 /**
- * Spec 007 v0.2 — 建立帳號頁（placeholder）
+ * Spec 007 v0.2 — `/register` 公開註冊入口。
  *
- * 首頁 LoginCard 的「建立帳號」按鈕指向 `/register`。spec 007 已對齊
- * backend spec 008 v0.6（Argon2id / `/auth/register` / username 3–30 等）
- * 的 contract；UI / hook / BFF route 待後續實作，此檔暫保留 placeholder
- * 以維持導航通路。
+ * RSC 渲染 brand header + 客戶端 <RegisterCard />（form + submit 邏輯）。
+ * 入口來源：首頁 LoginCard 「建立帳號」按鈕 router.push('/register')。
+ * 註冊成功（auto-login）→ /cms；按「我已有帳號」→ /。
  *
- * 為何不再用 `/admin`：spec 008 §10 / spec 007 §10「路由命名澄清」—
- * BE 有 `role=0=ADMIN` 概念與 `requireAdmin` preHandler；把面向所有
- * 使用者的「建立帳號」掛在 `/admin` 路徑會與「ADMIN role 限定區」概念
- * 衝突，故拆開：`/register` 是公開註冊入口，`/admin` 留給未來真正的
- * admin 後台。
+ * 為何不再用 `/admin`：BE 008 §10 / spec 007 §10 — BE 有 `role=0=ADMIN`
+ * 與 `requireAdmin` 後台概念，避免命名衝突，故拆：`/register` 是公開
+ * 註冊入口、`/admin` 留給未來真正的管理後台。
  */
 export default function RegisterPage() {
   return (
@@ -27,16 +25,8 @@ export default function RegisterPage() {
           建立帳號
         </h1>
       </header>
-      <main className="flex-1 flex flex-col items-center justify-center gap-4 px-[15px] py-10">
-        <p className="text-sm text-ink-AA text-center">
-          建立帳號功能尚未開發。
-        </p>
-        <Link
-          href="/"
-          className="text-sm text-ink-link underline underline-offset-2"
-        >
-          ← 回首頁
-        </Link>
+      <main className="flex-1 flex flex-col items-center justify-center gap-6 px-[15px] py-10">
+        <RegisterCard />
       </main>
     </div>
   )

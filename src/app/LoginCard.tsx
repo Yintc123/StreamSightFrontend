@@ -1,13 +1,14 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Field } from './auth/Field'
 
 /**
  * Spec 005 — 首頁登入卡片（demo 用）
  *
  * 帳密欄位目前**僅做客端非空驗證**；送出時呼叫 POST /api/dev/login（不
  * 帶 payload，本機 dev 模式只要 `ENABLE_DEV_LOGIN=1` 就回 session）。
- * 成功 → /dashboard；失敗 → 顯示 inline 錯誤。
+ * 成功 → /cms；失敗 → 顯示 inline 錯誤。
  *
  * 「建立帳號」按鈕純前端導航 → /register（spec 007 v0.2；目前 placeholder，
  * spec 已對齊 BE spec 008 v0.6 帳密註冊 contract，待 hook + BFF 實作）。
@@ -32,7 +33,7 @@ export function LoginCard() {
           setError(`登入失敗 (HTTP ${res.status.toString()})`)
           return
         }
-        router.push('/dashboard')
+        router.push('/cms')
       } catch (e) {
         setError(`登入失敗：${e instanceof Error ? e.message : '網路錯誤'}`)
       }
@@ -100,34 +101,3 @@ export function LoginCard() {
   )
 }
 
-function Field({
-  id,
-  label,
-  type,
-  autoComplete,
-  value,
-  onChange,
-}: {
-  id: string
-  label: string
-  type: 'text' | 'password'
-  autoComplete: string
-  value: string
-  onChange: (v: string) => void
-}) {
-  return (
-    <label htmlFor={id} className="flex flex-col gap-1">
-      <span className="text-[13px] leading-5 text-ink-AA">{label}</span>
-      <input
-        id={id}
-        type={type}
-        autoComplete={autoComplete}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-10 px-3 rounded-lg bg-surface-card border border-line
-                   text-sm text-ink-AAA placeholder:text-ink-A
-                   focus:outline-none focus:border-brand"
-      />
-    </label>
-  )
-}

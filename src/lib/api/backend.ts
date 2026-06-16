@@ -4,6 +4,7 @@ import { log } from '@/lib/log'
 import { resolveMock } from '@/lib/mock/dispatch'
 import { BackendTimeoutError } from '@/lib/errors/BackendTimeoutError'
 import { BackendUpstreamError } from '@/lib/errors/BackendUpstreamError'
+import { BackendClientError } from '@/lib/errors/BackendClientError'
 import { UnauthenticatedError } from '@/lib/errors/UnauthenticatedError'
 import { NotFoundError } from '@/lib/errors/NotFoundError'
 import { BffError } from '@/lib/errors/BffError'
@@ -20,6 +21,14 @@ export type BackendFetchOptions = {
   headers?: Record<string, string>
   session?: StoredSession | null
   requestId?: string
+  /**
+   * When true, 4xx responses (other than 401/404 which retain their
+   * dedicated mappings) propagate as `BackendClientError` carrying the
+   * upstream status and error code. Default false → collapses to
+   * `BackendUpstreamError` (502). Set on routes whose 4xx codes carry
+   * business meaning the FE must surface — e.g. POST /auth/register.
+   */
+  passClientErrors?: boolean
 }
 
 export type BackendResponse<T> = { data: T; requestId: string }
@@ -122,6 +131,20 @@ export async function backendFetch<T = unknown>(
       if (response.status === 404) throw new NotFoundError(`Backend 404 on ${path}`)
       if (response.status >= 500) {
         throw new BackendUpstreamError(`Backend ${response.status}`)
+      }
+      // 4xx (excluding 401 handled above, 404 handled above): default is to
+      // treat as upstream contract drift (502). Routes that need the actual
+      // status to reach the FE opt in via `passClientErrors`.
+      if (options.passClientErrors) {
+        const errBody = await safeReadJson(response)
+        const beCode = errBody?.error?.code ?? null
+        const beMsg =
+          (errBody?.error as { message?: unknown } | undefined)?.message
+        const message =
+          typeof beMsg === 'string' && beMsg.length > 0
+            ? beMsg
+            : `Backend ${response.status}`
+        throw new BackendClientError(response.status, beCode, message)
       }
       throw new BackendUpstreamError(`Unexpected backend status ${response.status}`)
     }
