@@ -363,12 +363,12 @@ export const GET = createAdminRoute({
 
 **影響**：011a edit 頁需要預填 10 欄；其中 3 欄 BE 端 user detail 不回，FE 無從預填 → admin 每次儲存 都會 reset 排序與排程時間。
 
-**v0.2 採用方案 A（必要）**：BE 必須在 [spec 020](../../../backend/docs/specs/020-donation-write-api.md) 補：
+**v0.2 採用方案 A（必要）**：對應 [BE spec 026 donation admin read API](../../../backend/docs/specs/026-donation-admin-read-api.md) v0.1 — 規劃 6 個 admin GET endpoint：
 
 ```
-GET /cms/donation/charities          → admin list（含 lifecycle metadata）
+GET /cms/donation/charities          → admin list（含 lifecycle metadata；支援 includeArchived/Deleted 旗標）
 GET /cms/donation/charities/:id      → admin detail（含 displayOrder / publishStartAt / publishEndAt / archivedAt / deletedAt / createdAt / updatedAt）
-GET /cms/donation/donation-projects, /sale-items 同上
+GET /cms/donation/donation-projects, /sale-items 同上（detail 多 parentCharityArchivedAt/DeletedAt 兩欄，提示 cascading visibility）
 ```
 
 FE 對應：

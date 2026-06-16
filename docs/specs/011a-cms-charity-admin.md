@@ -19,7 +19,7 @@
 - **前置條件（hard prerequisites）**：011a 開工前必須完成：
   1. **[011 §3.2~3.4](./011-cms-resource-admin.md#32-session-role-擴展型別與-helper)** session role 擴展 + 既存 session 清空 + 登入路徑更新（dev/login / OAuth / password 都帶 role）
   2. **[011 §3.5~3.6](./011-cms-resource-admin.md#35-requireadminsession-helper-rsc-用)** `requireAdminSession()` + `createAdminRoute()` + `ForbiddenError` 三條 helper / class
-  3. **BE 020 補三個 admin GET endpoint**：`/cms/donation/charities`、`/cms/donation/charities/:id`、（之後）`/donation-projects`、`/sale-items` 對應；FE 端 `BackendAdminCharityDetail` Zod schema（[011 §5.4](./011-cms-resource-admin.md#54-be-硬依賴backendcharitydetail-缺欄位)）
+  3. **BE 補 admin GET endpoint**（[BE spec 026](../../../backend/docs/specs/026-donation-admin-read-api.md) v0.1 規劃 6 條）：`GET /cms/donation/charities` + `GET /cms/donation/charities/:id`（v0.1 charity 部分必須先 ship；project / item 等 v0.2+）；FE 端對應 `BackendAdminCharityDetail` Zod schema（[011 §5.4](./011-cms-resource-admin.md#54-be-硬依賴backendcharitydetail-缺欄位)）
   4. **新增 helper**：`src/lib/api/getAdminCharityDetail.ts`（[§5.1](#51-rsc-結構)）+ `src/lib/api/getCategories.ts`（[011 §5.5](./011-cms-resource-admin.md#55-fetchcategories-rsc-helper-v02-補)）
   5. **`AuthRedirectToast` 新 reason** `cms-not-admin`：「需要管理員權限」（[010 §3.3](./010-cms-auth-gate.md)）
 - **Figma 對應**：無（admin 內部工具、無設計稿）
