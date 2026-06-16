@@ -56,7 +56,7 @@ export default async function Page({ params }: PageProps) {
         accessory={<ShareIconButton title={charity.name} />}
       />
       <Hero name={charity.name} logoUrl={charity.logoUrl} />
-      <div className="-mt-6 mx-3 bg-surface-card rounded-2xl shadow-[0_0_32px_4px_rgba(201,25,29,0.30)] ring-1 ring-black/5 relative z-10 p-5 space-y-5">
+      <div className="-mt-6 mx-3 bg-surface-card rounded-2xl shadow-[0_0_40px_8px_rgba(255,255,255,0.9)] ring-1 ring-black/5 relative z-10 p-5 space-y-5">
         <ContactInfo
           contactPhone={charity.contactPhone}
           contactEmail={charity.contactEmail}

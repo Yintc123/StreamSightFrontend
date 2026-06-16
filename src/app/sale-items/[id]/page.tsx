@@ -52,7 +52,7 @@ export default async function Page({ params }: PageProps) {
         fallback={pickFallbackImage('item', item.id)}
         alt={item.name}
       />
-      <div data-component="InfoPanel" className="mx-3 -mt-4 bg-surface-card rounded-2xl shadow-[0_0_32px_4px_rgba(201,25,29,0.30)] ring-1 ring-black/5 relative z-10 p-5 space-y-4">
+      <div data-component="InfoPanel" className="mx-3 -mt-4 bg-surface-card rounded-2xl shadow-[0_0_40px_8px_rgba(255,255,255,0.9)] ring-1 ring-black/5 relative z-10 p-5 space-y-4">
         <div>
           <h1 className="text-base font-semibold text-ink-AAA leading-7">
             {item.name}
@@ -71,7 +71,7 @@ export default async function Page({ params }: PageProps) {
         )}
       </div>
       <div className="flex-1 mx-3 mt-3">
-        <section data-component="ContentSection" className="bg-surface-card rounded-2xl shadow-[0_0_32px_4px_rgba(201,25,29,0.30)] ring-1 ring-black/5 p-5">
+        <section data-component="ContentSection" className="bg-surface-card rounded-2xl shadow-[0_0_40px_8px_rgba(255,255,255,0.9)] ring-1 ring-black/5 p-5">
           <h2 className="text-base font-medium text-ink-AAA mb-3">商品說明</h2>
           <p className="text-sm leading-6 text-ink-AAA whitespace-pre-line">
             {item.content || item.description}
