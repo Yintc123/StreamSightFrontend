@@ -17,6 +17,7 @@ export function KeyValueList({
 }: KeyValueListProps) {
   return (
     <dl
+      data-component="KeyValueList"
       className="grid gap-y-3 text-sm"
       style={{ gridTemplateColumns: `${labelWidth} 1fr` }}
     >

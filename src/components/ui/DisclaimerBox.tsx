@@ -14,6 +14,7 @@ export function DisclaimerBox({
 }: DisclaimerBoxProps) {
   return (
     <p
+      data-component="DisclaimerBox"
       className={`bg-black/5 text-xs text-ink-AA p-3 rounded-md leading-5 ${className}`}
     >
       {children}

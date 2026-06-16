@@ -50,7 +50,7 @@ export function QtyStepper({
     'text-ink-AAA disabled:text-ink-A disabled:border-line/50 ' +
     'focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand'
   return (
-    <div className="flex items-center gap-3">
+    <div data-component="QtyStepper" className="flex items-center gap-3">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}

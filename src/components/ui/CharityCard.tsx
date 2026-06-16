@@ -11,7 +11,7 @@ export function CharityCard({ item }: CharityCardProps) {
   const hasLogo = !!item.logoUrl && !imgFailed
 
   return (
-    <article className="bg-surface-card rounded-xl">
+    <article data-component="CharityCard" className="bg-surface-card rounded-xl">
       <Link
         href={`/charities/${item.id}`}
         className="flex items-center gap-3 w-full max-w-[345px] mx-auto px-3 py-[9px]

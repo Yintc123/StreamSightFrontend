@@ -130,6 +130,7 @@ export function BottomSheet({
     >
       <div
         ref={panelRef}
+        data-component="BottomSheet"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

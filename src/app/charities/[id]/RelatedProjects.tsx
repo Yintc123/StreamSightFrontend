@@ -13,7 +13,7 @@ export async function RelatedProjects({ charityId }: { charityId: string }) {
   const donations = await fetchDonationsByCharity(charityId)
   if (donations.length === 0) return null
   return (
-    <section className="px-3 py-6">
+    <section data-component="RelatedProjects" className="px-3 py-6">
       <h2 className="text-base font-medium text-ink-AAA mb-3 px-2">
         捐款專案
       </h2>

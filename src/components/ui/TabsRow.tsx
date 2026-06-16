@@ -14,7 +14,7 @@ const TABS: { key: ResourceKey; label: string }[] = [
 
 export function TabsRow({ active, onTabChange }: TabsRowProps) {
   return (
-    <div role="tablist" className="flex w-full h-11 border-b border-black/5">
+    <div data-component="TabsRow" role="tablist" className="flex w-full h-11 border-b border-black/5">
       {TABS.map((t) => {
         const isActive = t.key === active
         return (

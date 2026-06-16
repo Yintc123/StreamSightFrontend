@@ -16,7 +16,7 @@ const CONTAINER_CLASS: Record<ResourceKey, string> = {
 export function LoadingSkeleton({ variant, count = 6 }: LoadingSkeletonProps) {
   const safeCount = Math.max(0, count)
   return (
-    <div className={CONTAINER_CLASS[variant]} aria-hidden>
+    <div data-component="LoadingSkeleton" className={CONTAINER_CLASS[variant]} aria-hidden>
       {Array.from({ length: safeCount }).map((_, i) => {
         switch (variant) {
           case 'charity':

@@ -19,6 +19,7 @@ export function Spinner({ label = '載入中…', size = 'md' }: SpinnerProps) {
 
   return (
     <span
+      data-component="Spinner"
       role="status"
       aria-label={label}
       className={`inline-block ${wh} text-ink-A`}

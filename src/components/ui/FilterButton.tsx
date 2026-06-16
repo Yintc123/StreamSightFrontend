@@ -32,6 +32,7 @@ export function FilterButton({
 }: FilterButtonProps) {
   return (
     <button
+      data-component="FilterButton"
       type="button"
       onClick={onClick}
       aria-haspopup="dialog"

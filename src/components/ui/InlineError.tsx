@@ -9,6 +9,7 @@ export function InlineError({
 }: InlineErrorProps) {
   return (
     <div
+      data-component="InlineError"
       role="alert"
       className="flex flex-col items-center gap-3 py-8 px-4 text-center"
     >

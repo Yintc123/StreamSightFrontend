@@ -126,7 +126,7 @@ export function CharityListShell({
   })
 
   return (
-    <div className="min-h-dvh bg-surface-page flex flex-col">
+    <div data-component="CharityListShell" className="min-h-dvh bg-surface-page flex flex-col">
       {/* Spec 005 §4 — TopNav 預設用 useSmartBack：
           站內動過 → router.back()；否則 router.push('/')（fallback 預設 /）。
           不再手動傳 onBack。 */}

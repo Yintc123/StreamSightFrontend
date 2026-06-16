@@ -15,7 +15,7 @@ export function SaleItemCard({ item }: SaleItemCardProps) {
   )
 
   return (
-    <article className="bg-surface-card rounded-xl overflow-hidden border border-line">
+    <article data-component="SaleItemCard" className="bg-surface-card rounded-xl overflow-hidden border border-line">
       <Link
         href={`/sale-items/${item.id}`}
         className="flex flex-col w-full hover:shadow-md

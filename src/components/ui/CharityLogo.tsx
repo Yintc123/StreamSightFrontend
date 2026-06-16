@@ -29,6 +29,7 @@ export function CharityLogo({ name, logoUrl }: CharityLogoProps) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        data-component="CharityLogo"
         src={logoUrl}
         alt=""
         loading="lazy"

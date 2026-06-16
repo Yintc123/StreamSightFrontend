@@ -26,6 +26,7 @@ export function PurchaseQtySheet({ open, onClose, item }: Props) {
   return (
     <BottomSheet open={open} title="購買數量" onClose={onClose}>
       <form
+        data-component="PurchaseQtySheet"
         onSubmit={(e) => {
           e.preventDefault()
           handleSubmit()

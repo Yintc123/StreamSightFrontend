@@ -23,6 +23,7 @@ export function ConfirmPageShell({
       <TopNav title={title} fallback="/" />
       <div aria-hidden className="bg-brand h-32" />
       <form
+        data-component="ConfirmPageShell"
         onSubmit={(e) => {
           e.preventDefault()
           onSubmit()

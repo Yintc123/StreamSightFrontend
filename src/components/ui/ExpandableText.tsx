@@ -21,7 +21,7 @@ export function ExpandableText({ text, threshold = 100 }: ExpandableTextProps) {
   const [expanded, setExpanded] = useState(false)
   const canExpand = text.length > threshold
   return (
-    <div>
+    <div data-component="ExpandableText">
       <p
         className={
           expanded

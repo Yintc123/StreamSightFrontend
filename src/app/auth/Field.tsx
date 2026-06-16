@@ -25,7 +25,7 @@ export function Field({
   describedById?: string
 }) {
   return (
-    <label htmlFor={id} className="flex flex-col gap-1">
+    <label data-component="Field" htmlFor={id} className="flex flex-col gap-1">
       <span className="text-[13px] leading-5 text-ink-AA">{label}</span>
       <input
         id={id}

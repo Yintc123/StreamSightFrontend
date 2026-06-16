@@ -30,7 +30,7 @@ export function DonationProjectCard({ item }: DonationProjectCardProps) {
   const overflow = cats.length - visibleCats.length
 
   return (
-    <article className="bg-surface-card rounded-xl overflow-hidden shadow-sm hover:shadow-md">
+    <article data-component="DonationProjectCard" className="bg-surface-card rounded-xl overflow-hidden shadow-sm hover:shadow-md">
       <Link
         href={`/donation-projects/${item.id}`}
         className="flex flex-col w-full

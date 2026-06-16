@@ -82,6 +82,7 @@ export function ShareIconButton({ url, title, text }: ShareIconButtonProps = {})
 
   return (
     <button
+      data-component="ShareIconButton"
       type="button"
       onClick={handleClick}
       aria-label="分享"

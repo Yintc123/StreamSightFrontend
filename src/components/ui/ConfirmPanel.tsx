@@ -18,7 +18,7 @@ export function ConfirmPanel({
     .filter(Boolean)
     .join(' ')
   return (
-    <section className={className}>
+    <section data-component="ConfirmPanel" className={className}>
       {title && (
         <h2 className="text-base font-semibold text-ink-AAA text-center mb-4">
           {title}

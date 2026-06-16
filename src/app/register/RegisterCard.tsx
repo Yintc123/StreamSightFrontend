@@ -134,6 +134,7 @@ export function RegisterCard() {
 
   return (
     <section
+      data-component="RegisterCard"
       aria-labelledby="register-card-title"
       className="w-full max-w-[345px] mx-auto bg-surface-card rounded-2xl
                  shadow-sm border border-line p-5 flex flex-col gap-4"

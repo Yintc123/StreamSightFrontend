@@ -27,7 +27,7 @@ export function SearchBar({
   }
 
   return (
-    <div className="flex items-center w-full">
+    <div data-component="SearchBar" className="flex items-center w-full">
       <div className="flex-1 flex items-center gap-[9px] py-[9px] px-3 bg-black/5 rounded-[20px]">
         {/* SVG 20×20 icon — spec 003a §4 允許 <img>；不需 next/image */}
         {/* eslint-disable-next-line @next/next/no-img-element */}

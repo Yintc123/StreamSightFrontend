@@ -36,7 +36,7 @@ export default async function CmsPage() {
   if (!session) redirect('/?reason=cms-auth')
 
   return (
-    <div className="min-h-dvh bg-surface-page flex flex-col">
+    <div data-component="CmsPage" className="min-h-dvh bg-surface-page flex flex-col">
       <header className="flex items-center justify-center w-full h-11 bg-brand px-[14px]">
         <h1 className="text-white text-[17px] font-bold leading-[22px]">
           後台

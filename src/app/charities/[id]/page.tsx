@@ -50,7 +50,7 @@ export default async function Page({ params }: PageProps) {
   if (!charity) notFound()
 
   return (
-    <div className="flex flex-col min-h-dvh bg-surface-page">
+    <div data-component="CharityDetailPage" className="flex flex-col min-h-dvh bg-surface-page">
       <TopNav
         title="公益團體介紹"
         accessory={<ShareIconButton title={charity.name} />}
@@ -82,7 +82,7 @@ export default async function Page({ params }: PageProps) {
 
 function Hero({ name, logoUrl }: { name: string; logoUrl?: string }) {
   return (
-    <section className="bg-brand pb-10 pt-8 px-5 flex flex-col items-center gap-4">
+    <section data-component="Hero" className="bg-brand pb-10 pt-8 px-5 flex flex-col items-center gap-4">
       <div className="w-24 h-24 rounded-full bg-white border-4 border-white shadow-md flex items-center justify-center overflow-hidden">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -123,7 +123,7 @@ function ContactInfo({
     return null
   }
   return (
-    <section aria-labelledby="contact-info-h">
+    <section data-component="ContactInfo" aria-labelledby="contact-info-h">
       <h2 id="contact-info-h" className="text-base font-medium text-ink-AAA mb-3">
         基本資料
       </h2>
@@ -180,7 +180,7 @@ function CategoryTags({
   categories: { id: string; displayName: string }[]
 }) {
   return (
-    <ul className="flex flex-wrap gap-2">
+    <ul data-component="CategoryTags" className="flex flex-wrap gap-2">
       {categories.map((c) => (
         <li
           key={c.id}

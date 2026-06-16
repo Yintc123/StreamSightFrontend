@@ -45,14 +45,14 @@ export default async function Page({ params }: PageProps) {
   if (!item) notFound()
 
   return (
-    <div className="flex flex-col min-h-dvh bg-surface-page">
+    <div data-component="SaleItemDetailPage" className="flex flex-col min-h-dvh bg-surface-page">
       <TopNav title="義賣商品" />
       <CoverWithRibbon
         coverImageUrl={item.coverImageUrl}
         fallback={pickFallbackImage('item', item.id)}
         alt={item.name}
       />
-      <div className="px-5 py-5 space-y-4 bg-surface-card">
+      <div data-component="InfoPanel" className="px-5 py-5 space-y-4 bg-surface-card">
         <div>
           <h1 className="text-base font-semibold text-ink-AAA leading-7">
             {item.name}
@@ -70,7 +70,7 @@ export default async function Page({ params }: PageProps) {
           <CategoryTags categories={item.categories} />
         )}
       </div>
-      <section className="flex-1 px-5 py-6 bg-surface-page">
+      <section data-component="ContentSection" className="flex-1 px-5 py-6 bg-surface-page">
         <h2 className="text-base font-medium text-ink-AAA mb-3">商品說明</h2>
         <p className="text-sm leading-6 text-ink-AAA whitespace-pre-line">
           {item.content || item.description}
@@ -91,7 +91,7 @@ function CoverWithRibbon({
   alt: string
 }) {
   return (
-    <div className="relative w-full aspect-square">
+    <div data-component="CoverWithRibbon" className="relative w-full aspect-square">
       <FallbackImage
         primary={coverImageUrl}
         fallback={fallback}
@@ -118,7 +118,7 @@ function ApprovalNoList({
 }) {
   if (!raisingApprovalNo && !reliefApprovalNo) return null
   return (
-    <dl className="grid grid-cols-[8em_1fr] gap-y-1 text-xs text-ink-A">
+    <dl data-component="ApprovalNoList" className="grid grid-cols-[8em_1fr] gap-y-1 text-xs text-ink-A">
       {raisingApprovalNo && (
         <>
           <dt>勸募立案核准字號</dt>
@@ -145,6 +145,7 @@ function CharityChip({
     // 實測 UX「按 1 次返回卻跳過中間頁」反直覺，改回每點一次都堆一個 history entry。
     // 連鎖橫向導航的代價（A → 看團體 → B → 看團體 → C 要按 3 次返回）實際罕見。
     <Link
+      data-component="CharityChip"
       href={`/charities/${charity.id}`}
       className="flex items-center justify-between gap-3 p-3 bg-black/5 rounded-xl
                  hover:bg-black/10
@@ -171,7 +172,7 @@ function CategoryTags({
   categories: { id: string; displayName: string }[]
 }) {
   return (
-    <ul className="flex flex-wrap gap-2">
+    <ul data-component="CategoryTags" className="flex flex-wrap gap-2">
       {categories.map((c) => (
         <li
           key={c.id}

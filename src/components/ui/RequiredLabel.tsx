@@ -13,6 +13,7 @@ export function RequiredLabel({
 }: RequiredLabelProps) {
   return (
     <label
+      data-component="RequiredLabel"
       htmlFor={htmlFor}
       className={`block text-sm text-ink-AAA ${className}`}
     >

@@ -31,6 +31,7 @@ export function FallbackImage({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
+      data-component="FallbackImage"
       src={src}
       alt={alt}
       onError={onError}

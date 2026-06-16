@@ -73,6 +73,7 @@ export function CategoryMenu({
 
   return (
     <div
+      data-component="CategoryMenu"
       role="dialog"
       aria-modal="true"
       aria-labelledby="category-sheet-title"

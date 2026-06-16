@@ -28,6 +28,7 @@ export function TopNav({
   const handleBack = onBack ?? smartBack
   return (
     <header
+      data-component="TopNav"
       className="sticky top-0 z-30 flex items-center w-full h-11
                  bg-brand px-[14px] pt-[env(safe-area-inset-top)]"
     >

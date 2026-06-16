@@ -43,6 +43,7 @@ export function DonationSettingsSheet({ open, onClose, target }: Props) {
   return (
     <BottomSheet open={open} title="捐款設定" onClose={onClose}>
       <form
+        data-component="DonationSettingsSheet"
         onSubmit={(e) => {
           e.preventDefault()
           handleSubmit()

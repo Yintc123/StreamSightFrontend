@@ -44,14 +44,14 @@ export default async function Page({ params }: PageProps) {
   if (!donation) notFound()
 
   return (
-    <div className="flex flex-col min-h-dvh bg-surface-page">
+    <div data-component="DonationProjectDetailPage" className="flex flex-col min-h-dvh bg-surface-page">
       <TopNav title="捐款專案介紹" />
       <Cover
         coverImageUrl={donation.coverImageUrl}
         fallback={pickFallbackImage('donation', donation.id)}
         alt={donation.name}
       />
-      <div className="mx-3 -mt-4 bg-surface-card rounded-2xl shadow-sm relative z-10 p-5 space-y-4">
+      <div data-component="InfoPanel" className="mx-3 -mt-4 bg-surface-card rounded-2xl shadow-sm relative z-10 p-5 space-y-4">
         <h1 className="text-base font-semibold text-ink-AAA leading-7">
           {donation.name}
         </h1>
@@ -64,7 +64,7 @@ export default async function Page({ params }: PageProps) {
           <CategoryTags categories={donation.categories} />
         )}
       </div>
-      <section className="flex-1 px-5 py-6">
+      <section data-component="ContentSection" className="flex-1 px-5 py-6">
         <h2 className="text-base font-medium text-ink-AAA mb-3">專案內容</h2>
         <p className="text-sm leading-6 text-ink-AAA whitespace-pre-line">
           {donation.content || donation.description}
@@ -108,7 +108,7 @@ function ApprovalNoList({
 }) {
   if (!raisingApprovalNo && !reliefApprovalNo) return null
   return (
-    <dl className="grid grid-cols-[8em_1fr] gap-y-1 text-xs text-ink-A">
+    <dl data-component="ApprovalNoList" className="grid grid-cols-[8em_1fr] gap-y-1 text-xs text-ink-A">
       {raisingApprovalNo && (
         <>
           <dt>勸募立案核准字號</dt>
@@ -135,6 +135,7 @@ function CharityChip({
     // 實測 UX「按 1 次返回卻跳過中間頁」反直覺，改回每點一次都堆一個 history entry。
     // 連鎖橫向導航的代價（A → 看團體 → B → 看團體 → C 要按 3 次返回）實際罕見。
     <Link
+      data-component="CharityChip"
       href={`/charities/${charity.id}`}
       className="flex items-center justify-between gap-3 p-3 bg-black/5 rounded-xl
                  hover:bg-black/10
@@ -161,7 +162,7 @@ function CategoryTags({
   categories: { id: string; displayName: string }[]
 }) {
   return (
-    <ul className="flex flex-wrap gap-2">
+    <ul data-component="CategoryTags" className="flex flex-wrap gap-2">
       {categories.map((c) => (
         <li
           key={c.id}
