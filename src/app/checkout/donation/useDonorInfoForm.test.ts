@@ -218,7 +218,7 @@ describe('useDonorInfoForm (hook integration)', () => {
     expect(url).toBe('/api/checkout/donation')
     expect(init.method).toBe('POST')
     const payload = JSON.parse(init.body as string) as Record<string, unknown>
-    expect(payload._endpoint).toBe('/v1/donation/orders/charity-donation')
+    expect(payload._endpoint).toBe('/user/v1/donation/orders/charity-donation')
     expect(payload.charityId).toBe(CHARITY_ID)
     expect(payload.donorName).toBe('Alice')                    // trimmed
     expect(payload.isAnonymous).toBe(false)
@@ -253,7 +253,7 @@ describe('useDonorInfoForm (hook integration)', () => {
     })
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     const payload = JSON.parse(init.body as string) as Record<string, unknown>
-    expect(payload._endpoint).toBe('/v1/donation/orders/project-donation')
+    expect(payload._endpoint).toBe('/user/v1/donation/orders/project-donation')
     expect(payload.donationProjectId).toBe(CHARITY_ID)
     expect('charityId' in payload).toBe(false)
     expect(routerReplaceMock).toHaveBeenCalledWith(

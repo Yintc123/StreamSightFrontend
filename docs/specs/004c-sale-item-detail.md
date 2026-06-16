@@ -5,7 +5,7 @@
 - **路徑**：`src/app/sale-items/[id]/page.tsx` + `src/components/features/SaleItemDetail.tsx`
 - **依賴**：[004 index](./004-detail-pages.md)
 - **Figma 對應**：IMG_4882
-- **Backend endpoint**：`GET /v1/donation/sale-items/:id`（spec 017）
+- **Backend endpoint**：`GET /user/v1/donation/sale-items/:id`（spec 017）
 
 ---
 

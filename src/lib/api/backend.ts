@@ -192,7 +192,7 @@ let mocksRegistered = false
 async function ensureMocksRegistered(): Promise<void> {
   if (mocksRegistered) return
   // Side-effect import: calls `registerMock` once per process for every
-  // /v1/donation/* upstream path.
+  // /user/v1/donation/* upstream path.
   await import('@/lib/mock/register')
   mocksRegistered = true
 }

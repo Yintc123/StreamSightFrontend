@@ -1,6 +1,6 @@
 # Spec 004a：公益團體介紹頁
 
-- **狀態**：Draft（v0.3 — ShareIconButton 接 Web Share API + clipboard fallback）
+- **狀態**：Draft（v0.4 — upstream cutover `/user/v1/donation/*` 對齊 BE spec 023 §2.4）
 - **路由**：`/charities/:id`
 - **路徑**：
   - `src/app/charities/[id]/page.tsx`（RSC）
@@ -11,8 +11,8 @@
 - **依賴**：[004 index](./004-detail-pages.md)、[003e2 DonationProjectCard](./003e2-donation-project-card.md)（cross-link 區重用）、[003b TopNav](./003b-topnav.md) v0.3 含 `accessory` slot
 - **Figma 對應**：IMG_4881（v0.2 修正：v0.1 寫 IMG_4876 是錯的）
 - **Backend endpoints**：
-  - `GET /v1/donation/charities/:id`（spec 017，charity detail）
-  - `GET /v1/donation/donation-projects?charityId=:id&limit=10`（spec 016 v0.5，donation list with charityId filter）
+  - `GET /user/v1/donation/charities/:id`（spec 017，charity detail）
+  - `GET /user/v1/donation/donation-projects?charityId=:id&limit=10`（spec 016 v0.5，donation list with charityId filter）
 
 ---
 
@@ -89,7 +89,7 @@ export async function RelatedProjects({ charityId }) {
 }
 ```
 
-`fetchDonationsByCharity`：直接 `backendFetch('/v1/donation/donation-projects', { query: { charityId, limit: 10 }})`、重用既有 `BackendDonationListItem` schema + `toClientDonation` mapper，**不**經 BFF route。對齊 `fetchCharityDetail` 同套路。
+`fetchDonationsByCharity`：直接 `backendFetch('/user/v1/donation/donation-projects', { query: { charityId, limit: 10 }})`、重用既有 `BackendDonationListItem` schema + `toClientDonation` mapper，**不**經 BFF route。對齊 `fetchCharityDetail` 同套路。
 
 > **平行 fetch**：目前 `charity = await fetchCharityDetail(id)` 再 `<RelatedProjects>` 內部 await 另一個 fetcher — 是 sequential（嚴格說有兩段 waterfall）。優化方案是把兩個 fetch 提到 page 頂層 `Promise.all`，但這需要 props drill 或 Suspense；本 v0.2 不做（demo 場景對 ~100ms 額外延遲不敏感）。
 
@@ -168,3 +168,4 @@ export async function RelatedProjects({ charityId }) {
 | 0.1 | 2026-06-14 | 初版：Figma 對應誤標 IMG_4876；CTA sticky；Related 只放 text + link |
 | 0.2 | 2026-06-15 | 對齊 IMG_4881：(1) TopNav 加 `<ShareIconButton>` accessory；(2) 描述用 `<ExpandableText>`（line-clamp-3 + 更多 toggle、7 個 test case）；(3) CTA 從 sticky 改 **in-card**（白色 panel 底部紅色 pill 按鈕）；(4) 「捐款專案」cross-link 區改 async RSC `<RelatedProjects>`，呼叫新 `fetchDonationsByCharity` 並渲染 `<DonationProjectCard>` 列表；(5) 修正 Figma 對應為 IMG_4881。新檔：`ExpandableText.tsx`、`ShareIconButton.tsx`、`getRelated.ts`、`RelatedProjects.tsx` |
 | 0.3 | 2026-06-15 | **ShareIconButton 接 Web Share API**（取代 v0.2 `console.log` placeholder）：(a) `navigator.share` 存在 → 開系統 share sheet；(b) AbortError 視為使用者取消、靜默；(c) 不支援 / 其他錯 → `navigator.clipboard.writeText` fallback + sonner toast「已複製連結」；(d) 剪貼簿也失敗 → toast「無法分享」。元件多 3 個 optional prop（`url` / `title` / `text`），未傳走 `window.location.href` / `document.title`。caller 在 charity detail 傳 `title={charity.name}`，分享預覽更明確。新增 9 個 colocated unit test 覆蓋全部失敗矩陣（mock `navigator.share` / `navigator.clipboard` / `sonner.toast`）。對 brief.md「分享 icon button 作業範圍外」是合理外擴：純前端 web API、零金流、零後端依賴 |
+| 0.4 | 2026-06-16 | **Upstream path cutover 到 `/user/v1/donation/*`**（對齊 [backend spec 023 §2.4](../../../backend/docs/specs/023-api-routing-versioning.md)）：§Backend endpoints 兩條 URL（charity detail / donation-projects?charityId 過濾）+ §3.2 `fetchDonationsByCharity` 範例的 `backendFetch` upstream path 都改成新前綴；`src/lib/api/getDetail.ts` / `getRelated.ts` / 對應測試 fixtures 同步。 |

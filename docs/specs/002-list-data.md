@@ -1,7 +1,7 @@
 # Spec 002：捐款項目列表 — 業務 / 資料層（三 tab 通用）
 
 - **狀態**：Draft
-- **建立日期**：2026-06-13（v0.1）/ 2026-06-14（v0.2 — 三 tab + 10 筆 + scroll% 觸發 + tab lazy）/ 2026-06-14（v0.5 — per-tab limit：charity 10 / donation 5 / item 4）/ 2026-06-15（v0.6 — viewport hint：item desktop=12）
+- **建立日期**：2026-06-13（v0.1）/ 2026-06-14（v0.2 — 三 tab + 10 筆 + scroll% 觸發 + tab lazy）/ 2026-06-14（v0.5 — per-tab limit：charity 10 / donation 5 / item 4）/ 2026-06-15（v0.6 — viewport hint：item desktop=12）/ 2026-06-16（v0.9 — upstream cutover `/user/v1/donation/*` 對齊 BE spec 023 §2.4）
 - **影響範圍**：
   - BFF：`src/app/api/{charities,donations,items}/route.ts` + `src/lib/api/createListRoute.ts`
   - 資料層：`src/lib/schemas/list.ts`、`src/lib/api/client.ts`、`src/lib/query/list.ts`
@@ -11,7 +11,7 @@
   - Hooks：`src/lib/hooks/useDebouncedValue.ts`、`src/lib/hooks/useUrlSync.ts`、`src/lib/hooks/useScrollPercentSentinel.ts`
 - **依賴**：
   - [Spec 001 BFF 基礎建設](./001-bff-infrastructure.md)（`createRoute` / `okResponse` / `backendFetch` / `parseQuery` / mock dispatch）
-  - Backend [Spec 016](../../../backend/docs/specs/016-charity-list-api.md) `/v1/donation/charities`；以及（**待 backend 補**）`/v1/donations` 與 `/v1/items` 假設同契約
+  - Backend [Spec 016](../../../backend/docs/specs/016-charity-list-api.md) `/user/v1/donation/charities`；以及（**待 backend 補**）`/user/v1/donation/donation-projects` 與 `/user/v1/donation/sale-items` 假設同契約
   - 專案根 ADR 002（Next.js + BFF）
 - **下游**：[Spec 003 列表 UI](./003-charity-list-ui.md) 全系列
 
@@ -182,7 +182,7 @@ import { createListRoute } from '@/lib/api/createListRoute'
 import { BackendCharityListItem } from '@/lib/schemas/list'
 
 export const GET = createListRoute({
-  upstreamPath: '/v1/donation/charities',
+  upstreamPath: '/user/v1/donation/charities',
   backendItemSchema: BackendCharityListItem,
   limit: 10,        // v0.5 — row 卡，mobile 寬度下單行 → 10 筆 ≈ 滑 1~2 頁觸發 next
   desktopLimit: 30, // v0.7 — desktop lg:grid-cols-3 × 10 列；tablet md:grid-cols-2 沿用 10（5 列足）
@@ -200,7 +200,7 @@ export const GET = createListRoute({
 import { BackendDonationListItem } from '@/lib/schemas/list'
 
 export const GET = createListRoute({
-  upstreamPath: '/v1/donations',
+  upstreamPath: '/user/v1/donation/donation-projects',
   backendItemSchema: BackendDonationListItem,
   limit: 5,        // v0.5 — 16:9 cover card 在 mobile 寬度下每張約半屏，5 筆 ≈ 2 屏
   tabletLimit: 8,  // v0.8 — tablet md:grid-cols-2 × 4 列；desktop 暫沿用 5
@@ -219,7 +219,7 @@ export const GET = createListRoute({
 import { BackendItemListItem } from '@/lib/schemas/list'
 
 export const GET = createListRoute({
-  upstreamPath: '/v1/items',
+  upstreamPath: '/user/v1/donation/sale-items',
   backendItemSchema: BackendItemListItem,
   limit: 4,         // v0.5 — mobile：2 欄正方 grid，4 筆 = 2 列 ≈ 1 屏
   tabletLimit: 6,   // v0.6 — tablet：md:grid-cols-3，6 筆 = 2 列
@@ -555,9 +555,9 @@ import { charityListHandler } from './charity-fixtures'
 import { donationListHandler } from './donation-fixtures'
 import { itemListHandler } from './item-fixtures'
 
-registerMock('/v1/donation/charities', charityListHandler)
-registerMock('/v1/donations', donationListHandler)
-registerMock('/v1/items', itemListHandler)
+registerMock('/user/v1/donation/charities', charityListHandler)
+registerMock('/user/v1/donation/donation-projects', donationListHandler)
+registerMock('/user/v1/donation/sale-items', itemListHandler)
 ```
 
 ### 4.4 Fixture 內容約定
@@ -987,3 +987,4 @@ URL              ?tab=donation&q=foo&category=animal
 | 0.6 | 2026-06-15 | **Viewport-aware limits**：item tab 在 `md:` / `lg:` grid 由 2 → 3 → 4 欄變化，單一 limit 不夠 → 加 `opts.tabletLimit` / `desktopLimit`；item 設 `limit:4 / tabletLimit:6 / desktopLimit:12`；`ListQuery` 加 `viewport: enum(['mobile','tablet','desktop']).optional()`；新增 `useViewport()` hook（兩個 matchMedia：`min-width:768px` + `min-width:1024px`，對齊 Tailwind `md:` / `lg:`，SSR 預設 mobile）；`useResourceListInfinite` 接 `viewport` 並寫入 queryKey 與 URL；CharityListShell 頂層呼叫 `useViewport()` 串給三個 hook。對應 brief.md v0.8 |
 | 0.7 | 2026-06-15 | **Charity desktop limit 擴 30**：charity tab 原本 mobile/tablet/desktop 都吃 mobile 10/page；desktop `lg:grid-cols-3` 下 10 筆只填 ~3 列，留白偏多。加 `desktopLimit: 30`（10 列 × 3 欄），讓桌機首屏即填滿 grid。tablet 仍 fallback 到 mobile 10（5 列 × 2 欄足夠首屏，不過度抓）。donation 暫不擴。`createListRoute` 行為不變（v0.6 已支援 `desktopLimit` fallback），純配置調整。新增 colocated `charities/route.test.ts` 4 個 viewport wiring case |
 | 0.8 | 2026-06-15 | **Donation tablet limit 擴 8**：donation tab tablet 寬度下 `md:grid-cols-2` × 4 列 = 8 筆，配合 16:9 cover 約半屏的視覺密度（mobile 仍 5、desktop 沿用 5 不擴）。`createListRoute` 行為不變。新增 colocated `donations/route.test.ts` 4 個 viewport wiring case |
+| 0.9 | 2026-06-16 | **Upstream path cutover 到 `/user/v1/donation/*`**（對齊 [backend spec 023 §2.4](../../../backend/docs/specs/023-api-routing-versioning.md)）：BE 重組三個 URL surface（`/auth` / `/user/v{N}` / `/cms`），公開 reads 從 `/v1/donation/*` 移到 `/user/v1/donation/*`。FE 端 `src/app/api/{charities,donations,items,categories}/route.ts` upstream / mock register / createListRoute / createDetailRoute / mock dispatch 註解全部同步更新。所有 BFF / mock register / createListRoute 測試的 URL 斷言同步替換；746 unit/integration 全綠。`/v1/donations` / `/v1/items` 兩個本檔早期假設的 placeholder path 也對齊到 BE 實際命名（`donation-projects` / `sale-items`）。 |

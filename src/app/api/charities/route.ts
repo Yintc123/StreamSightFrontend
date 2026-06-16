@@ -1,5 +1,5 @@
 // Spec 002 §2 / backend 016 §3 — public charity list BFF.
-// Upstream: GET /v1/donation/charities
+// Upstream: GET /user/v1/donation/charities (BE spec 023 §2.4)
 
 import 'server-only'
 
@@ -10,7 +10,7 @@ import {
 } from '@/lib/schemas/list'
 
 export const GET = createListRoute({
-  upstream: '/v1/donation/charities',
+  upstream: '/user/v1/donation/charities',
   backendItemSchema: BackendCharityListItem,
   toClientItem: toClientCharity,
   // Spec 002 §1.3 v0.3 — charity row layout, 10/page at mobile width.

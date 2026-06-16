@@ -1,5 +1,5 @@
 // Spec 004c / backend 017 §5 — Sale-item detail BFF.
-// Upstream: GET /v1/donation/sale-items/:id
+// Upstream: GET /user/v1/donation/sale-items/:id (BE spec 023 §2.4)
 
 import 'server-only'
 
@@ -10,7 +10,7 @@ import {
 } from '@/lib/schemas/detail'
 
 export const GET = createDetailRoute({
-  upstream: '/v1/donation/sale-items',
+  upstream: '/user/v1/donation/sale-items',
   backendSchema: BackendItemDetail,
   toClient: toClientItemDetail,
 })

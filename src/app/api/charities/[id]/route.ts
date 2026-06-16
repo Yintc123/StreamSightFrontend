@@ -1,5 +1,5 @@
 // Spec 004a / backend 017 §3 — Charity detail BFF.
-// Upstream: GET /v1/donation/charities/:id
+// Upstream: GET /user/v1/donation/charities/:id (BE spec 023 §2.4)
 
 import 'server-only'
 
@@ -10,7 +10,7 @@ import {
 } from '@/lib/schemas/detail'
 
 export const GET = createDetailRoute({
-  upstream: '/v1/donation/charities',
+  upstream: '/user/v1/donation/charities',
   backendSchema: BackendCharityDetail,
   toClient: toClientCharityDetail,
 })

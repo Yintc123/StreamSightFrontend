@@ -52,7 +52,7 @@ const PROJECT_ID = '00000000-0000-4000-8000-000000000002'
 const ORDER_ID = '11111111-1111-4111-8111-000000000010'
 
 const VALID_CHARITY_BODY = {
-  _endpoint: '/v1/donation/orders/charity-donation',
+  _endpoint: '/user/v1/donation/orders/charity-donation',
   donorName: 'Alice',
   isAnonymous: false,
   receiptOption: 'NONE',
@@ -63,7 +63,7 @@ const VALID_CHARITY_BODY = {
 } as const
 
 const VALID_PROJECT_BODY = {
-  _endpoint: '/v1/donation/orders/project-donation',
+  _endpoint: '/user/v1/donation/orders/project-donation',
   donorName: 'Bob',
   isAnonymous: false,
   receiptOption: 'INDIVIDUAL',
@@ -107,7 +107,7 @@ describe('POST /api/checkout/donation', () => {
     let receivedBody: unknown
     mockBackend(
       'post',
-      'http://backend.test/v1/donation/orders/charity-donation',
+      'http://backend.test/user/v1/donation/orders/charity-donation',
       async (req) => {
         receivedUrl = req.url
         receivedBody = await req.json()
@@ -129,7 +129,7 @@ describe('POST /api/checkout/donation', () => {
     expect(body.data.status).toBe('PENDING')
     // 確認 _endpoint 被剝掉、不會送進 BE（BE strict additionalProperties=false 會 400）
     expect(receivedUrl).toBe(
-      'http://backend.test/v1/donation/orders/charity-donation',
+      'http://backend.test/user/v1/donation/orders/charity-donation',
     )
     expect(receivedBody).not.toHaveProperty('_endpoint')
     expect(receivedBody).toEqual({
@@ -147,7 +147,7 @@ describe('POST /api/checkout/donation', () => {
     let receivedBody: Record<string, unknown> | undefined
     mockBackend(
       'post',
-      'http://backend.test/v1/donation/orders/charity-donation',
+      'http://backend.test/user/v1/donation/orders/charity-donation',
       async (req) => {
         receivedBody = (await req.json()) as Record<string, unknown>
         return HttpResponse.json(
@@ -166,7 +166,7 @@ describe('POST /api/checkout/donation', () => {
     let receivedUrl: string | undefined
     mockBackend(
       'post',
-      'http://backend.test/v1/donation/orders/project-donation',
+      'http://backend.test/user/v1/donation/orders/project-donation',
       async (req) => {
         receivedUrl = req.url
         return HttpResponse.json(
@@ -178,7 +178,7 @@ describe('POST /api/checkout/donation', () => {
     const res = await POST(postReq(VALID_PROJECT_BODY), noParams)
     expect(res.status).toBe(200)
     expect(receivedUrl).toBe(
-      'http://backend.test/v1/donation/orders/project-donation',
+      'http://backend.test/user/v1/donation/orders/project-donation',
     )
   })
 
@@ -205,7 +205,7 @@ describe('POST /api/checkout/donation', () => {
   })
 
   it('未知 _endpoint → 400', async () => {
-    const broken = { ...VALID_CHARITY_BODY, _endpoint: '/v1/donation/orders/wrong' }
+    const broken = { ...VALID_CHARITY_BODY, _endpoint: '/user/v1/donation/orders/wrong' }
     const res = await POST(postReq(broken), noParams)
     expect(res.status).toBe(400)
   })
@@ -213,7 +213,7 @@ describe('POST /api/checkout/donation', () => {
   it('BE 回 404（charity 不存在）→ 404 透傳', async () => {
     mockBackend(
       'post',
-      'http://backend.test/v1/donation/orders/charity-donation',
+      'http://backend.test/user/v1/donation/orders/charity-donation',
       async () =>
         HttpResponse.json(
           { error: { code: 'CHARITY_NOT_FOUND', message: 'not found' } },

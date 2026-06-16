@@ -151,7 +151,7 @@ describe('useReceiptInfoForm (hook)', () => {
     expect(url).toBe('/api/checkout/purchase')
     expect(init.method).toBe('POST')
     const payload = JSON.parse(init.body as string) as Record<string, unknown>
-    expect(payload._endpoint).toBe('/v1/donation/orders/sale-item-purchase')
+    expect(payload._endpoint).toBe('/user/v1/donation/orders/sale-item-purchase')
     expect(payload.donorName).toBe('Alice')
     expect(payload.isAnonymous).toBe(true)
     expect(payload.items).toEqual([{ saleItemId: ITEM_ID, quantity: 2 }])

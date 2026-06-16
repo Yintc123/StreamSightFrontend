@@ -1,5 +1,5 @@
 // Spec 002 §2 / backend 016 §3 — public donation-project list BFF.
-// Upstream: GET /v1/donation/donation-projects
+// Upstream: GET /user/v1/donation/donation-projects (BE spec 023 §2.4)
 //
 // Path name divergence is intentional: client URL stays `/api/donations`
 // (matches spec 002 §3.2 RESOURCE_TO_PATH); the longer backend path
@@ -15,7 +15,7 @@ import {
 } from '@/lib/schemas/list'
 
 export const GET = createListRoute({
-  upstream: '/v1/donation/donation-projects',
+  upstream: '/user/v1/donation/donation-projects',
   backendItemSchema: BackendDonationListItem,
   toClientItem: toClientDonation,
   // Spec 002 §1.3 v0.3 — donation 16:9 cover cards, 5/page at mobile width.

@@ -15,8 +15,8 @@ const literals = new Map<string, MockHandler>()
 const patterns: PatternEntry[] = []
 
 /**
- * Register a mock handler for an exact path (`/v1/donation/charities`)
- * or a single-param pattern (`/v1/donation/charities/:id`). The captured
+ * Register a mock handler for an exact path (`/user/v1/donation/charities`)
+ * or a single-param pattern (`/user/v1/donation/charities/:id`). The captured
  * param value is forwarded to the handler as `query.__<paramName>`
  * (double-underscored to avoid collision with real query params).
  */

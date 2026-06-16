@@ -56,7 +56,7 @@ export function getCategoryLabel(key: CategoryKey | null): string {
   return key === null ? '全部' : CATEGORY_LABELS[key]
 }
 
-// —— Backend /v1/donation/categories response shape (spec 016 §6.2) ——
+// —— Backend /user/v1/donation/categories response shape (spec 016 §6.2) ——
 //
 // Used by the BFF `/api/categories` Route Handler to validate the upstream
 // payload. Client receives the same shape (no transformation needed —

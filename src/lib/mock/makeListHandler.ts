@@ -1,7 +1,7 @@
 // Spec 002 §4.1 — Generic list handler factory.
 //
 // Wraps a client-shape fixture array + an adapter and returns a
-// `MockHandler` that mimics the backend `/v1/donation/<resource>` list
+// `MockHandler` that mimics the backend `/user/v1/donation/<resource>` list
 // endpoint (q + category + cursor + limit):
 //
 //   - `q` lowercase contains match against name + description.

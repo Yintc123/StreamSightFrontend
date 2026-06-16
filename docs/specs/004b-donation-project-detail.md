@@ -5,7 +5,7 @@
 - **路徑**：`src/app/donation-projects/[id]/page.tsx` + `src/components/features/DonationProjectDetail.tsx`
 - **依賴**：[004 index](./004-detail-pages.md)
 - **Figma 對應**：IMG_4883
-- **Backend endpoint**：`GET /v1/donation/donation-projects/:id`（spec 017）
+- **Backend endpoint**：`GET /user/v1/donation/donation-projects/:id`（spec 017）
 
 ---
 
@@ -59,7 +59,7 @@ export default async function Page({ params }) {
 }
 ```
 
-> 用 nested embed 避免 N+1（前端不再多打一次 `/v1/donation/charities/:charityId`）。Backend spec 017 對應提供。
+> 用 nested embed 避免 N+1（前端不再多打一次 `/user/v1/donation/charities/:charityId`）。Backend spec 017 對應提供。
 
 ---
 

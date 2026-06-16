@@ -56,7 +56,7 @@ async function captureUpstreamLimit(viewport?: string): Promise<string | null> {
   let captured: string | null = null
   mockBackend(
     'get',
-    'http://backend.test/v1/donation/charities',
+    'http://backend.test/user/v1/donation/charities',
     async (req) => {
       captured = new URL(req.url).searchParams.get('limit')
       return HttpResponse.json({

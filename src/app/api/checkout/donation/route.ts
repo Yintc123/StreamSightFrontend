@@ -43,13 +43,13 @@ const BASE = {
 }
 
 const CharityDonationBody = z.object({
-  _endpoint: z.literal('/v1/donation/orders/charity-donation'),
+  _endpoint: z.literal('/user/v1/donation/orders/charity-donation'),
   ...BASE,
   charityId: z.string().uuid(),
 })
 
 const ProjectDonationBody = z.object({
-  _endpoint: z.literal('/v1/donation/orders/project-donation'),
+  _endpoint: z.literal('/user/v1/donation/orders/project-donation'),
   ...BASE,
   donationProjectId: z.string().uuid(),
 })

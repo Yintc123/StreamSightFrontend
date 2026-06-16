@@ -97,7 +97,7 @@ type ClientItem = {
 }
 
 const route = createListRoute({
-  upstream: '/v1/donation/charities',
+  upstream: '/user/v1/donation/charities',
   backendItemSchema: BackendItemForTest,
   toClientItem: (b): ClientItem => ({
     id: b.id,
@@ -130,7 +130,7 @@ describe('createListRoute — happy path', () => {
     let capturedLang: string | null = null
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/charities',
+      'http://backend.test/user/v1/donation/charities',
       async (req) => {
         capturedUrl = new URL(req.url)
         capturedLang = req.headers.get('accept-language')
@@ -158,7 +158,7 @@ describe('createListRoute — happy path', () => {
   it('maps inflated categories → string[] of keys, strips createdAt/updatedAt', async () => {
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/charities',
+      'http://backend.test/user/v1/donation/charities',
       async () =>
         HttpResponse.json({
           items: [
@@ -195,7 +195,7 @@ describe('createListRoute — happy path', () => {
   it('drops null logoUrl from the output (client schema uses optional, not nullable)', async () => {
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/charities',
+      'http://backend.test/user/v1/donation/charities',
       async () =>
         HttpResponse.json({
           items: [
@@ -220,7 +220,7 @@ describe('createListRoute — happy path', () => {
   it('opts.tabletLimit / desktopLimit kick in per query.viewport', async () => {
     // Spec 002 §1.3 v0.6 — item tab: limit:4 / tabletLimit:6 / desktopLimit:12.
     const route = createListRoute({
-      upstream: '/v1/donation/sale-items',
+      upstream: '/user/v1/donation/sale-items',
       backendItemSchema: BackendItemForTest,
       toClientItem: (b): ClientItem => ({
         id: b.id,
@@ -235,7 +235,7 @@ describe('createListRoute — happy path', () => {
     const captured: string[] = []
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/sale-items',
+      'http://backend.test/user/v1/donation/sale-items',
       async (req) => {
         captured.push(new URL(req.url).searchParams.get('limit') ?? '')
         return HttpResponse.json({
@@ -253,7 +253,7 @@ describe('createListRoute — happy path', () => {
 
   it('viewport=tablet without opts.tabletLimit → falls back to limit', async () => {
     const route = createListRoute({
-      upstream: '/v1/donation/charities',
+      upstream: '/user/v1/donation/charities',
       backendItemSchema: BackendItemForTest,
       toClientItem: (b): ClientItem => ({
         id: b.id,
@@ -266,7 +266,7 @@ describe('createListRoute — happy path', () => {
     let captured: string | null = null
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/charities',
+      'http://backend.test/user/v1/donation/charities',
       async (req) => {
         captured = new URL(req.url).searchParams.get('limit')
         return HttpResponse.json({
@@ -282,7 +282,7 @@ describe('createListRoute — happy path', () => {
   it('per-route opts.limit overrides the default 10', async () => {
     // Spec 002 §1.3 v0.3 — donation tab uses limit=5, item tab limit=4.
     const routeWithLimit = createListRoute({
-      upstream: '/v1/donation/donation-projects',
+      upstream: '/user/v1/donation/donation-projects',
       backendItemSchema: BackendItemForTest,
       toClientItem: (b): ClientItem => ({
         id: b.id,
@@ -295,7 +295,7 @@ describe('createListRoute — happy path', () => {
     let capturedUrl: URL | undefined
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/donation-projects',
+      'http://backend.test/user/v1/donation/donation-projects',
       async (req) => {
         capturedUrl = new URL(req.url)
         return HttpResponse.json({
@@ -312,7 +312,7 @@ describe('createListRoute — happy path', () => {
   it('returns nextCursor=null on the last page', async () => {
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/charities',
+      'http://backend.test/user/v1/donation/charities',
       async () =>
         HttpResponse.json({
           items: [],
@@ -330,7 +330,7 @@ describe('createListRoute — query validation', () => {
     let backendCalled = false
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/charities',
+      'http://backend.test/user/v1/donation/charities',
       async () => {
         backendCalled = true
         return HttpResponse.json({})
@@ -345,7 +345,7 @@ describe('createListRoute — query validation', () => {
     let backendCalled = false
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/charities',
+      'http://backend.test/user/v1/donation/charities',
       async () => {
         backendCalled = true
         return HttpResponse.json({})
@@ -363,7 +363,7 @@ describe('createListRoute — query validation', () => {
 
 describe('createListRoute — upstream failure modes', () => {
   it('502-equivalent (BackendUpstreamError) when upstream returns 500', async () => {
-    mockBackend('get', 'http://backend.test/v1/donation/charities', async () =>
+    mockBackend('get', 'http://backend.test/user/v1/donation/charities', async () =>
       HttpResponse.text('boom', { status: 500 }),
     )
     const res = await route(getReq('/api/charities'), noParams)
@@ -373,7 +373,7 @@ describe('createListRoute — upstream failure modes', () => {
   it('502 when upstream response shape violates the schema (ContractViolationError)', async () => {
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/charities',
+      'http://backend.test/user/v1/donation/charities',
       async () =>
         HttpResponse.json({
           // Missing required `categories` field → fails BackendItemForTest.
@@ -399,7 +399,7 @@ describe('createListRoute — response headers', () => {
   it('enforces Cache-Control: no-store, private', async () => {
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/charities',
+      'http://backend.test/user/v1/donation/charities',
       async () =>
         HttpResponse.json({
           items: [],

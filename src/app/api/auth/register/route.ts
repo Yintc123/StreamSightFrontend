@@ -6,8 +6,9 @@
 //   2. GET  /auth/me         → BE returns Account profile (BE 008 §6.4),
 //                              using the access JWT from step 1
 //
-// Note: auth endpoints are NOT under `/v1/` (BE 008 §3 / spec 007 v0.2
-// §10.x); only `/v1/donation/*` carries the version prefix.
+// Note: auth endpoints stay unprefixed (BE spec 023 §2.1 — Auth surface
+// intentionally not versioned); only `/user/v1/donation/*` carries the
+// version prefix.
 //
 // Then BFF builds an iron-session (user + tokens), returns 201 with the
 // session id + csrf token. Either step failing leaves no session — see

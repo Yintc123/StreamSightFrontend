@@ -73,7 +73,7 @@ const BackendForTest = z.object({
 type ClientShape = { id: string; name: string }
 
 const route = createDetailRoute({
-  upstream: '/v1/donation/charities',
+  upstream: '/user/v1/donation/charities',
   backendSchema: BackendForTest,
   toClient: (b): ClientShape => ({ id: b.id, name: b.name }),
 })
@@ -106,7 +106,7 @@ describe('createDetailRoute — happy path', () => {
     let captured: { path: string; lang: string | null } = { path: '', lang: null }
     mockBackend(
       'get',
-      `http://backend.test/v1/donation/charities/${VALID_UUID}`,
+      `http://backend.test/user/v1/donation/charities/${VALID_UUID}`,
       async (req) => {
         captured = {
           path: new URL(req.url).pathname,
@@ -121,14 +121,14 @@ describe('createDetailRoute — happy path', () => {
       ctxFor(VALID_UUID),
     )
     expect(res.status).toBe(200)
-    expect(captured.path).toBe(`/v1/donation/charities/${VALID_UUID}`)
+    expect(captured.path).toBe(`/user/v1/donation/charities/${VALID_UUID}`)
     expect(captured.lang).toBe('en')
   })
 
   it('strips backend-only fields via the mapper', async () => {
     mockBackend(
       'get',
-      `http://backend.test/v1/donation/charities/${VALID_UUID}`,
+      `http://backend.test/user/v1/donation/charities/${VALID_UUID}`,
       async () =>
         HttpResponse.json({
           id: VALID_UUID,
@@ -148,7 +148,7 @@ describe('createDetailRoute — :id validation', () => {
     let backendCalled = false
     mockBackend(
       'get',
-      'http://backend.test/v1/donation/charities/not-a-uuid',
+      'http://backend.test/user/v1/donation/charities/not-a-uuid',
       async () => {
         backendCalled = true
         return HttpResponse.json({})
@@ -164,7 +164,7 @@ describe('createDetailRoute — error propagation', () => {
   it('upstream 404 → 404 to client (NOT 502)', async () => {
     mockBackend(
       'get',
-      `http://backend.test/v1/donation/charities/${VALID_UUID}`,
+      `http://backend.test/user/v1/donation/charities/${VALID_UUID}`,
       async () =>
         HttpResponse.json(
           {
@@ -182,7 +182,7 @@ describe('createDetailRoute — error propagation', () => {
   it('upstream 500 → 502 to client', async () => {
     mockBackend(
       'get',
-      `http://backend.test/v1/donation/charities/${VALID_UUID}`,
+      `http://backend.test/user/v1/donation/charities/${VALID_UUID}`,
       async () => HttpResponse.text('boom', { status: 500 }),
     )
     const res = await route(getReq(`/api/charities/${VALID_UUID}`), ctxFor(VALID_UUID))
@@ -192,7 +192,7 @@ describe('createDetailRoute — error propagation', () => {
   it('upstream schema drift → 502 ContractViolationError', async () => {
     mockBackend(
       'get',
-      `http://backend.test/v1/donation/charities/${VALID_UUID}`,
+      `http://backend.test/user/v1/donation/charities/${VALID_UUID}`,
       async () =>
         HttpResponse.json({
           // `name` missing — fails BackendForTest
@@ -208,7 +208,7 @@ describe('createDetailRoute — response headers', () => {
   it('Cache-Control: no-store, private (inherited from createRoute)', async () => {
     mockBackend(
       'get',
-      `http://backend.test/v1/donation/charities/${VALID_UUID}`,
+      `http://backend.test/user/v1/donation/charities/${VALID_UUID}`,
       async () => HttpResponse.json({ id: VALID_UUID, name: 'ACC' }),
     )
     const res = await route(getReq(`/api/charities/${VALID_UUID}`), ctxFor(VALID_UUID))

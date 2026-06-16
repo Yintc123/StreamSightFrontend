@@ -1,7 +1,7 @@
 // Spec 004 / spec 017 — Detail-endpoint Route-Handler factory.
 //
 // Parallel to `createListRoute` but for single-resource lookups:
-//   GET /api/<resource>/:id  →  upstream  GET /v1/donation/<X>/:id
+//   GET /api/<resource>/:id  →  upstream  GET /user/v1/donation/<X>/:id
 //
 // Per-route config is 3 lines (upstream prefix + backend Zod schema +
 // client mapper). Path-level UUID validation lives in the factory so
@@ -31,7 +31,7 @@ const DetailParams = z.object({
 })
 
 export interface CreateDetailRouteOptions<TBackend, TClient> {
-  /** Upstream backend path prefix, e.g. `/v1/donation/charities`. */
+  /** Upstream backend path prefix, e.g. `/user/v1/donation/charities`. */
   upstream: string
   /** Zod schema describing the backend detail response shape. */
   backendSchema: ZodType<TBackend>

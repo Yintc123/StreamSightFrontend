@@ -1,5 +1,5 @@
 // Spec 002 §2 / backend 016 §3 — public sale-item list BFF.
-// Upstream: GET /v1/donation/sale-items
+// Upstream: GET /user/v1/donation/sale-items (BE spec 023 §2.4)
 
 import 'server-only'
 
@@ -10,7 +10,7 @@ import {
 } from '@/lib/schemas/list'
 
 export const GET = createListRoute({
-  upstream: '/v1/donation/sale-items',
+  upstream: '/user/v1/donation/sale-items',
   backendItemSchema: BackendItemListItem,
   toClientItem: toClientItem,
   // Spec 002 §1.3 v0.3 — item 2-col square grid, 4/page at mobile width.

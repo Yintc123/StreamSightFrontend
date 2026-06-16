@@ -44,7 +44,7 @@ export function reducer(s: FormState, a: Action): FormState {
 // ─── Payload (BE 022 §4.3) ─────────────────────────────────────────
 
 export type PurchaseConfirmPayload = {
-  _endpoint: '/v1/donation/orders/sale-item-purchase'
+  _endpoint: '/user/v1/donation/orders/sale-item-purchase'
   donorName: string
   isAnonymous: boolean
   items: [{ saleItemId: string; quantity: number }]
@@ -55,7 +55,7 @@ export function buildPayload(
   form: FormState,
 ): PurchaseConfirmPayload {
   return {
-    _endpoint: '/v1/donation/orders/sale-item-purchase',
+    _endpoint: '/user/v1/donation/orders/sale-item-purchase',
     donorName: form.donorName.trim(),
     isAnonymous: form.isAnonymous,
     items: [{ saleItemId: draft.item.id, quantity: draft.quantity }],

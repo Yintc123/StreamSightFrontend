@@ -42,7 +42,7 @@ interface BackendListShape<T> {
 }
 
 export interface CreateListRouteOptions<TBackend, TClient> {
-  /** Upstream backend path, e.g. `/v1/donation/charities`. */
+  /** Upstream backend path, e.g. `/user/v1/donation/charities`. */
   upstream: string
   /** Zod schema describing one item in the backend list response. */
   backendItemSchema: ZodType<TBackend>

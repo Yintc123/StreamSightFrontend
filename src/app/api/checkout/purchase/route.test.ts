@@ -1,5 +1,5 @@
 // Spec 009 §5 (v0.4) — BFF /api/checkout/purchase forwards to BE 022 §4.3
-// `/v1/donation/orders/sale-item-purchase`. Body shape matches BE
+// `/user/v1/donation/orders/sale-item-purchase`. Body shape matches BE
 // SaleItemPurchaseBody verbatim (ADR 012) so no field translation.
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -47,7 +47,7 @@ const SALE_ITEM_ID = '00000000-0000-4000-8000-000000000099'
 const ORDER_ID = '11111111-1111-4111-8111-000000000020'
 
 const VALID_BODY = {
-  _endpoint: '/v1/donation/orders/sale-item-purchase',
+  _endpoint: '/user/v1/donation/orders/sale-item-purchase',
   donorName: 'Alice',
   isAnonymous: false,
   items: [{ saleItemId: SALE_ITEM_ID, quantity: 2 }],
@@ -84,7 +84,7 @@ describe('POST /api/checkout/purchase', () => {
     let receivedBody: unknown
     mockBackend(
       'post',
-      'http://backend.test/v1/donation/orders/sale-item-purchase',
+      'http://backend.test/user/v1/donation/orders/sale-item-purchase',
       async (req) => {
         receivedBody = await req.json()
         return HttpResponse.json(
@@ -132,7 +132,7 @@ describe('POST /api/checkout/purchase', () => {
   it('BE 回 404（sale-item 不存在）→ 404 透傳', async () => {
     mockBackend(
       'post',
-      'http://backend.test/v1/donation/orders/sale-item-purchase',
+      'http://backend.test/user/v1/donation/orders/sale-item-purchase',
       async () =>
         HttpResponse.json(
           { error: { code: 'SALE_ITEM_NOT_FOUND', message: 'not found' } },

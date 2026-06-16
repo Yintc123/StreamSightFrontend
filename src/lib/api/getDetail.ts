@@ -40,7 +40,7 @@ async function languageHeader(): Promise<Record<string, string> | undefined> {
 
 export async function fetchCharityDetail(id: string): Promise<CharityDetail> {
   const { data } = await backendFetch<unknown>(
-    `/v1/donation/charities/${id}`,
+    `/user/v1/donation/charities/${id}`,
     { headers: await languageHeader() },
   )
   const parsed = BackendCharityDetail.safeParse(data)
@@ -54,7 +54,7 @@ export async function fetchCharityDetail(id: string): Promise<CharityDetail> {
 
 export async function fetchDonationDetail(id: string): Promise<DonationDetail> {
   const { data } = await backendFetch<unknown>(
-    `/v1/donation/donation-projects/${id}`,
+    `/user/v1/donation/donation-projects/${id}`,
     { headers: await languageHeader() },
   )
   const parsed = BackendDonationDetail.safeParse(data)
@@ -68,7 +68,7 @@ export async function fetchDonationDetail(id: string): Promise<DonationDetail> {
 
 export async function fetchItemDetail(id: string): Promise<ItemDetail> {
   const { data } = await backendFetch<unknown>(
-    `/v1/donation/sale-items/${id}`,
+    `/user/v1/donation/sale-items/${id}`,
     { headers: await languageHeader() },
   )
   const parsed = BackendItemDetail.safeParse(data)

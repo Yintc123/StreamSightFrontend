@@ -85,7 +85,7 @@ export function reducer(s: FormState, a: Action): FormState {
 // ─── Payload (BE 022 §4.1 / §4.2) ──────────────────────────────────
 
 type CharityDonationPayload = {
-  _endpoint: '/v1/donation/orders/charity-donation'
+  _endpoint: '/user/v1/donation/orders/charity-donation'
   donorName: string
   isAnonymous: boolean      // v0.8 — was literal false; now wired to form state
   receiptOption: ReceiptOption
@@ -96,7 +96,7 @@ type CharityDonationPayload = {
 }
 
 type ProjectDonationPayload = {
-  _endpoint: '/v1/donation/orders/project-donation'
+  _endpoint: '/user/v1/donation/orders/project-donation'
   donorName: string
   isAnonymous: boolean      // v0.8 — see CharityDonationPayload
   receiptOption: ReceiptOption
@@ -125,13 +125,13 @@ export function buildPayload(
   }
   if (draft.target.type === 'CHARITY') {
     return {
-      _endpoint: '/v1/donation/orders/charity-donation',
+      _endpoint: '/user/v1/donation/orders/charity-donation',
       ...base,
       charityId: draft.target.detail.id,
     }
   }
   return {
-    _endpoint: '/v1/donation/orders/project-donation',
+    _endpoint: '/user/v1/donation/orders/project-donation',
     ...base,
     donationProjectId: draft.target.detail.id,
   }

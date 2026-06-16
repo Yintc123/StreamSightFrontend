@@ -1,7 +1,7 @@
 /**
  * Spec 004 / backend spec 017 — detail-page schemas (single-resource lookups).
  *
- * Backend shape (what `/v1/donation/<resource>/:id` actually emits) and the
+ * Backend shape (what `/user/v1/donation/<resource>/:id` actually emits) and the
  * client shape (what the RSC detail page consumes) are separate types —
  * BFF strips backend-only fields (createdAt / updatedAt), drops null URL
  * values to `undefined` (matches existing `if (foo)` rendering), and

@@ -1,6 +1,6 @@
 # Spec 009：結帳確認頁（捐款 / 購買，index）
 
-- **狀態**：Draft（v0.5 — confirm 頁資料改走 in-memory draft store；URL 不再帶 query；無 draft → 導回 /donation）
+- **狀態**：Draft（v0.7 — `_endpoint` discriminator cutover `/user/v1/donation/orders/*` 對齊 BE spec 023 §2.4）
 - **建立日期**：2026-06-15
 - **Figma 對應**：IMG_4888（charity 直捐確認）/ IMG_4889（donation 確認）/ IMG_4890（item 購買確認）
 
@@ -29,8 +29,8 @@ v0.2 抽 009c：009a / 009b 排版高度相同（紅 hero + 白 panel + dl + dis
 
 | Path | 子 spec | 資料來源 | 對應 BE endpoint |
 |---|---|---|---|
-| `/checkout/donation` | [009a](./009a-donation-confirm.md) | `src/app/checkout/donation/draft-store.ts`（peek 不到 → redirect `/donation`） | `POST /v1/donation/orders/charity-donation` 或 `/project-donation` |
-| `/checkout/purchase` | [009b](./009b-purchase-confirm.md) | `src/app/checkout/purchase/draft-store.ts`（peek 不到 → redirect `/donation`） | `POST /v1/donation/orders/sale-item-purchase` |
+| `/checkout/donation` | [009a](./009a-donation-confirm.md) | `src/app/checkout/donation/draft-store.ts`（peek 不到 → redirect `/donation`） | `POST /user/v1/donation/orders/charity-donation` 或 `/project-donation` |
+| `/checkout/purchase` | [009b](./009b-purchase-confirm.md) | `src/app/checkout/purchase/draft-store.ts`（peek 不到 → redirect `/donation`） | `POST /user/v1/donation/orders/sale-item-purchase` |
 
 **為何 v0.5 從 URL query 改為 in-memory store**：
 
@@ -194,8 +194,8 @@ TopNav + 紅 hero + `<form>` + sticky CTA 整套外殼實作於 [`<ConfirmPageSh
 ```ts
 // 對齊 BE 022 §4.1 / §4.2 — discriminated union body
 const Body = z.discriminatedUnion('_endpoint', [
-  CharityDonationBody,       // _endpoint='/v1/donation/orders/charity-donation' + charityId
-  ProjectDonationBody,       // _endpoint='/v1/donation/orders/project-donation' + donationProjectId
+  CharityDonationBody,       // _endpoint='/user/v1/donation/orders/charity-donation' + charityId
+  ProjectDonationBody,       // _endpoint='/user/v1/donation/orders/project-donation' + donationProjectId
 ]).refine(...).refine(...)   // billingDay cross-field
 
 export const POST = createRoute({
@@ -211,7 +211,7 @@ export const POST = createRoute({
 
 Sale-item route 同 pattern、body schema 更簡單（無 receiptOption / donationFrequency / billingDay）。
 
-**Mock 對應**：`src/lib/mock/orders-mock.ts` 註冊三條 `/v1/donation/orders/*` dispatcher，USE_MOCK=1 跑也走得通。返回 `{ id, status: 'PENDING' }`（不模 BE 完整 OrderResponse，因為 FE 只用 orderId / status）。
+**Mock 對應**：`src/lib/mock/orders-mock.ts` 註冊三條 `/user/v1/donation/orders/*` dispatcher，USE_MOCK=1 跑也走得通。返回 `{ id, status: 'PENDING' }`（不模 BE 完整 OrderResponse，因為 FE 只用 orderId / status）。
 
 ---
 
@@ -291,3 +291,4 @@ type CtaIslandProps = {
 | 0.5 | 2026-06-15 | **送出成功 → router.replace 回 entry detail page**：捐款 charity 來源回 `/charities/:targetId`、project 來源回 `/donation-projects/:targetId`、sale-item 來源回 `/sale-items/:saleItemId`。用 `replace`（非 push）避免使用者按返回回到「已送出」的死頁面或重複送單。失敗不導頁、留在 confirm 頁顯示 toast.error。useDonorInfoForm / useReceiptInfoForm 加 `useRouter()`；hook test 新增「成功後 router.replace 被叫」斷言、「失敗不導頁」斷言；spec 009 §4 共同決策表新增此條 |
 | 0.5 | 2026-06-15 | **URL query → in-memory draft store**（資安 / UX）：confirm 頁 URL 不再帶 `targetType/amountTwd/...`。新增 `donation/draft-store.ts` + `purchase/draft-store.ts`（module 單例：`setX` / `peekX` / `clearX`）。sheet handleSubmit 寫 store + `router.push('/checkout/{donation,purchase}')` bare path。confirm 頁從 RSC（searchParams + RSC fetch detail）改為 RSC shell + `*ConfirmPageEntry.tsx`（client）：`useEffect` peek，**空 → `router.replace('/donation')`**；refresh / 直接 URL / 部署 → JS runtime 重置 → 同樣導回。CtaIsland prop 升級：donation target、purchase item 從 `{type, id}` / `PurchaseItem` 改為攜帶**完整 detail object**（CharityDetail / DonationDetail / ItemDetail）—— confirm 頁不再 fetch、改從 draft 讀。useDonorInfoForm / useReceiptInfoForm opts 從 `{query, target}` / `{query, item}` 收成 `{draft}`；buildPayload 從 draft 讀；submit 成功 `clearXDraft()` 後再 `router.replace(entryUrl(draft))`。§2 routing 章節全部改寫、加 §2.1 draft store 設計；§4 共同決策表加「資料 handoff 走 in-memory draft store」一條；§6 sheet handler reference 同步更新。`DonationCheckoutQuery` / `PurchaseCheckoutQuery` 型別移除（不再從 URL 解析） |
 | 0.6 | 2026-06-15 | **donation flow 也支援匿名**：BFF `/api/checkout/donation` body Zod `isAnonymous` 從 `z.literal(false)` 升為 `z.boolean()`，配合 [009a v0.8](./009a-donation-confirm.md) 把「我要匿名捐款」checkbox 加進 charity / project 確認頁。BE 022 §4.1/§4.2 本來就接受 boolean、無變動。同檔新增 wiring test「isAnonymous=true 也通過 schema」 |
+| 0.7 | 2026-06-16 | **`_endpoint` discriminator cutover 到 `/user/v1/donation/orders/*`**（對齊 [backend spec 023 §2.4](../../../backend/docs/specs/023-api-routing-versioning.md)）：BE 把三條 order create endpoint 從 `/v1/donation/orders/*` 移到 `/user/v1/donation/orders/*`；FE side discriminator 字面值 = BE 真實 path，必須同步替換。§2 routing 表 + §5 BFF route handler 範例 + §7 mock dispatcher 都更新。對應檔案：`src/app/api/checkout/{donation,purchase}/route.ts` zod literal、`useDonorInfoForm.ts` / `useReceiptInfoForm.ts` 中的 `_endpoint` literal、`src/lib/mock/register.ts` 三條 `registerMock` 路徑、相關測試 URL 斷言。 |

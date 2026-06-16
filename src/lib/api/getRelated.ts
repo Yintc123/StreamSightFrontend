@@ -39,7 +39,7 @@ export async function fetchDonationsByCharity(
   limit = 10,
 ): Promise<Donation[]> {
   const { data } = await backendFetch<unknown>(
-    '/v1/donation/donation-projects',
+    '/user/v1/donation/donation-projects',
     {
       query: { charityId, limit },
       headers: await languageHeader(),

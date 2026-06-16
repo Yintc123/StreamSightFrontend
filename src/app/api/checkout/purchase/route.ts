@@ -16,7 +16,7 @@ const Item = z.object({
 })
 
 const Body = z.object({
-  _endpoint: z.literal('/v1/donation/orders/sale-item-purchase'),
+  _endpoint: z.literal('/user/v1/donation/orders/sale-item-purchase'),
   donorName: z.string().min(1).max(120),
   isAnonymous: z.boolean(),
   // BE 022 §4.3: items 必為長度 1（單品 UI，本期不支援 cart）
