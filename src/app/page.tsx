@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { LoginCard } from './LoginCard'
+import { AuthRedirectToast } from './AuthRedirectToast'
 
 export const metadata: Metadata = {
   title: 'JKODonation',
@@ -23,6 +25,14 @@ export default function HomePage() {
         </h1>
       </header>
       <main className="flex-1 flex flex-col items-center justify-center gap-6 px-[15px] py-10">
+        {/*
+          spec 010 §3.3 — listens for `?reason=cms-auth` query (set by
+          proxy.ts / cms/page.tsx redirect) and fires a toast.
+          `useSearchParams` requires <Suspense> in Next 16.
+        */}
+        <Suspense fallback={null}>
+          <AuthRedirectToast />
+        </Suspense>
         <LoginCard />
         <Link
           href="/donation"
