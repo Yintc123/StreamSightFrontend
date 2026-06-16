@@ -15,7 +15,10 @@ import {
   BackendAdminCharityListResponse,
   type BackendAdminCharityListItem,
 } from '@/lib/schemas/admin-detail'
-import { requireAdminSession } from '@/lib/session/requireAdmin'
+import {
+  ensureAdminAccess,
+  requireAdminSession,
+} from '@/lib/session/requireAdmin'
 
 export const metadata: Metadata = {
   title: '公益團體 | JKODonation',
@@ -70,7 +73,11 @@ const COLUMNS: AdminTableColumn<BackendAdminCharityListItem>[] = [
 
 export default async function CharityListPage() {
   await requireAdminSession()
-  const items = await fetchAdminCharityList()
+  // ensureAdminAccess catches 401 (token expired / revoked) + 403 (admin
+  // demoted mid-session) thrown by BE — both signal "this user no longer
+  // has admin access", so log out + redirect home rather than dump a
+  // generic error UI.
+  const items = await ensureAdminAccess(fetchAdminCharityList)
   return (
     <AdminPageShell
       title="公益團體"

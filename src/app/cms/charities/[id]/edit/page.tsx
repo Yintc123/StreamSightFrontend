@@ -11,7 +11,10 @@ import { notFound } from 'next/navigation'
 import { fetchAdminCharityDetail } from '@/lib/api/getAdminCharityDetail'
 import { fetchCategories } from '@/lib/api/getCategories'
 import { NotFoundError } from '@/lib/errors/NotFoundError'
-import { requireAdminSession } from '@/lib/session/requireAdmin'
+import {
+  ensureAdminAccess,
+  requireAdminSession,
+} from '@/lib/session/requireAdmin'
 
 import { CharityForm } from '../../CharityForm'
 import { DEFAULT_FORM, type FormState } from '../../useCharityForm'
@@ -28,14 +31,17 @@ export default async function CharityEditPage({
   await requireAdminSession()
   const { id } = await params
 
-  let charity
-  try {
-    charity = await fetchAdminCharityDetail(id)
-  } catch (e) {
-    if (e instanceof NotFoundError) notFound()
-    throw e
-  }
-  const categories = await fetchCategories()
+  // ensureAdminAccess takes 401/403 from BE → log out + redirect home.
+  // NotFoundError stays in this layer so the page can flip to notFound().
+  const charity = await ensureAdminAccess(async () => {
+    try {
+      return await fetchAdminCharityDetail(id)
+    } catch (e) {
+      if (e instanceof NotFoundError) notFound()
+      throw e
+    }
+  })
+  const categories = await ensureAdminAccess(fetchCategories)
 
   const initial: FormState = {
     ...DEFAULT_FORM,

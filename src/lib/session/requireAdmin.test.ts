@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Role, type StoredSession } from './types'
+import { UnauthenticatedError } from '@/lib/errors/UnauthenticatedError'
+import { BackendClientError } from '@/lib/errors/BackendClientError'
 
 const getMock = vi.fn<() => Promise<StoredSession | null>>()
+const destroyMock = vi.fn(async () => {})
 vi.mock('./service', () => ({
-  getSessionService: () => ({ get: getMock }),
+  getSessionService: () => ({ get: getMock, destroy: destroyMock }),
 }))
 
 const redirectMock = vi.fn((path: string): never => {
@@ -13,10 +16,11 @@ vi.mock('next/navigation', () => ({
   redirect: (path: string) => redirectMock(path),
 }))
 
-import { requireAdminSession } from './requireAdmin'
+import { ensureAdminAccess, requireAdminSession } from './requireAdmin'
 
 beforeEach(() => {
   getMock.mockReset()
+  destroyMock.mockClear()
   redirectMock.mockClear()
 })
 
@@ -52,6 +56,55 @@ describe('requireAdminSession', () => {
     const s = adminSession()
     getMock.mockResolvedValue(s)
     await expect(requireAdminSession()).resolves.toBe(s)
+    expect(redirectMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('ensureAdminAccess', () => {
+  it('happy path → pass-through 結果', async () => {
+    await expect(ensureAdminAccess(async () => 'ok')).resolves.toBe('ok')
+    expect(redirectMock).not.toHaveBeenCalled()
+    expect(destroyMock).not.toHaveBeenCalled()
+  })
+
+  it('UnauthenticatedError → destroy + redirect /?reason=cms-not-admin', async () => {
+    await expect(
+      ensureAdminAccess(async () => {
+        throw new UnauthenticatedError('UNAUTHORIZED')
+      }),
+    ).rejects.toThrow(/REDIRECT/)
+    expect(destroyMock).toHaveBeenCalledTimes(1)
+    expect(redirectMock).toHaveBeenCalledWith('/?reason=cms-not-admin')
+  })
+
+  it('BackendClientError 403 → destroy + redirect', async () => {
+    await expect(
+      ensureAdminAccess(async () => {
+        throw new BackendClientError(403, 'FORBIDDEN', 'admin only')
+      }),
+    ).rejects.toThrow(/REDIRECT/)
+    expect(destroyMock).toHaveBeenCalledTimes(1)
+    expect(redirectMock).toHaveBeenCalledWith('/?reason=cms-not-admin')
+  })
+
+  it('BackendClientError 400 → rethrow（非權限錯誤）', async () => {
+    const validationErr = new BackendClientError(400, 'VALIDATION_FAILED', 'bad')
+    await expect(
+      ensureAdminAccess(async () => {
+        throw validationErr
+      }),
+    ).rejects.toBe(validationErr)
+    expect(destroyMock).not.toHaveBeenCalled()
+    expect(redirectMock).not.toHaveBeenCalled()
+  })
+
+  it('其他 Error → rethrow', async () => {
+    const e = new Error('network')
+    await expect(
+      ensureAdminAccess(async () => {
+        throw e
+      }),
+    ).rejects.toBe(e)
     expect(redirectMock).not.toHaveBeenCalled()
   })
 })
