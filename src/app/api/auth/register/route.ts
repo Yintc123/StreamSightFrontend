@@ -23,14 +23,27 @@ import 'server-only'
 
 import { createRoute } from '@/lib/api'
 import { backendFetch } from '@/lib/api/backend'
+import { decodeJwtPayload } from '@/lib/auth/decodeJwtPayload'
 import { ContractViolationError } from '@/lib/errors/ContractViolationError'
 import { getSessionService } from '@/lib/session/service'
+import { Role, type RoleValue } from '@/lib/session/types'
 import {
   BackendMeResponse,
   BackendRegisterResponse,
   RegisterRequest,
   type ClientUser,
 } from '@/lib/schemas/auth'
+
+function resolveRole(
+  meRole: number | null | undefined,
+  accessToken: string,
+): RoleValue {
+  // /me wins if BE ever ships role there. Today it doesn't (BE 008 §6.4),
+  // so we fall through to the JWT claim (spec 007 §10.10).
+  if (meRole === Role.ADMIN || meRole === Role.USER) return meRole
+  const claims = decodeJwtPayload(accessToken)
+  return claims?.role === Role.ADMIN ? Role.ADMIN : Role.USER
+}
 
 const NO_STORE_HEADERS = {
   'content-type': 'application/json',
@@ -81,9 +94,12 @@ export const POST = createRoute({
     // page always has something to print.
     const name = me.username ?? me.email ?? 'User'
 
-    // Spec 011 §3.4 — BE /me returns `role` (0=ADMIN / 1=USER);
-    // missing → USER by default (fail-closed for admin gate).
-    const role = me.role === 0 ? 0 : 1
+    // Spec 011 §3.4 / spec 007 v0.3 — BE /me does NOT carry role
+    // (BE 008 §6.4). Decode the access JWT to read the role claim
+    // (mirror /api/dev/login resolveRole). BE 008 v0.x demo policy
+    // creates self-registered accounts as ADMIN, so the JWT role lands
+    // as 0 and the new session goes straight to /cms.
+    const role = resolveRole(me.role, tokens.accessToken)
 
     const sessionResult = await getSessionService().create({
       user: { id: me.id, name },

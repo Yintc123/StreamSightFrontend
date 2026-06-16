@@ -50,8 +50,25 @@ import { POST } from './route'
 
 const VALID_BODY = { username: 'alice', password: 'hunter2hunter' }
 
+// Hand-rolled JWT carrying role=0 (ADMIN) — BE 008 demo policy creates
+// self-registered accounts as ADMIN; FE decodes the access token since
+// BE /auth/me intentionally omits role (BE 008 §6.4).
+function jwt(payload: Record<string, unknown>): string {
+  const b64 = (o: unknown) =>
+    Buffer.from(JSON.stringify(o))
+      .toString('base64')
+      .replace(/=+$/, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+  return `${b64({ alg: 'HS256' })}.${b64(payload)}.sig`
+}
+
 const BE_REGISTER_OK = {
-  accessToken: 'access-jwt',
+  accessToken: jwt({
+    sub: '00000000-0000-4000-8000-000000000001',
+    type: 'access',
+    role: 0,
+  }),
   accessExpiresIn: 900,
   refreshToken: 'refresh-token',
   refreshExpiresIn: 2592000,
@@ -63,7 +80,6 @@ const BE_ME_OK = {
   username: 'alice',
   email: null,
   displayOrder: null,
-  role: 1,
   createdAt: '2026-06-16T00:00:00.000Z',
   updatedAt: '2026-06-16T00:00:00.000Z',
   lastLoginAt: '2026-06-16T00:00:00.000Z',
@@ -133,7 +149,7 @@ describe('POST /api/auth/register', () => {
     }
     expect(arg.user.id).toBe(BE_ME_OK.id)
     expect(arg.user.name).toBe(BE_ME_OK.username)
-    expect(arg.tokens.accessToken).toBe('access-jwt')
+    expect(arg.tokens.accessToken).toBe(BE_REGISTER_OK.accessToken)
     // accessExpiresIn 900 s → expiresAt about now+900s
     const now = Date.now()
     expect(arg.tokens.accessTokenExpiresAt).toBeGreaterThan(now)
@@ -153,7 +169,7 @@ describe('POST /api/auth/register', () => {
       id: BE_ME_OK.id,
       name: 'alice',
       email: null,
-      role: 1,
+      role: 0, // BE 008 demo policy: self-register lands as ADMIN; FE decodes JWT
     })
     expect(body.data.expiresAt).toBeGreaterThan(now)
   })
