@@ -6,6 +6,8 @@ import { useCallback, useReducer } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
+import { getCsrfToken } from '@/lib/client/csrf'
+
 export interface FormState {
   name: string
   description: string
@@ -133,10 +135,17 @@ export function useCharityForm(opts: UseCharityFormOptions = {}) {
       : '/api/cms/charities'
     const method = opts.id ? 'PATCH' : 'POST'
     try {
+      // /api/cms/* are CSRF-gated (admin BFFs do not opt into csrfExempt);
+      // fetch the token from the session each submit. One extra round
+      // trip is fine for admin operations.
+      const csrfToken = await getCsrfToken()
       const res = await fetch(endpoint, {
         method,
         body: JSON.stringify(payload),
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          'x-csrf-token': csrfToken,
+        },
       })
       if (!res.ok) throw new Error(`non-2xx: ${res.status}`)
       toast.success(opts.id ? '已更新' : '已建立')

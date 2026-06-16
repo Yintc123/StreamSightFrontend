@@ -26,6 +26,25 @@ vi.mock('next/navigation', () => ({
 
 const fetchMock = vi.fn<typeof fetch>()
 
+function csrfResp(): Response {
+  return new Response(JSON.stringify({ data: { csrfToken: 'csrf-token-x' } }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
+// Most tests don't care which endpoint is hit — they want the same response
+// regardless. This wrapper intercepts /api/csrf first (so getCsrfToken works)
+// and routes everything else to the test-defined response.
+function setFetchResponse(mutationResp: Response | Error) {
+  fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString()
+    if (url.endsWith('/api/csrf')) return csrfResp()
+    if (mutationResp instanceof Error) throw mutationResp
+    return mutationResp
+  })
+}
+
 beforeEach(() => {
   toastSuccessMock.mockReset()
   toastErrorMock.mockReset()
@@ -188,8 +207,8 @@ describe('useCharityForm', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('H4: create happy → POST /api/cms/charities + toast.success + router.replace /cms/charities', async () => {
-    fetchMock.mockResolvedValue(
+  it('H4: create happy → POST /api/cms/charities (含 x-csrf-token) + toast.success + router.replace /cms/charities', async () => {
+    setFetchResponse(
       new Response(JSON.stringify({ data: { id: 'new-id' } }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -203,16 +222,20 @@ describe('useCharityForm', () => {
     await act(async () => {
       await result.current.handleSubmit()
     })
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/cms/charities',
-      expect.objectContaining({ method: 'POST' }),
-    )
+    // first call hits /api/csrf, second hits the mutation
+    const calls = fetchMock.mock.calls
+    expect(calls[0][0]).toBe('/api/csrf')
+    expect(calls[1][0]).toBe('/api/cms/charities')
+    expect(calls[1][1]?.method).toBe('POST')
+    expect(
+      (calls[1][1] as RequestInit).headers as Record<string, string>,
+    ).toMatchObject({ 'x-csrf-token': 'csrf-token-x' })
     expect(toastSuccessMock).toHaveBeenCalled()
     expect(routerReplaceMock).toHaveBeenCalledWith('/cms/charities')
   })
 
   it('H5: edit happy → PATCH /api/cms/charities/:id', async () => {
-    fetchMock.mockResolvedValue(
+    setFetchResponse(
       new Response(JSON.stringify({ data: { id: 'x' } }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -227,14 +250,14 @@ describe('useCharityForm', () => {
     await act(async () => {
       await result.current.handleSubmit()
     })
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/cms/charities/abc',
-      expect.objectContaining({ method: 'PATCH' }),
-    )
+    const calls = fetchMock.mock.calls
+    expect(calls[0][0]).toBe('/api/csrf')
+    expect(calls[1][0]).toBe('/api/cms/charities/abc')
+    expect(calls[1][1]?.method).toBe('PATCH')
   })
 
   it('H6: BFF 500 → toast.error + 不導頁', async () => {
-    fetchMock.mockResolvedValue(
+    setFetchResponse(
       new Response('{}', {
         status: 500,
         headers: { 'content-type': 'application/json' },
@@ -253,7 +276,7 @@ describe('useCharityForm', () => {
   })
 
   it('H7: fetch throw → toast.error + 不導頁', async () => {
-    fetchMock.mockRejectedValue(new Error('network'))
+    setFetchResponse(new Error('network'))
     const { result } = renderHook(() => useCharityForm())
     act(() => {
       result.current.dispatch({ type: 'SET_NAME', value: 'X' })
