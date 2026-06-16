@@ -5,26 +5,25 @@ import 'server-only'
 import { backendFetch } from '@/lib/api/backend'
 import { createAdminRoute } from '@/lib/api/createAdminRoute'
 import { okResponse } from '@/lib/api/responses'
-import { ContractViolationError } from '@/lib/errors/ContractViolationError'
-import { BackendAdminCharityDetail } from '@/lib/schemas/admin-detail'
 
 import { CharityCreateBody } from './schemas'
 
 export const POST = createAdminRoute({
   bodySchema: CharityCreateBody,
+  // Pass-through response — BE 020 §5.1.1 declares
+  // `response: { 201: CharityDetail }`, which is the *public* shape and
+  // intentionally strips the five admin lifecycle fields (displayOrder /
+  // publishStartAt / publishEndAt / archivedAt / deletedAt). FE doesn't
+  // read this response (form router.replaces back to the list and the
+  // next render comes from GET admin detail anyway), so Zod-gating with
+  // BackendAdminCharityDetail would 502 on every successful create even
+  // though BE persisted the row correctly.
   handler: async ({ body, requestId, session }) => {
-    // Forward admin session so BE sees Bearer; /cms/* is admin-gated.
     const { data } = await backendFetch<unknown>(
       '/cms/donation/charities',
       { method: 'POST', body, requestId, session },
     )
-    const parsed = BackendAdminCharityDetail.safeParse(data)
-    if (!parsed.success) {
-      throw new ContractViolationError(
-        `Upstream POST /cms/donation/charities response failed schema: ${parsed.error.message}`,
-      )
-    }
-    return okResponse(parsed.data)
+    return okResponse(data)
   },
 })
 

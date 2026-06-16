@@ -141,24 +141,38 @@ describe('POST /api/cms/charities', () => {
     expect(res.status).toBe(400)
   })
 
-  it('admin + valid body → forward POST /cms/donation/charities + return parsed admin detail', async () => {
+  it('admin + valid body → forward POST /cms/donation/charities + passthrough public response', async () => {
     overrides.session = adminSession()
     let receivedBody: unknown
+    // BE actually returns the *public* CharityDetail shape on POST (no
+    // admin lifecycle fields). The BFF passes through verbatim.
+    const publicResp = {
+      id: CHARITY_ID,
+      name: '中華耆幼關懷協會',
+      description: '描述',
+      logoUrl: null,
+      contactPhone: null,
+      contactEmail: null,
+      officialWebsite: null,
+      approvalNo: null,
+      categories: [],
+      createdAt: '2026-06-16T00:00:00.000Z',
+      updatedAt: '2026-06-16T00:00:00.000Z',
+    }
     mockBackend(
       'post',
       'http://backend.test/cms/donation/charities',
       async (req) => {
         receivedBody = await req.json()
-        return HttpResponse.json(FULL_DETAIL_RESPONSE, { status: 201 })
+        return HttpResponse.json(publicResp, { status: 201 })
       },
     )
     const session = adminSession()
     overrides.session = session
     const res = await POST(postReq(VALID_BODY, session.csrfToken), noParams)
     expect(res.status).toBe(200)
-    const body = (await res.json()) as { data: typeof FULL_DETAIL_RESPONSE }
+    const body = (await res.json()) as { data: typeof publicResp }
     expect(body.data.id).toBe(CHARITY_ID)
-    expect(body.data.displayOrder).toBe(0)
     expect(receivedBody).toMatchObject({ name: '中華耆幼關懷協會' })
   })
 
