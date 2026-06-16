@@ -97,7 +97,7 @@ function Cover({
       fallback={fallback}
       alt={alt}
       // mask-image 讓圖底端逐漸透明、淡入下方的 InfoPanel / page surface
-      className="w-full aspect-[4/3] object-cover [mask-image:linear-gradient(to_bottom,black_70%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black_70%,transparent)]"
+      className="w-full aspect-[4/3] object-cover [mask-image:linear-gradient(to_bottom,black_85%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black_85%,transparent)]"
     />
   )
 }

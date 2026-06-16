@@ -100,7 +100,7 @@ function CoverWithRibbon({
         primary={coverImageUrl}
         fallback={fallback}
         alt={alt}
-        className="w-full h-full object-cover [mask-image:linear-gradient(to_bottom,black_70%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black_70%,transparent)]"
+        className="w-full h-full object-cover [mask-image:linear-gradient(to_bottom,black_85%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black_85%,transparent)]"
       />
       {/* spec 004c — detail ribbon (雙語版): */}
       <div className="absolute top-3 left-0 px-3 py-1 bg-brand text-white rounded-r-md shadow">
