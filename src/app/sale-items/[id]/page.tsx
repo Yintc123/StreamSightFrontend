@@ -70,12 +70,14 @@ export default async function Page({ params }: PageProps) {
           <CategoryTags categories={item.categories} />
         )}
       </div>
-      <section data-component="ContentSection" className="flex-1 px-5 py-6">
-        <h2 className="text-base font-medium text-ink-AAA mb-3">商品說明</h2>
-        <p className="text-sm leading-6 text-ink-AAA whitespace-pre-line">
-          {item.content || item.description}
-        </p>
-      </section>
+      <div className="flex-1 mx-3 mt-3">
+        <section data-component="ContentSection" className="bg-surface-card rounded-2xl shadow-sm p-5">
+          <h2 className="text-base font-medium text-ink-AAA mb-3">商品說明</h2>
+          <p className="text-sm leading-6 text-ink-AAA whitespace-pre-line">
+            {item.content || item.description}
+          </p>
+        </section>
+      </div>
       <CtaIsland kind="purchase" item={item} label="立即捐款" sticky />
     </div>
   )
