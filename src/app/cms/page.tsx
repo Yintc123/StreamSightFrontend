@@ -39,16 +39,46 @@ export default async function CmsPage() {
       {/* CMS 是 top-level landing；返回語意 = 「回首頁」(也順帶可用作登出
           動線的視覺起點)。用 backHref 強制 push('/')、不依賴 history。 */}
       <TopNav title="後台" backHref="/" />
-      <main className="flex-1 flex flex-col items-center justify-center gap-4 px-[15px] py-10">
-        <p className="text-base text-ink-AAA text-center">
-          歡迎進入後台，{session.user.name}
-        </p>
-        <p className="text-sm text-ink-AA text-center">
-          已驗證 session（cookie `jko_session`）。後台 CMS 功能尚未開發。
-        </p>
+      <main className="flex-1 px-[15px] py-6 flex flex-col gap-6">
+        <header>
+          <p className="text-base text-ink-AAA">歡迎，{session.user.name}</p>
+          <p className="text-xs text-ink-A mt-1">資料管理後台</p>
+        </header>
+
+        {/* Spec 011 §1 — 三個 admin 資源管理入口。v0.1 只 ship charity；
+            project / item 等 011b / 011c 上線時把連結改成可點。 */}
+        <nav aria-label="資源管理" className="flex flex-col gap-2">
+          <Link
+            href="/cms/charities"
+            className="flex items-center justify-between px-4 py-3 rounded-xl
+                       bg-surface-card hover:bg-black/5
+                       focus-visible:outline focus-visible:outline-2
+                       focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            <span className="text-sm text-ink-AAA">公益團體</span>
+            <span className="text-sm text-ink-link">›</span>
+          </Link>
+          <span
+            aria-disabled="true"
+            className="flex items-center justify-between px-4 py-3 rounded-xl
+                       bg-surface-card opacity-60 cursor-not-allowed"
+          >
+            <span className="text-sm text-ink-AAA">募款專案</span>
+            <span className="text-xs text-ink-A">即將推出</span>
+          </span>
+          <span
+            aria-disabled="true"
+            className="flex items-center justify-between px-4 py-3 rounded-xl
+                       bg-surface-card opacity-60 cursor-not-allowed"
+          >
+            <span className="text-sm text-ink-AAA">義賣商品</span>
+            <span className="text-xs text-ink-A">即將推出</span>
+          </span>
+        </nav>
+
         <Link
           href="/donation"
-          className="text-sm text-ink-link underline underline-offset-2"
+          className="text-sm text-ink-link underline underline-offset-2 self-start"
         >
           前往公開捐款列表
         </Link>

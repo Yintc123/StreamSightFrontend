@@ -82,15 +82,18 @@ describe('createAdminRoute', () => {
 
   it('admin role → handler 被叫 + session 不為 null', async () => {
     sessionGet.mockResolvedValue(adminSession())
-    const handler = vi.fn(async () => new Response('"ok"', {
-      headers: { 'content-type': 'application/json' },
-    }))
+    let received: { session: StoredSession } | undefined
+    const handler = async (args: { session: StoredSession }) => {
+      received = args
+      return new Response('"ok"', {
+        headers: { 'content-type': 'application/json' },
+      })
+    }
     const route = createAdminRoute({ handler })
     const res = await route(jsonReq('GET'), { params: Promise.resolve({}) })
     expect(res.status).toBe(200)
-    expect(handler).toHaveBeenCalledOnce()
-    const args = handler.mock.calls[0][0]
-    expect(args.session.role).toBe(Role.ADMIN)
+    expect(received).toBeDefined()
+    expect(received!.session.role).toBe(Role.ADMIN)
   })
 
   it('admin + bodySchema → body 自動 Zod parse', async () => {

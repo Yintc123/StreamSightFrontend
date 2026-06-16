@@ -20,7 +20,7 @@ import { CategoryKeyEnum } from './categories'
 
 // —— Inflated category (re-declared here so detail.ts has no circular
 // dependency on list.ts schema graph; exact same shape) ——
-const InflatedCategory = z.object({
+export const InflatedCategory = z.object({
   id: z.string(),
   key: CategoryKeyEnum,
   displayName: z.string(),
