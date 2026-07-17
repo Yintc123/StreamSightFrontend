@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars and adjust. region + project MUST match the overview
+# stack (this stack reuses its VPC, cluster, datastore and SSM secrets).
+region  = "ap-northeast-2"
+project = "streamsight"
+
+# --- Backend the BFF calls ---
+# Required while use_mock = "0". Point at the backend's public URL once it
+# deploys; until then either set the URL or flip use_mock = "1".
+# backend_api_url = "https://<backend-id>.cloudfront.net"
+# use_mock        = "1"
+
+# --- Optional: custom domain CSRF origins (besides the CloudFront URL) ---
+# extra_allowed_origins = ["https://app.example.com"]
+
+# --- Optional sizing overrides ---
+# desired_count = 1
+# task_cpu      = 512
+# task_memory   = 1024
