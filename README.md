@@ -102,5 +102,5 @@ check(目前是 placeholder 保護區,示範 Next.js 16 Proxy + RSC 雙層驗證
 ## 文件
 
 - [`docs/architecture.md`](./docs/architecture.md) — BFF 架構、資料流、資料夾結構
-- [`docs/specs/`](./docs/specs/) — 基建實作規格(001x BFF / session / CSRF、005 首頁 auth、006 錯誤處理、007 註冊、010 auth-gate)
+- [`docs/specs/`](./docs/specs/) — 基建實作規格(001x BFF / session / CSRF、005 首頁 auth、006 錯誤處理、007 註冊、010 auth-gate、012 後端 auth 對接)
 - [`docs/decisions/`](./docs/decisions/) — ADR(架構決策紀錄)
