@@ -160,7 +160,7 @@ export function RegisterCard() {
             <p
               id="register-username-error"
               role="alert"
-              className="text-[13px] leading-5 text-brand"
+              className="text-[13px] leading-5 text-danger"
             >
               {usernameError}
             </p>
@@ -180,7 +180,7 @@ export function RegisterCard() {
             <p
               id="register-password-error"
               role="alert"
-              className="text-[13px] leading-5 text-brand"
+              className="text-[13px] leading-5 text-danger"
             >
               {passwordError}
             </p>
@@ -200,7 +200,7 @@ export function RegisterCard() {
             <p
               id="register-confirm-error"
               role="alert"
-              className="text-[13px] leading-5 text-brand"
+              className="text-[13px] leading-5 text-danger"
             >
               {confirmError}
             </p>
@@ -209,7 +209,7 @@ export function RegisterCard() {
         {serverFormError && (
           <p
             role="alert"
-            className="text-[13px] leading-5 text-brand"
+            className="text-[13px] leading-5 text-danger"
           >
             {serverFormError}
           </p>
@@ -217,10 +217,10 @@ export function RegisterCard() {
         <button
           type="submit"
           disabled={!canSubmit}
-          className="h-11 rounded-lg bg-brand text-white text-base font-medium leading-6
+          className="h-11 rounded-lg bg-brand text-ink-on-brand text-base font-semibold leading-6
                      disabled:opacity-50 disabled:cursor-not-allowed
                      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand
-                     hover:bg-brand/90"
+                     hover:bg-brand-400"
         >
           {isPending ? '註冊中…' : '註冊'}
         </button>

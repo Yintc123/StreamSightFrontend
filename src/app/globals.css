@@ -6,31 +6,40 @@
 @source not "../../docs";
 
 /* ============================================================
- * Spec 003a v0.3 — Design System tokens
+ * StreamSight — Design System tokens（深色觀測台 / Dark Observability）
  * ============================================================
- * Source of truth: Figma file 0kx2Ne2rvndhfVr3uVUwad + IMG_4875-4883
+ * 監控 / 資料流主題：deep-slate 底 + 電子青(cyan) accent + 語義狀態色。
  *
- * Rules (003a §2):
+ * Rules:
  *  - 禁直接寫 hex（class 端統一用 token）
- *  - 允許 Tailwind 原生 black/[opacity]（hover bg / divider / backdrop）
- *  - 紅色統一 brand（CTA / 義賣 ribbon / TWD 價格 / CategoryMenu 選中態）
+ *  - accent 統一走 brand（CTA / 連結強調 / focus ring）
+ *  - 狀態一律用 ok / warn / danger 語義色，勿拿 brand 當錯誤色
  * ============================================================ */
 @theme {
-  /* Color tokens */
-  --color-brand: #c9191d;              /* TopNav bg / CTA / ribbon / 價格 / 選中態紅 */
-  --color-brand-400: #d63f3c;          /* active tab underline */
-  --color-brand-overlay: rgba(201, 25, 29, 0.78); /* 003e2 圖片底部主辦團體名 overlay */
+  /* Accent（cyan）— CTA / focus ring / 強調 */
+  --color-brand: #22d3ee;              /* electric cyan */
+  --color-brand-400: #38bdf8;          /* lighter cyan（hover / 次強調） */
+  --color-brand-overlay: rgba(34, 211, 238, 0.14); /* 圖上疊字用半透明 accent */
+  --color-ink-on-brand: #06121a;       /* 疊在 cyan 上的深色文字（按鈕字） */
 
-  --color-ink-AAA: rgba(0, 0, 0, 0.9); /* primary text */
-  --color-ink-AA:  rgba(0, 0, 0, 0.7); /* secondary text */
-  --color-ink-A:   rgba(0, 0, 0, 0.5); /* muted text */
-  --color-ink-link: #2e7dd9;           /* 取消 button / 聯絡資訊連結 */
+  /* Text — 淺色（疊在深底 surface 上） */
+  --color-ink-AAA: rgba(230, 237, 246, 0.95); /* primary text */
+  --color-ink-AA:  rgba(230, 237, 246, 0.72); /* secondary text */
+  --color-ink-A:   rgba(230, 237, 246, 0.45); /* muted text / placeholder */
+  --color-ink-link: #38bdf8;           /* 連結 */
 
-  --color-surface-page: #f4f4f6;       /* page bg */
-  --color-surface-card: #ffffff;       /* card / modal sheet bg */
+  /* Surfaces — deep slate */
+  --color-surface-page: #0b0f17;       /* page bg（最深） */
+  --color-surface-card: #151c2b;       /* card / modal sheet bg */
 
-  --color-line: rgba(0, 0, 0, 0.10);    /* 卡片 border / modal divider / chip border */
-  --color-line-soft: rgba(0, 0, 0, 0.06); /* 細分隔線（modal header bottom） */
+  /* Borders — 淺色低透明 */
+  --color-line: rgba(230, 237, 246, 0.12);   /* 卡片 border / divider */
+  --color-line-soft: rgba(230, 237, 246, 0.07); /* 細分隔線 */
+
+  /* 語義狀態色（監控用：健康 / 警告 / 異常） */
+  --color-ok:     #34d399;             /* healthy / up */
+  --color-warn:   #fbbf24;             /* degraded / warning */
+  --color-danger: #f87171;            /* error / down */
 
   /* Font stack — PingFang TC（macOS/iOS）→ Noto Sans TC → system-ui */
   --font-sans: "PingFang TC", "Noto Sans TC", system-ui, sans-serif;
@@ -76,6 +85,9 @@
 html, body {
   font-family: var(--font-sans);
   background-color: var(--color-surface-page);
+  color: var(--color-ink-AAA);
+  /* 深色主題：讓原生控件（input、scrollbar、autofill）跟著走暗色 */
+  color-scheme: dark;
 }
 
 button:not(:disabled) {

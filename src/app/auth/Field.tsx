@@ -34,9 +34,9 @@ export function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-describedby={describedById}
-        className="h-10 px-3 rounded-lg bg-surface-card border border-line
+        className="h-10 px-3 rounded-lg bg-surface-page border border-line
                    text-sm text-ink-AAA placeholder:text-ink-A
-                   focus:outline-none focus:border-brand"
+                   focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand"
       />
     </label>
   )

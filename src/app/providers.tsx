@@ -68,7 +68,7 @@ export function Providers({ children }: { children: ReactNode }) {
           gives the user an X to dismiss manually; per-toast duration
           (3s) handles the auto-dismiss path. Position uses sonner default
           (top-center, ~32px from top). */}
-      <Toaster richColors position="top-center" closeButton />
+      <Toaster theme="dark" richColors position="top-center" closeButton />
     </QueryClientProvider>
   )
 }

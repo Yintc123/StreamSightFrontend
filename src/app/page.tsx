@@ -16,9 +16,9 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <div data-component="HomePage" className="min-h-dvh bg-surface-page flex flex-col">
-      <header className="flex items-center justify-center w-full h-11 bg-brand px-[14px]">
-        <h1 className="text-white text-[17px] font-bold leading-[22px]">
-          StreamSight
+      <header className="flex items-center justify-center w-full h-11 bg-surface-card border-b-2 border-brand px-[14px]">
+        <h1 className="text-ink-AAA text-[17px] font-bold leading-[22px] tracking-tight">
+          Stream<span className="text-brand">Sight</span>
         </h1>
       </header>
       <main className="flex-1 flex flex-col items-center justify-center gap-6 px-[15px] py-10">

@@ -17,7 +17,7 @@ export function InlineError({
       <button
         type="button"
         onClick={onRetry}
-        className="px-4 py-2 bg-brand text-white rounded-full text-sm
+        className="px-4 py-2 bg-brand text-ink-on-brand font-medium rounded-full text-sm
                    hover:opacity-90 active:opacity-80
                    focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       >

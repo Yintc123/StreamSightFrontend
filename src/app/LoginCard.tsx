@@ -77,7 +77,7 @@ export function LoginCard() {
         {error && (
           <p
             role="alert"
-            className="text-[13px] leading-5 text-brand"
+            className="text-[13px] leading-5 text-danger"
           >
             {error}
           </p>
@@ -85,10 +85,10 @@ export function LoginCard() {
         <button
           type="submit"
           disabled={!canSubmit}
-          className="h-11 rounded-lg bg-brand text-white text-base font-medium leading-6
+          className="h-11 rounded-lg bg-brand text-ink-on-brand text-base font-semibold leading-6
                      disabled:opacity-50 disabled:cursor-not-allowed
                      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand
-                     hover:bg-brand/90"
+                     hover:bg-brand-400"
         >
           {isPending ? '登入中…' : '登入後台'}
         </button>
