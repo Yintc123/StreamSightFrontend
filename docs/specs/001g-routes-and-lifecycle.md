@@ -325,5 +325,5 @@ export interface SessionStore {
 - [ ] `src/app/api/auth/login/route.ts`：§4.2 程式碼通過 §6.4 案例；含 `csrfExempt: true`
 - [ ] `src/lib/lifecycle.ts`：§5.1 程式碼通過 §6.5 案例
 - [ ] `src/instrumentation.ts`：§5.2 程式碼存在；本機跑 `pnpm dev` 啟動時看到 `bff.shutdown.begin` log（kill 後）
-- [ ] **無業務字眼**（grep 不到 `charity|donation|jko[^_-]`；前綴 `jko-` / `jko_` 允許）
+- [ ] **無業務字眼**（grep 不到 `charity|donation|streamsight[^_-]`；前綴 `streamsight-` / `streamsight_` 允許）
 - [ ] `pnpm lint` + `pnpm test` + `pnpm typecheck` 綠

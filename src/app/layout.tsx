@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "JKODonation",
+  title: "StreamSight",
   description: "捐款項目列表 — 公益團體 / 捐款專案 / 義賣商品",
 };
 

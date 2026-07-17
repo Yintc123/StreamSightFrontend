@@ -1,15 +1,6 @@
-import { http, HttpResponse } from 'msw'
+import type { HttpHandler } from 'msw'
 
-export const handlers = [
-  http.get('/api/charities', ({ request }) => {
-    const url = new URL(request.url)
-    const q = url.searchParams.get('q') ?? ''
-    const cursor = url.searchParams.get('cursor')
-
-    return HttpResponse.json({
-      items: [],
-      nextCursor: null,
-      meta: { q, cursor },
-    })
-  }),
-]
+// Shared MSW handlers for unit + e2e tests. The domain endpoints were
+// removed with the feature layer; add per-feature handlers here as new
+// verticals land.
+export const handlers: HttpHandler[] = []

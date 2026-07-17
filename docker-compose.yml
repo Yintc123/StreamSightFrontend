@@ -1,7 +1,7 @@
 services:
   redis:
     image: redis:7-alpine
-    container_name: jko-bff-redis
+    container_name: streamsight-bff-redis
     ports:
       - '6380:6379'   # host 6380 → container 6379（避開其他專案常用 6379）
     command: redis-server --appendonly yes --save ""

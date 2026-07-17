@@ -314,5 +314,5 @@ export function mockBackend(method: 'get'|'post'|'put'|'patch'|'delete', path: s
 - [ ] Redis 不可用 → 502 fail-closed（**不**降級為 anonymous）
 - [ ] Mock 模式跳過 session 邏輯但不跳過 createRoute CSRF（驗證在 001f 測試）
 - [ ] `tests/helpers/backend-mock.ts` 可用
-- [ ] **無業務字眼**（grep 不到 `charity|donation|jko[^_-]`）
+- [ ] **無業務字眼**（grep 不到 `charity|donation|streamsight[^_-]`）
 - [ ] `pnpm lint` + `pnpm test` + `pnpm typecheck` 綠

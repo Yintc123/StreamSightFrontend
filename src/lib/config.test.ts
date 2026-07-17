@@ -5,18 +5,18 @@ const REAL_ENV = {
   BACKEND_API_URL: 'http://localhost:3001',
   USE_MOCK: '0',
   SESSION_SECRET: 'a'.repeat(32),
-  SESSION_COOKIE_NAME: 'jko_session',
+  SESSION_COOKIE_NAME: 'streamsight_session',
   SESSION_TTL_SECONDS: '2592000',
   ALLOWED_ORIGINS: 'http://localhost:3000',
   REDIS_HOST: 'localhost',
   REDIS_PORT: '6379',
   REDIS_PASSWORD: '',
-  REDIS_KEY_PREFIX: 'jko-bff',
+  REDIS_KEY_PREFIX: 'streamsight-bff',
   REDIS_TLS_ENABLED: '0',
   REDIS_CONNECT_TIMEOUT_MS: '2000',
   REDIS_COMMAND_TIMEOUT_MS: '1000',
   APP_VERSION: '0.0.0',
-  NEXT_PUBLIC_APP_NAME: 'JKODonation',
+  NEXT_PUBLIC_APP_NAME: 'StreamSight',
 }
 
 /**
@@ -53,9 +53,9 @@ describe('config', () => {
     const { env } = await loadConfig({})
     expect(env.BACKEND_API_URL).toBe('http://localhost:3001')
     expect(env.USE_MOCK).toBe('0')
-    expect(env.SESSION_COOKIE_NAME).toBe('jko_session')
+    expect(env.SESSION_COOKIE_NAME).toBe('streamsight_session')
     expect(env.SESSION_TTL_SECONDS).toBe(2_592_000)
-    expect(env.REDIS_KEY_PREFIX).toBe('jko-bff')
+    expect(env.REDIS_KEY_PREFIX).toBe('streamsight-bff')
   })
 
   it('USE_MOCK=1 allows missing BACKEND_API_URL / REDIS_HOST (but not SESSION_SECRET)', async () => {

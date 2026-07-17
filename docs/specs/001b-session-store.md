@@ -352,5 +352,5 @@ runSessionStoreContract('redis', async () => new RedisSessionStore())
 - [ ] `src/lib/session/store/in-memory.ts`：純記憶體實作；契約測試與 Redis impl 同套案例都通過
 - [ ] `src/lib/session/store/index.ts`：`getSessionStore()` factory；測試可 `vi.mock` 廣域替換
 - [ ] `tests/contracts/session-store.contract.ts`：§8 案例全綠（兩個 impl 都跑）
-- [ ] **無業務字眼**（grep 不到 `charity|donation|jko[^_-]`）
+- [ ] **無業務字眼**（grep 不到 `charity|donation|streamsight[^_-]`）
 - [ ] `pnpm lint` + `pnpm test` + `pnpm typecheck` 綠

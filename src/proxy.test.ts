@@ -27,7 +27,7 @@ function buildRequest(
 describe('proxy (Next.js 16) — /cms auth gate', () => {
   it('lets the request through when the session cookie is present', () => {
     const req = buildRequest('http://localhost:3000/cms', {
-      cookie: 'jko_session=opaque-sealed-blob',
+      cookie: 'streamsight_session=opaque-sealed-blob',
     })
     const res = proxy(req)
     // Allow = NOT a redirect. Asserting on `location` keeps the test
@@ -39,7 +39,7 @@ describe('proxy (Next.js 16) — /cms auth gate', () => {
 
   it('lets nested `/cms/*` through when cookie is present', () => {
     const req = buildRequest('http://localhost:3000/cms/orders', {
-      cookie: 'jko_session=blob',
+      cookie: 'streamsight_session=blob',
     })
     const res = proxy(req)
     expect(res.headers.get('location')).toBeNull()

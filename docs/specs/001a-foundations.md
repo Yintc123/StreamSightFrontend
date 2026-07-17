@@ -184,7 +184,7 @@ const RawEnv = z.object({
   /** 上一代 secret，用於 rotation 期間 verify-only。iron-session 餵 [current, previous]，
    *  既能讀舊 cookie 又會用新 secret 重簽。輪換完拿掉即可。 */
   SESSION_SECRET_PREVIOUS: z.string().min(32).optional(),
-  SESSION_COOKIE_NAME: z.string().default('jko_session'),
+  SESSION_COOKIE_NAME: z.string().default('streamsight_session'),
   /** 預設與 refresh token 壽命對齊（ADR 004：30d）。先前預設 7d 會導致「refresh 還有效但
    *  session 過期，使用者體感被莫名踢出」。對齊後使用者只在「30 天沒互動」才需重新登入。 */
   SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 60 * 24 * 30),
@@ -192,14 +192,14 @@ const RawEnv = z.object({
 
   // —— Redis（BFF session store，ADR 006）——
   REDIS_URL: z.string().url().optional(),
-  REDIS_KEY_PREFIX: z.string().default('jko-bff'),
+  REDIS_KEY_PREFIX: z.string().default('streamsight-bff'),
   REDIS_TLS_ENABLED: z.enum(['0', '1']).default('0'),
   REDIS_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
   REDIS_COMMAND_TIMEOUT_MS: z.coerce.number().int().positive().default(1000),
 
   APP_VERSION: z.string().default('0.0.0'),       // 給 /api/health 用
   APP_COMMIT: z.string().optional(),              // 給 /api/health 用
-  NEXT_PUBLIC_APP_NAME: z.string().default('JKODonation'),
+  NEXT_PUBLIC_APP_NAME: z.string().default('StreamSight'),
 }).superRefine((env, ctx) => {
   // USE_MOCK=0 時：BACKEND_API_URL、REDIS_URL 必填
   // (SESSION_SECRET 已在 schema 層 unconditional 要求，不需在這裡再守一道)
@@ -230,17 +230,17 @@ export const env = RawEnv.parse(process.env)
 | `USE_MOCK` | server | — | `'0'` | `'1'` 走 mock fixture |
 | `SESSION_SECRET` | server | **必填**（≥ 32 字元，含 USE_MOCK=1 模式） | — | iron-session cookie 加密金鑰；cookie 路徑一律會用到 |
 | `SESSION_SECRET_PREVIOUS` | server | — | — | Rotation 期間 verify-only 的舊 secret；輪換完拿掉 |
-| `SESSION_COOKIE_NAME` | server | — | `jko_session` | session cookie 名稱 |
+| `SESSION_COOKIE_NAME` | server | — | `streamsight_session` | session cookie 名稱 |
 | `SESSION_TTL_SECONDS` | server | — | `2592000`（30d，與 refresh token 對齊） | session 存活秒數（cookie + Redis 同步） |
 | `ALLOWED_ORIGINS` | server | production 必且非僅 localhost | `http://localhost:3000` | CSRF Origin 白名單 |
 | `REDIS_URL` | server | `USE_MOCK=0` 時必填 | — | BFF Redis 連線；`redis://` / `rediss://` |
-| `REDIS_KEY_PREFIX` | server | — | `jko-bff` | Key 命名空間（多環境共用一 Redis 時隔離） |
+| `REDIS_KEY_PREFIX` | server | — | `streamsight-bff` | Key 命名空間（多環境共用一 Redis 時隔離） |
 | `REDIS_TLS_ENABLED` | server | — | `'0'` | 顯式覆寫；通常從 URL scheme 推斷 |
 | `REDIS_CONNECT_TIMEOUT_MS` | server | — | `2000` | 連線 timeout |
 | `REDIS_COMMAND_TIMEOUT_MS` | server | — | `1000` | 單一 command timeout |
 | `APP_VERSION` | server | — | `0.0.0` | `/api/health` 回傳用 |
 | `APP_COMMIT` | server | — | — | `/api/health` 回傳用 |
-| `NEXT_PUBLIC_APP_NAME` | client + server | — | `JKODonation` | UI 顯示用 |
+| `NEXT_PUBLIC_APP_NAME` | client + server | — | `StreamSight` | UI 顯示用 |
 
 `.env.example` 同步更新。
 
@@ -484,5 +484,5 @@ export function resolveMock(path: string): MockHandler | undefined { return regi
 - [ ] `src/lib/schemas/envelope.ts` + `pagination.ts` 通過 §9.4 case
 - [ ] `src/lib/mock/dispatch.ts` 通過 §9.5 case
 - [ ] `.env.example` 同步 §3.2 變數清單
-- [ ] **無業務字眼**（grep 不到 `charity|donation|jko[^_-]`）
+- [ ] **無業務字眼**（grep 不到 `charity|donation|streamsight[^_-]`）
 - [ ] `pnpm lint` + `pnpm test` + `pnpm typecheck` 綠

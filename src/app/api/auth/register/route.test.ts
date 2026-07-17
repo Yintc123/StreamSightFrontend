@@ -16,10 +16,10 @@ vi.mock('@/lib/config', () => ({
     BACKEND_API_URL: 'http://backend.test',
     NODE_ENV: 'test',
     SESSION_SECRET: 'test-session-secret-must-be-32-chars-long',
-    SESSION_COOKIE_NAME: 'jko_session',
+    SESSION_COOKIE_NAME: 'streamsight_session',
     SESSION_TTL_SECONDS: 2_592_000,
     ALLOWED_ORIGINS: 'http://localhost:3000',
-    REDIS_KEY_PREFIX: 'jko-bff-test',
+    REDIS_KEY_PREFIX: 'streamsight-bff-test',
     REDIS_HOST: 'localhost',
     REDIS_PORT: 6380,
     REDIS_PASSWORD: '',
@@ -27,7 +27,7 @@ vi.mock('@/lib/config', () => ({
     REDIS_CONNECT_TIMEOUT_MS: 2000,
     REDIS_COMMAND_TIMEOUT_MS: 1000,
     APP_VERSION: '0.0.0-test',
-    NEXT_PUBLIC_APP_NAME: 'JKODonation',
+    NEXT_PUBLIC_APP_NAME: 'StreamSight',
   },
 }))
 

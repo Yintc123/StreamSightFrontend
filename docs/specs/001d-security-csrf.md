@@ -208,5 +208,5 @@ export function csrfHeader(token: string): HeadersInit {
 - [ ] `src/lib/security/verifyCsrf.ts`：§3 程式碼通過 §6.1 所有案例（含 `session=null + exempt=false` → CsrfError 的關鍵案例）
 - [ ] `src/lib/security/origin.ts`：`allowedOrigins` Set + `extractOriginFromReferer` 通過 §6.2 / §6.3
 - [ ] `tests/helpers/csrf.ts` 提供 `csrfHeader(token)`
-- [ ] **無業務字眼**（grep 不到 `charity|donation|jko[^_-]`）
+- [ ] **無業務字眼**（grep 不到 `charity|donation|streamsight[^_-]`）
 - [ ] `pnpm lint` + `pnpm test` + `pnpm typecheck` 綠

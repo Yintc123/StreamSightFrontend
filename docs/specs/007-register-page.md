@@ -199,7 +199,7 @@ export const POST = createRoute({
 
 ```http
 HTTP/1.1 201 Created
-Set-Cookie: jko_session=<iron-encrypted>; HttpOnly; SameSite=Lax; Secure
+Set-Cookie: streamsight_session=<iron-encrypted>; HttpOnly; SameSite=Lax; Secure
 Cache-Control: no-store, private
 
 {

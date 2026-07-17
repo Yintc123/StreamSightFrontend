@@ -47,9 +47,9 @@ describe('cookie layer', () => {
     it('readSessionId returns null when cookie value is tampered', async () => {
       const id = newSessionId()
       await writeSessionId(id)
-      const cookie = fakeStore.get('jko_session')!
+      const cookie = fakeStore.get('streamsight_session')!
       // Corrupt one character of the sealed value
-      fakeStore.set('jko_session', cookie.value.slice(0, -3) + 'AAA')
+      fakeStore.set('streamsight_session', cookie.value.slice(0, -3) + 'AAA')
       expect(await readSessionId()).toBeNull()
     })
 

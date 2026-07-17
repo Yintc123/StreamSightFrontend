@@ -335,5 +335,5 @@ export * from './constants'
 - [ ] `src/lib/api/parsers.ts`：`parseBody` / `parseQuery` / `parsePathParams` 通過 §5.2 案例（含 streaming 1MB 驗證）
 - [ ] `src/lib/api/request-id.ts`：`newRequestId` 產正確格式
 - [ ] `src/lib/api/index.ts` barrel re-export 上述四檔（不含 backend）
-- [ ] **無業務字眼**（grep 不到 `charity|donation|jko[^_-]`）
+- [ ] **無業務字眼**（grep 不到 `charity|donation|streamsight[^_-]`）
 - [ ] `pnpm lint` + `pnpm test` + `pnpm typecheck` 綠

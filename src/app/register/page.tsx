@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { RegisterCard } from './RegisterCard'
 
 export const metadata: Metadata = {
-  title: '建立帳號 | JKODonation',
+  title: '建立帳號 | StreamSight',
 }
 
 /**

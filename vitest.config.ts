@@ -24,15 +24,15 @@ export default defineConfig({
       USE_MOCK: '1',
       SESSION_SECRET:
         process.env.SESSION_SECRET ?? 'test-session-secret-must-be-32-chars-long',
-      SESSION_COOKIE_NAME: 'jko_session',
+      SESSION_COOKIE_NAME: 'streamsight_session',
       SESSION_TTL_SECONDS: '2592000',
       ALLOWED_ORIGINS: 'http://localhost:3000',
       REDIS_HOST: process.env.REDIS_HOST ?? 'localhost',
       REDIS_PORT: process.env.REDIS_PORT ?? '6380',
       REDIS_PASSWORD: process.env.REDIS_PASSWORD ?? '',
-      REDIS_KEY_PREFIX: process.env.REDIS_KEY_PREFIX ?? 'jko-bff-test',
+      REDIS_KEY_PREFIX: process.env.REDIS_KEY_PREFIX ?? 'streamsight-bff-test',
       APP_VERSION: '0.0.0-test',
-      NEXT_PUBLIC_APP_NAME: 'JKODonation',
+      NEXT_PUBLIC_APP_NAME: 'StreamSight',
     },
     coverage: {
       provider: 'v8',

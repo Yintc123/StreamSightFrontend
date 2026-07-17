@@ -5,7 +5,7 @@ import { RedisSessionStore } from './redis'
 const host = process.env.REDIS_HOST ?? 'localhost'
 const port = Number(process.env.REDIS_PORT ?? 6380)
 const password = process.env.REDIS_PASSWORD ?? ''
-const prefix = `jko-test-${randomBytes(4).toString('hex')}`
+const prefix = `streamsight-test-${randomBytes(4).toString('hex')}`
 
 runSessionStoreContract(
   'redis',

@@ -167,12 +167,12 @@ Browser ──▶ createRoute
 ### 5.3 規格純淨度（無業務字眼自檢）
 
 ```bash
-grep -rE "charity|donation|jko[^_-]" \
+grep -rE "charity|donation|streamsight[^_-]" \
   src/lib/{api,session,security,errors,config,mock,log,schemas/{envelope,pagination}} \
   || echo "✓ no business words"
 ```
 
-`jko-` / `jko_` 等基建前綴（key prefix、cookie name）允許。
+`streamsight-` / `streamsight_` 等基建前綴（key prefix、cookie name）允許。
 
 ### 5.4 整體 Quality Gates
 

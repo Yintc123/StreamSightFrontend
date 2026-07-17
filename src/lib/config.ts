@@ -11,7 +11,7 @@ const RawEnv = z
     // USE_MOCK=0 but in practice the cookie path runs for every request.
     SESSION_SECRET: z.string().min(32),
     SESSION_SECRET_PREVIOUS: z.string().min(32).optional(),
-    SESSION_COOKIE_NAME: z.string().default('jko_session'),
+    SESSION_COOKIE_NAME: z.string().default('streamsight_session'),
     SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 60 * 24 * 30),
     ALLOWED_ORIGINS: z.string().optional(),
 
@@ -22,14 +22,14 @@ const RawEnv = z
     REDIS_HOST: z.string().min(1).optional(),
     REDIS_PORT: z.coerce.number().int().positive().default(6379),
     REDIS_PASSWORD: z.string().default(''),
-    REDIS_KEY_PREFIX: z.string().default('jko-bff'),
+    REDIS_KEY_PREFIX: z.string().default('streamsight-bff'),
     REDIS_TLS_ENABLED: z.enum(['0', '1']).default('0'),
     REDIS_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
     REDIS_COMMAND_TIMEOUT_MS: z.coerce.number().int().positive().default(1000),
 
     APP_VERSION: z.string().default('0.0.0'),
     APP_COMMIT: z.string().optional(),
-    NEXT_PUBLIC_APP_NAME: z.string().default('JKODonation'),
+    NEXT_PUBLIC_APP_NAME: z.string().default('StreamSight'),
   })
   .superRefine((env, ctx) => {
     if (env.USE_MOCK === '0') {

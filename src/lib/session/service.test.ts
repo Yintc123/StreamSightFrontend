@@ -67,7 +67,7 @@ describe('get', () => {
   })
 
   it('returns null when cookie unsealable', async () => {
-    fakeStore.set('jko_session', 'this-is-not-a-sealed-cookie')
+    fakeStore.set('streamsight_session', 'this-is-not-a-sealed-cookie')
     expect(await getSessionService().get()).toBeNull()
   })
 
@@ -80,12 +80,12 @@ describe('get', () => {
     const svc = getSessionService()
     await svc.create({ user: USER, role: Role.USER, tokens: tokens() })
 
-    const beforeCookie = fakeStore.get('jko_session')!.value
+    const beforeCookie = fakeStore.get('streamsight_session')!.value
     // call get a few times
     await svc.get()
     await svc.get()
     await svc.get()
-    const afterCookie = fakeStore.get('jko_session')!.value
+    const afterCookie = fakeStore.get('streamsight_session')!.value
     expect(afterCookie).toBe(beforeCookie)
   })
 })
@@ -153,7 +153,7 @@ describe('destroy', () => {
     vi.spyOn(sharedStore, 'destroy').mockRejectedValueOnce(new Error('redis down'))
     await expect(svc.destroy()).resolves.toBeUndefined()
     // Cookie still cleared
-    expect(fakeStore.get('jko_session')).toBeUndefined()
+    expect(fakeStore.get('streamsight_session')).toBeUndefined()
   })
 })
 
@@ -168,19 +168,19 @@ describe('touch', () => {
     await writeSessionId('z'.repeat(43)) // cookie points at non-existent entry
     const svc = getSessionService()
     await svc.touch()
-    expect(fakeStore.get('jko_session')).toBeUndefined()
+    expect(fakeStore.get('streamsight_session')).toBeUndefined()
   })
 
   it('refreshes both layers when session valid', async () => {
     const svc = getSessionService()
     await svc.create({ user: USER, role: Role.USER, tokens: tokens() })
-    const before = fakeStore.get('jko_session')!.value
+    const before = fakeStore.get('streamsight_session')!.value
 
     // Simulate small time passage so iron-session produces a different sealed value
     await new Promise((r) => setTimeout(r, 5))
 
     await svc.touch()
-    const after = fakeStore.get('jko_session')!.value
+    const after = fakeStore.get('streamsight_session')!.value
     expect(after).not.toBe(before) // cookie was rewritten
     expect(svc.wasMutated()).toBe(true)
   })
@@ -310,7 +310,7 @@ describe('refresh — failure paths', () => {
     await expect(svc.refresh()).rejects.toThrow(/refresh token revoked/i)
 
     // Local session must be gone — both cookie and store side
-    expect(fakeStore.get('jko_session')).toBeUndefined()
+    expect(fakeStore.get('streamsight_session')).toBeUndefined()
     expect(await svc.get()).toBeNull()
   })
 })

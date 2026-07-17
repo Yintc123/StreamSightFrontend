@@ -1,9 +1,10 @@
-# JKODonation — Frontend
+# StreamSight — Frontend
 
-2026 全端面試作業：捐款項目列表（公益團體）。
-本目錄為 **Next.js 16（App Router）+ BFF** 前端應用。
+**Next.js 16（App Router）+ BFF** 前端骨架。
 
-> 設計稿：Figma《2026 全端面試作業 - web》
+本 repo 已剝除原業務功能，只保留可重用的基礎架構：BFF Route Handler 框架、
+iron-session + Redis session、CSRF 防護、登入 / 註冊 auth、錯誤標準化、mock
+框架、測試與部署設定。新功能垂直（list / detail / …）在此骨架上長出來。
 
 ---
 
@@ -55,7 +56,7 @@ pnpm dev                        # http://localhost:3000
 ## Tech Stack
 
 - **框架**:Next.js 16(App Router、Turbopack 預設)· React 19.2 · TypeScript · TailwindCSS v4
-- **資料**:TanStack Query v5(infinite query)· Zod v4
+- **資料**:TanStack Query v5 · Zod v4
 - **BFF**(Route Handlers `src/app/api/*`,對外隱藏真後端):
   - iron-session(cookie session)+ Redis(ioredis)session store
   - CSRF 防護(`verifyCsrf`)· 登入 / 註冊 auth
@@ -65,37 +66,41 @@ pnpm dev                        # http://localhost:3000
 
 > 註:專案脈絡文件曾提及 React Compiler,但目前 `next.config.ts` **未啟用**(無對應設定與依賴)。
 
-## 頁面與 BFF Route
+## 目前保留的頁面與 BFF Route
 
-**頁面(`src/app/*/page.tsx`)**:`/`(首頁 + 登入)· `/register` · `/donation`(列表)· `/charities/[id]` · `/donation-projects/[id]` · `/sale-items/[id]` · `/checkout/donation` · `/checkout/purchase` · `/cms`(+ `/cms/charities`、`/new`、`/[id]/edit`)
+**頁面(`src/app/*/page.tsx`)**:`/`(首頁 + 登入卡)· `/register`(註冊)
 
-**BFF Route(`src/app/api/*/route.ts`,16 條)**:`auth/login`、`auth/register`、`csrf`、`categories`、`charities`(+`[id]`)、`donations`(+`[id]`)、`items`(+`[id]`)、`checkout/donation`、`checkout/purchase`、`cms/charities`(+`[id]`)、`health`(+`health/live`)
+**BFF Route(`src/app/api/*/route.ts`)**:`auth/login`、`auth/register`、`csrf`、`health`(+`health/live`)
+
+**受保護路由 auth-gate**:`src/proxy.ts` 對 `/cms*` 做 session-cookie optimistic
+check(目前是 placeholder 保護區,示範 Next.js 16 Proxy + RSC 雙層驗證 pattern)。
+
+## 骨架能力(可重用基建)
+
+- **`src/lib/api/`** — BFF Route Handler 框架:`createRoute`(query/body/params
+  parse + 統一錯誤)、`backendFetch`(→ 真後端,含 timeout)、`okResponse`、
+  `parsers`、`request-id`、`http-status`
+- **`src/lib/session/`** — iron-session cookie + Redis / in-memory store、
+  `requireAdmin`
+- **`src/lib/security/`** — CSRF(`verifyCsrf`)、origin 檢查
+- **`src/lib/errors/`** — 錯誤型別階層 + `toErrorResponse` + 全域 query error
+- **`src/lib/hooks/`** — `useDebouncedValue`、`useUrlSync`、`useViewport`、
+  `useScrollPercentSentinel`、`useSmartBack`、`useInAppNav`
+- **`src/components/ui/`** — primitives:`Spinner`、`EmptyState`、`InlineError`、
+  `BottomSheet`、`FallbackImage`
+- **`src/lib/mock/`** — `USE_MOCK=1` 的 mock dispatch 框架(目前只註冊 auth bridge)
 
 ## 部署
 
-`next.config.ts` 用 `output: "standalone"` 產出精簡 Node server;搭配 `Dockerfile` + `docker-compose.yml`(含 Redis on 6380)。詳見專案根 [ADR 010](../docs/decisions/)。
+`next.config.ts` 用 `output: "standalone"` 產出精簡 Node server;搭配 `Dockerfile` +
+`docker-compose.yml`(含 Redis on 6380)。
+
+> ⚠️ `.aws/task-definition.json` 與 `.github/workflows/pipeline.yml` 內的 ECS
+> cluster / service / ALB DNS / SecretsManager 等識別符沿用舊部署的實體資源命名
+> (僅字串已改為 `streamsight`),實際上線前需對照重建後的 AWS 資源。
 
 ## 文件
 
-- [`docs/brief.md`](./docs/brief.md) — 作業需求、畫面盤點、範圍
 - [`docs/architecture.md`](./docs/architecture.md) — BFF 架構、資料流、資料夾結構
-- [`docs/specs/`](./docs/specs/) — API / UI 實作規格（持續補上）
-- 專案根 `/docs/decisions/` — ADR（架構決策紀錄）
-
----
-
-## AI 使用聲明
-
-本專案在開發過程中使用 AI 工具輔助。
-
-### 使用的 AI 工具
-- Claude（[Claude Code](https://claude.com/claude-code) CLI，模型：Opus 4.8）
-
-### AI 角色
-BFF 架構討論、Zod schema 與 Route Handler 的按規格 TDD 實作、元件骨架生成、code review。
-
-### 人工角色
-需求理解、畫面盤點、架構決策、實作驗收、跨 spec 一致性把關。
-
-### Prompt 紀錄
-代表性 Prompt 對話見專案根 [`/docs/prompts/`](../docs/prompts/)（raw + 精選版）。
+- [`docs/specs/`](./docs/specs/) — 基建實作規格(001x BFF / session / CSRF、005 首頁 auth、006 錯誤處理、007 註冊、010 auth-gate)
+- [`docs/decisions/`](./docs/decisions/) — ADR(架構決策紀錄)

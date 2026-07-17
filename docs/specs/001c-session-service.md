@@ -474,5 +474,5 @@ export async function withSessionCookie(req: Request, sessionId: string): Promis
 - [ ] `get()` 為純讀無副作用（不寫 cookie、不動 Redis TTL）
 - [ ] `wasMutated()` 旗標跨所有 mutation 路徑都生效
 - [ ] `refresh()` 內部不會遞迴呼叫 `create` / `update`
-- [ ] **無業務字眼**（grep 不到 `charity|donation|jko[^_-]`）
+- [ ] **無業務字眼**（grep 不到 `charity|donation|streamsight[^_-]`）
 - [ ] `pnpm lint` + `pnpm test` + `pnpm typecheck` 綠

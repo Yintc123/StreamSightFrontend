@@ -16,7 +16,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server'
 
-const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? 'jko_session'
+const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? 'streamsight_session'
 
 export function proxy(request: NextRequest): NextResponse {
   const hasSessionCookie = Boolean(

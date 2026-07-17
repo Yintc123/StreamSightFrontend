@@ -28,7 +28,7 @@
 
 ```
 ┌─────────────────────────────────┐
-│       JKODonation (brand 紅)    │ ← h1，置中
+│       StreamSight (brand 紅)    │ ← h1，置中
 ├─────────────────────────────────┤
 │                                 │
 │      ┌─────────────────┐        │
@@ -70,7 +70,7 @@
 
 > CMS 真功能（charity / project / sale-item 三套 CRUD）規劃未來再開 spec；register 規劃已收斂於 007。
 >
-> **為何 v0.5 改路徑（`/dashboard` → `/cms`）**：JKODonation 後台主要做「公益團體 / 募款專案 / 義賣商品」三類資料的 CRUD（對應 BE spec 020 charity / project / sale-item 三套 admin route），語意上是 content management，不是純 analytics dashboard。`/cms` 讓路徑與業務領域對齊，也避開 Grafana 等觀測 dashboard 的命名噪音。
+> **為何 v0.5 改路徑（`/dashboard` → `/cms`）**：StreamSight 後台主要做「公益團體 / 募款專案 / 義賣商品」三類資料的 CRUD（對應 BE spec 020 charity / project / sale-item 三套 admin route），語意上是 content management，不是純 analytics dashboard。`/cms` 讓路徑與業務領域對齊，也避開 Grafana 等觀測 dashboard 的命名噪音。
 >
 > **為何 v0.4 改路徑（`/admin` → `/register`）**：BE spec 008 §10 有 `role=0=ADMIN` 與 `requireAdmin` preHandler 概念。把面向所有使用者的「建立帳號」掛在 `/admin` 會與「ADMIN role 限定區」概念衝突。`/register` 是公開註冊入口；`/admin` 留給未來真正的 admin 後台。
 
@@ -212,5 +212,5 @@ export function useSmartBack(fallback: string = '/'): () => void {
 | 0.3 | 2026-06-16 | skip link 文案「我不想登入」→「demo」（更直白表達訪客 / 展示模式；與作業繳交「附 demo 連結」的脈絡更一致）。`src/app/page.tsx`、`tests/e2e/smoke.spec.ts`、`docs/brief.md` §3、本 spec §2 ASCII + §3 行為表 + §4.4 / §6 行文同步 |
 | 0.4 | 2026-06-16 | **`/admin` 路徑 → `/register`**（隨 [spec 007 v0.2](./007-register-page.md) 重寫對齊 [BE spec 008 v0.6](../../../backend/docs/specs/008-auth-flow-password.md)）：原本「建立帳號」placeholder 掛在 `/admin`，與 BE `role=0=ADMIN` 概念衝突（BE 有 `requireAdmin` preHandler）。把公開註冊入口拆到 `/register`，`/admin` 留給未來真正的 admin 後台。`src/app/admin/` 整目錄移到 `src/app/register/`；LoginCard `router.push('/register')` + 對應 component test；spec 005 §1 路徑、§3 行為表、§4 placeholder 章節（標題從「/admin 與 /dashboard」改為「/register 與 /dashboard」+ 新增「為何 v0.4 改路徑」段落）、§5.1 client test row、§6 OQ 同步 |
 | 0.5 | 2026-06-16 | **`/dashboard` 路徑 → `/cms`**：後台主要做 charity / project / sale-item 三類資料 CRUD（對應 BE spec 020 三套 admin route），語意上是 content management 而非 analytics dashboard；改名讓路徑與業務領域對齊，也避開 Grafana 等觀測 dashboard 的命名噪音。`src/app/dashboard/` 整目錄移到 `src/app/cms/`、component 改名 `DashboardPage` → `CmsPage`；LoginCard `router.push('/cms')` + 對應 test、spec 007 RegisterCard `router.push('/cms')` + 對應 test 同步；spec 005 §1 路徑、§3 行為表、§4 placeholder 章節（標題改「/register 與 /cms」+ 新增「為何 v0.5 改路徑」段落）、§5.1 client test row、§6 OQ 同步；spec 007 §1 / §2 / §4 / §5.2 / §6 / §7.1 / §7.3 同步；brief.md §3 同步 |
-| 0.6 | 2026-06-16 | **`/cms` Auth Gate 上線**（Next.js 16 Proxy + RSC 雙層）：(a) 新 `src/proxy.ts`（Next 16 把 Middleware 改名 Proxy）matcher `['/cms', '/cms/:path*']`、edge runtime 做 `jko_session` cookie presence optimistic check，無 cookie → 307 `/`；(b) `src/app/cms/page.tsx` 改 async RSC、`await getSessionService().get()` 做 full validation（iron-session decrypt + Redis lookup），`null` → `redirect('/')`、render 改顯示 `session.user.name`；(c) 對齊 [Next.js 16 auth 指南](../../node_modules/next/dist/docs/01-app/02-guides/authentication.md) 「Optimistic checks with Proxy + Data Access Layer」雙層 pattern；本 spec §4a / §5.3a 為 stub，完整脈絡 / threat model / 行為矩陣 / OQ 抽到新 **[spec 010 `/cms` Auth Gate](./010-cms-auth-gate.md) v0.1** |
+| 0.6 | 2026-06-16 | **`/cms` Auth Gate 上線**（Next.js 16 Proxy + RSC 雙層）：(a) 新 `src/proxy.ts`（Next 16 把 Middleware 改名 Proxy）matcher `['/cms', '/cms/:path*']`、edge runtime 做 `streamsight_session` cookie presence optimistic check，無 cookie → 307 `/`；(b) `src/app/cms/page.tsx` 改 async RSC、`await getSessionService().get()` 做 full validation（iron-session decrypt + Redis lookup），`null` → `redirect('/')`、render 改顯示 `session.user.name`；(c) 對齊 [Next.js 16 auth 指南](../../node_modules/next/dist/docs/01-app/02-guides/authentication.md) 「Optimistic checks with Proxy + Data Access Layer」雙層 pattern；本 spec §4a / §5.3a 為 stub，完整脈絡 / threat model / 行為矩陣 / OQ 抽到新 **[spec 010 `/cms` Auth Gate](./010-cms-auth-gate.md) v0.1** |
 | 0.7 | 2026-06-17 | **登入路徑改名 `/api/dev/login` → `/api/auth/login`**：原 dev-only 命名隨 v0.3 接真實 BE `/auth/login` 已不再貼切；本版同步搬到 `src/app/api/auth/login/`、移除 `ENABLE_DEV_LOGIN` env gate 與 `DEV_ADMIN_USERNAME / PASSWORD` body fallback，body schema 變成 required `{ identifier, password }`。`LoginCard.tsx` fetch URL + comment + `LoginCard.test.tsx` 第 6 case 斷言同步；本 spec §3、§5.1 同步 |
