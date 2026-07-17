@@ -4,15 +4,15 @@ name: terraform
 # as the overview repo's terraform.yml. Runs plan on every push; applies only on
 # main. The app image build/rollout stays in pipeline.yml.
 #
-# Prerequisites (one-time, done locally — see infra/terraform/README.md):
-#   - overview stack applied (creates the shared cluster/datastore/ECR/roles/SSM)
-#   - first `terraform apply` run locally, which creates the OIDC role this
-#     workflow assumes; then wire the repo secrets/variables below.
+# Prerequisites (no local bootstrap — see infra/terraform/README.md):
+#   - overview stack applied. It owns the shared cluster/datastore/ECR/roles/SSM
+#     AND this stack's Terraform CI role (streamsight-frontend-terraform), so the
+#     first apply can run right here in CI once the secrets below are set.
 #
-# Required repo secrets:   TF_ROLE_ARN         (terraform_role_arn output)
-# Required repo variables: TF_STATE_BUCKET     (same S3 bucket as the overview)
-#                          BACKEND_API_URL     (required unless USE_MOCK=1)
-# Optional repo variable:  USE_MOCK            ('1' to run without a backend)
+# Required repo secrets:   TF_ROLE_ARN     (overview output terraform_role_arns.frontend)
+# Required repo variables: TF_STATE_BUCKET (same S3 bucket as the overview)
+#                          BACKEND_API_URL (required unless USE_MOCK=1)
+# Optional repo variable:  USE_MOCK        ('1' to run without a backend)
 
 on:
   push:

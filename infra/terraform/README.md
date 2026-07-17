@@ -22,13 +22,19 @@ is the fixed floor. Free HTTPS on the default `*.cloudfront.net` domain.
 
 ## Prerequisites (apply the overview stack first)
 
-This stack **reads** resources the overview stack owns. Before the first apply,
-the overview stack must have created:
+**No local bootstrap is needed for this repo.** The overview stack is the single
+admin bootstrap — it owns all the cross-repo IAM/OIDC, including this stack's
+Terraform CI role. Once it's applied, this stack runs entirely through CI.
+
+This stack **reads** (and is deployed by roles owned by) the overview stack, which
+must have created:
 
 - ECS cluster `streamsight`, datastore EC2 tagged `Name=streamsight-datastore`
   (running), and its ECS SG tagged `Name=streamsight-ecs`.
 - ECR repo `streamsight-frontend` + roles `streamsight-frontend-execution` and
   `streamsight-ecs-task`.
+- The **Terraform CI role** `streamsight-frontend-terraform` (created by the
+  overview's `apps.tf`) — this is what `terraform.yml` assumes.
 - SSM params `/streamsight/shared/redis_password` **and**
   `/streamsight/frontend/session_secret`. The latter only exists once
   `session_secret` was set in the overview's `terraform.tfvars` — set it there
@@ -36,26 +42,24 @@ the overview stack must have created:
 
 Keep `region` and `project` identical to the overview stack.
 
-## One-time bootstrap (local)
+## Deploy (via CI — no local Terraform)
 
-Like the overview stack, the **first apply is local**: it creates the OIDC role
-that the `terraform.yml` workflow then assumes (`streamsight-frontend-terraform`,
-trusted by this repo's `main`). Run it with your own admin credentials:
+The first (and every) apply runs in GitHub Actions. Wire the repo once, then push:
 
-```bash
-cp backend.hcl.example backend.hcl              # same bucket as overview, different key
-cp terraform.tfvars.example terraform.tfvars    # set backend_api_url or use_mock=1
+1. From the **overview** stack, grab this app's Terraform CI role ARN and set it
+   as this repo's `TF_ROLE_ARN` secret:
+   ```bash
+   terraform output -json terraform_role_arns   # → use the "frontend" entry
+   ```
+2. Set repo variables `TF_STATE_BUCKET` (the overview's state bucket) and
+   `BACKEND_API_URL` (or `USE_MOCK=1`). See **Terraform CI/CD** below for the
+   full list.
+3. Push a change under `infra/terraform/**` (or run the workflow manually). The
+   `terraform.yml` job `plan`s and `apply`s the whole stack.
 
-terraform init -backend-config=backend.hcl
-terraform apply
-```
-
-Then wire the repo for CI (see **Terraform CI/CD** below):
-
-```bash
-terraform output -raw terraform_role_arn   # → repo secret  TF_ROLE_ARN
-# TF_STATE_BUCKET repo variable = the same S3 bucket as the overview stack
-```
+> Prefer to apply locally instead? You still can — `terraform init
+> -backend-config=backend.hcl && terraform apply` with your own admin
+> credentials. It's just not required.
 
 The ECS service can't stabilise until an image exists in ECR. Either let the
 `pipeline.yml` workflow build+push (push to `main`), or push one manually:
@@ -82,7 +86,7 @@ Set these on the repo (Settings → Secrets and variables → Actions):
 
 | kind     | name              | value                                                        |
 |----------|-------------------|--------------------------------------------------------------|
-| secret   | `TF_ROLE_ARN`     | `terraform output -raw terraform_role_arn`                   |
+| secret   | `TF_ROLE_ARN`     | overview: `terraform output -json terraform_role_arns` → `frontend` |
 | variable | `TF_STATE_BUCKET` | the overview stack's S3 state bucket (`streamsight-tfstate-…`)|
 | variable | `BACKEND_API_URL` | the backend URL the BFF calls (required unless `USE_MOCK=1`) |
 | variable | `USE_MOCK`        | *(optional)* `1` to run without a backend                    |

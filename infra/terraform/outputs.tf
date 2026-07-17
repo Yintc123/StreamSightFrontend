@@ -27,8 +27,3 @@ output "task_family" {
   description = "Task definition family the pipeline registers new revisions under."
   value       = aws_ecs_task_definition.app.family
 }
-
-output "terraform_role_arn" {
-  description = "OIDC role for this stack's Terraform CI. Set as the TF_ROLE_ARN repo secret after the first local apply."
-  value       = aws_iam_role.terraform_ci.arn
-}

@@ -19,18 +19,6 @@ variable "project" {
   default     = "streamsight"
 }
 
-variable "github_repo" {
-  description = "owner/name of the GitHub repo allowed to assume the Terraform CI role via OIDC."
-  type        = string
-  default     = "Yintc123/StreamSightFrontend"
-}
-
-variable "deploy_branch" {
-  description = "Only OIDC tokens from this branch may assume the Terraform CI role."
-  type        = string
-  default     = "main"
-}
-
 variable "container_port" {
   description = "Port the Next.js standalone server listens on (Dockerfile EXPOSE / PORT)."
   type        = number
