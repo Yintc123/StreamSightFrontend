@@ -16,9 +16,10 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     css: true,
     // Vitest's test.env merges OVER process.env (i.e. test.env wins on
-    // collision). Use fallback pattern so CI's discrete REDIS_* env (port
-    // 6379) takes precedence over the local docker-compose default (6380)
-    // when set.
+    // collision). Use fallback pattern so an explicit REDIS_* env takes
+    // precedence when set; the default (6379) matches infra/docker-compose.yml
+    // + infra/.env and the app runtime default (src/lib/config.ts), so a bare
+    // `pnpm test` against `docker compose up -d redis` connects with no env.
     env: {
       NODE_ENV: 'test',
       USE_MOCK: '1',
@@ -28,7 +29,7 @@ export default defineConfig({
       SESSION_TTL_SECONDS: '2592000',
       ALLOWED_ORIGINS: 'http://localhost:3000',
       REDIS_HOST: process.env.REDIS_HOST ?? 'localhost',
-      REDIS_PORT: process.env.REDIS_PORT ?? '6380',
+      REDIS_PORT: process.env.REDIS_PORT ?? '6379',
       REDIS_PASSWORD: process.env.REDIS_PASSWORD ?? '',
       REDIS_KEY_PREFIX: process.env.REDIS_KEY_PREFIX ?? 'streamsight-bff-test',
       APP_VERSION: '0.0.0-test',

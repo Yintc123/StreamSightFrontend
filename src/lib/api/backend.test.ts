@@ -24,7 +24,7 @@ vi.mock('@/lib/config', () => ({
     ALLOWED_ORIGINS: 'http://localhost:3000',
     REDIS_KEY_PREFIX: 'streamsight-bff-test',
     REDIS_HOST: 'localhost',
-    REDIS_PORT: 6380,
+    REDIS_PORT: 6379,
     REDIS_PASSWORD: '',
     REDIS_TLS_ENABLED: '0',
     REDIS_CONNECT_TIMEOUT_MS: 2000,
