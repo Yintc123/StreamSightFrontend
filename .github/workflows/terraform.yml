@@ -1,0 +1,76 @@
+name: terraform
+
+# Manages the frontend's own infra (CloudFront -> ALB -> Fargate) — same shape
+# as the overview repo's terraform.yml. Runs plan on every push; applies only on
+# main. The app image build/rollout stays in pipeline.yml.
+#
+# Prerequisites (one-time, done locally — see infra/terraform/README.md):
+#   - overview stack applied (creates the shared cluster/datastore/ECR/roles/SSM)
+#   - first `terraform apply` run locally, which creates the OIDC role this
+#     workflow assumes; then wire the repo secrets/variables below.
+#
+# Required repo secrets:   TF_ROLE_ARN         (terraform_role_arn output)
+# Required repo variables: TF_STATE_BUCKET     (same S3 bucket as the overview)
+#                          BACKEND_API_URL     (required unless USE_MOCK=1)
+# Optional repo variable:  USE_MOCK            ('1' to run without a backend)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write # assume the AWS role via OIDC
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  # Non-secret app config passed to Terraform. session_secret + redis_password
+  # come from SSM (created by the overview stack), not from here.
+  TF_VAR_backend_api_url: ${{ vars.BACKEND_API_URL }}
+  TF_VAR_use_mock: ${{ vars.USE_MOCK || '0' }}
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.TF_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+
+      # backend.hcl is gitignored (bucket name is environment-specific), so the
+      # backend is configured inline from repo variables instead. Reuse the
+      # overview's state bucket with a frontend-specific key.
+      - name: Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=streamsight-frontend/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true"
+
+      - name: Format check
+        run: terraform fmt -check -recursive
+
+      - name: Validate
+        run: terraform validate
+
+      - name: Plan
+        run: terraform plan -no-color -input=false
+
+      - name: Apply
+        if: github.ref == 'refs/heads/main'
+        run: terraform apply -no-color -input=false -auto-approve

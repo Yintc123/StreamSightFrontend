@@ -36,7 +36,11 @@ the overview stack must have created:
 
 Keep `region` and `project` identical to the overview stack.
 
-## Apply
+## One-time bootstrap (local)
+
+Like the overview stack, the **first apply is local**: it creates the OIDC role
+that the `terraform.yml` workflow then assumes (`streamsight-frontend-terraform`,
+trusted by this repo's `main`). Run it with your own admin credentials:
 
 ```bash
 cp backend.hcl.example backend.hcl              # same bucket as overview, different key
@@ -44,6 +48,13 @@ cp terraform.tfvars.example terraform.tfvars    # set backend_api_url or use_moc
 
 terraform init -backend-config=backend.hcl
 terraform apply
+```
+
+Then wire the repo for CI (see **Terraform CI/CD** below):
+
+```bash
+terraform output -raw terraform_role_arn   # → repo secret  TF_ROLE_ARN
+# TF_STATE_BUCKET repo variable = the same S3 bucket as the overview stack
 ```
 
 The ECS service can't stabilise until an image exists in ECR. Either let the
@@ -60,7 +71,26 @@ docker push "$REPO:latest"
 Get the URL: `terraform output cloudfront_url`
 (A new CloudFront distribution takes ~5–15 min to finish deploying.)
 
-## Wire up the CI/CD pipeline (`.github/workflows/pipeline.yml`)
+## Terraform CI/CD (`.github/workflows/terraform.yml`)
+
+After the bootstrap, infra changes go through CI — same shape as the overview's
+`terraform.yml`. Push to `main` (or run it manually) → `init` → `fmt` →
+`validate` → `plan`; `apply` runs only on `main`. Trigger paths are
+`infra/terraform/**` + the workflow file. Authenticates via OIDC (no AWS keys).
+
+Set these on the repo (Settings → Secrets and variables → Actions):
+
+| kind     | name              | value                                                        |
+|----------|-------------------|--------------------------------------------------------------|
+| secret   | `TF_ROLE_ARN`     | `terraform output -raw terraform_role_arn`                   |
+| variable | `TF_STATE_BUCKET` | the overview stack's S3 state bucket (`streamsight-tfstate-…`)|
+| variable | `BACKEND_API_URL` | the backend URL the BFF calls (required unless `USE_MOCK=1`) |
+| variable | `USE_MOCK`        | *(optional)* `1` to run without a backend                    |
+
+`session_secret` and `redis_password` are **not** set here — they live in shared
+SSM (created by the overview stack) and are read by ARN.
+
+## Wire up the app pipeline (`.github/workflows/pipeline.yml`)
 
 The deploy job builds the image and rolls out this service. Terraform ignores
 `task_definition`/`desired_count` on the service, so pipeline deploys won't be
