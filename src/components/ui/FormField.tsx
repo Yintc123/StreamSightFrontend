@@ -30,8 +30,14 @@ export function FormField({
 }: FormFieldProps) {
   const errId = `${id}-error`
   return (
-    <label htmlFor={id} className="flex flex-col gap-1">
-      <span className="text-[13px] text-ink-AA">{label}</span>
+    // The label is associated via htmlFor (NOT by wrapping the input), so the
+    // inline error span sits OUTSIDE the label — otherwise the error text would
+    // leak into the field's accessible name. It's linked back via
+    // aria-describedby instead.
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="text-[13px] text-ink-AA">
+        {label}
+      </label>
       <input
         id={id}
         type={type}
@@ -56,6 +62,6 @@ export function FormField({
           {error}
         </span>
       )}
-    </label>
+    </div>
   )
 }

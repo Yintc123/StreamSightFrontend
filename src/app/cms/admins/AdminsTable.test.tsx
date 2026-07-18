@@ -18,11 +18,15 @@ vi.mock('./api', () => ({
   CmsHttpError: class extends Error {},
 }))
 
-import { fetchAdmins, fetchMe } from './api'
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+vi.mock('sonner', () => ({ toast }))
+
+import { fetchAdmins, fetchMe, changeRole } from './api'
 import { AdminsTable } from './AdminsTable'
 
 const fetchAdminsMock = vi.mocked(fetchAdmins)
 const fetchMeMock = vi.mocked(fetchMe)
+const changeRoleMock = vi.mocked(changeRole)
 
 function admin(over: Partial<ClientAdminSummary>): ClientAdminSummary {
   return {
@@ -82,6 +86,32 @@ describe('AdminsTable — action availability', () => {
     expect(within(row).getByText('（你自己）')).toBeInTheDocument()
     expect(within(row).queryByRole('button', { name: '封存' })).not.toBeInTheDocument()
     expect(within(row).queryByRole('button', { name: '刪除' })).not.toBeInTheDocument()
+  })
+})
+
+describe('AdminsTable — mutation invalidates the list', () => {
+  it('a successful role change invalidates ["cms-admins"]', async () => {
+    changeRoleMock.mockReset().mockResolvedValueOnce({
+      id: 2,
+      username: 'editor1',
+      name: 'Editor One',
+      adminRole: 'viewer',
+    })
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries')
+    render(
+      <QueryClientProvider client={qc}>
+        <AdminsTable />
+      </QueryClientProvider>,
+    )
+    const row = await screen.findByTestId('admin-row-2') // editor, not self → role editable
+    fireEvent.change(within(row).getByLabelText('editor1 權限'), {
+      target: { value: 'viewer' },
+    })
+    await waitFor(() => expect(changeRoleMock).toHaveBeenCalledWith(2, 'viewer'))
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['cms-admins'] }),
+    )
   })
 })
 

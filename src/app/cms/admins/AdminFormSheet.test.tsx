@@ -49,6 +49,28 @@ describe('AdminFormSheet — create', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
+  it('username 含空白 → inline 格式錯誤，不打 API', async () => {
+    render(<AdminFormSheet open mode="create" initial={null} onClose={() => {}} onSuccess={() => {}} />)
+    fillCreate({ username: 'ja ne' })
+    fireEvent.click(screen.getByRole('button', { name: '建立' }))
+    expect(await screen.findByText(/空白/)).toBeInTheDocument()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('server 400 (格式) → inline 於帳號欄（aria-invalid + describedby），顯示後端訊息', async () => {
+    createMock.mockRejectedValueOnce(new CmsHttpError(400, 'bad_request', '帳號格式不符'))
+    const onSuccess = vi.fn()
+    render(<AdminFormSheet open mode="create" initial={null} onClose={() => {}} onSuccess={onSuccess} />)
+    fillCreate({ username: 'weird' })
+    fireEvent.click(screen.getByRole('button', { name: '建立' }))
+    await screen.findByText('帳號格式不符')
+    const input = screen.getByLabelText('帳號')
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    const errId = input.getAttribute('aria-describedby')!
+    expect(document.getElementById(errId)).toHaveTextContent('帳號格式不符')
+    expect(onSuccess).not.toHaveBeenCalled()
+  })
+
   it('409 conflict → inline "帳號已被使用"', async () => {
     createMock.mockRejectedValueOnce(new CmsHttpError(409, 'conflict', '帳號已被使用'))
     const onSuccess = vi.fn()

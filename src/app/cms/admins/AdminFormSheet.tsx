@@ -57,10 +57,19 @@ function FormBody({ mode, initial, onClose, onSuccess }: Omit<Props, 'open'>) {
   const [serverFormError, setServerFormError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const usernameError =
-    serverUsernameError ??
-    (isCreate && username.trim().length === 0 ? '請輸入帳號' : undefined)
-  const nameError = name.trim().length === 0 ? '請輸入顯示名稱' : undefined
+  // Client-side format check kept intentionally minimal/safe (never stricter
+  // than the backend): empty or whitespace only. Any richer format rule (e.g.
+  // charset) is the backend's call and surfaces via a 400 mapped to this field.
+  // Format errors (non-empty but malformed) show immediately, like password;
+  // the "empty" hint waits for a submit attempt (touched).
+  const usernameFormatError =
+    isCreate && username.trim().length > 0 && /\s/.test(username)
+      ? '帳號不可包含空白'
+      : undefined
+  const usernameEmptyError =
+    isCreate && touched && username.trim().length === 0 ? '請輸入帳號' : undefined
+  const usernameError = serverUsernameError ?? usernameFormatError ?? usernameEmptyError
+  const nameError = touched && name.trim().length === 0 ? '請輸入顯示名稱' : undefined
   const passwordError =
     isCreate && password.length > 0 && password.length < PASSWORD_MIN
       ? `密碼至少 ${PASSWORD_MIN} 個字元`
@@ -69,12 +78,19 @@ function FormBody({ mode, initial, onClose, onSuccess }: Omit<Props, 'open'>) {
   const allFilled = isCreate
     ? username.trim() && name.trim() && password.length >= PASSWORD_MIN
     : name.trim().length > 0
-  const canSubmit = Boolean(allFilled) && !nameError && !usernameError && !isPending
+  const canSubmit =
+    Boolean(allFilled) &&
+    !usernameFormatError &&
+    !serverUsernameError &&
+    name.trim().length > 0 &&
+    !isPending
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setTouched(true)
     setServerFormError(null)
+    // Client-side blocks before hitting the API.
+    if (isCreate && usernameFormatError) return
     if (isCreate && password.length > 0 && password.length < PASSWORD_MIN) return
     if (!canSubmit) return
 
@@ -87,13 +103,22 @@ function FormBody({ mode, initial, onClose, onSuccess }: Omit<Props, 'open'>) {
         }
         onSuccess()
       } catch (err) {
-        if (err instanceof CmsHttpError && err.status === 409) {
-          setServerUsernameError('帳號已被使用')
+        if (err instanceof CmsHttpError) {
+          // 409 (taken) and, on create, 400 (username format — 013a §1.2) are
+          // username-scoped → inline on the field. Everything else is
+          // form-level.
+          if (err.status === 409) {
+            setServerUsernameError('帳號已被使用')
+            return
+          }
+          if (isCreate && err.status === 400) {
+            setServerUsernameError(err.message)
+            return
+          }
+          setServerFormError(err.message)
           return
         }
-        setServerFormError(
-          err instanceof CmsHttpError ? err.message : '操作失敗，請稍後再試',
-        )
+        setServerFormError('操作失敗，請稍後再試')
       }
     })
   }
@@ -108,7 +133,7 @@ function FormBody({ mode, initial, onClose, onSuccess }: Omit<Props, 'open'>) {
           setUsername(v)
           setServerUsernameError(null)
         }}
-        error={touched ? usernameError : serverUsernameError ?? undefined}
+        error={usernameError}
         autoComplete="off"
         readOnly={!isCreate}
       />
@@ -117,7 +142,7 @@ function FormBody({ mode, initial, onClose, onSuccess }: Omit<Props, 'open'>) {
         label="顯示名稱"
         value={name}
         onChange={setName}
-        error={touched ? nameError : undefined}
+        error={nameError}
         autoComplete="off"
       />
       {isCreate && (
