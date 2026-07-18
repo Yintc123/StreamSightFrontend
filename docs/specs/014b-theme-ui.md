@@ -1,6 +1,6 @@
 # Spec 014b — 主題 UI 元件與淺色調色盤（元件 / 視覺）
 
-狀態：**規格定案，dev-ready（未實作）**（v0.1，2026-07-18）
+狀態：**已實作（2026-07-18）**（v0.2）
 父規格：[`014-theme-mode.md`](./014-theme-mode.md)｜姊妹規格：[`014a-theme-logic.md`](./014a-theme-logic.md)
 
 本規格負責主題功能的**視覺與元件**部分：`ThemeToggle` 元件、淺色調色盤色值、
@@ -191,7 +191,8 @@
 | 版本 | 日期 | 變更 |
 |---|---|---|
 | 0.1 | 2026-07-18 | 自 `014-theme-mode.md` v0.2 拆出「UI 元件 / 視覺」部分：淺色調色盤、`globals.css` 覆寫、`ThemeToggle`、`color-scheme` / Toaster 跟隨、過渡 + FOUC guard、元件 TDD 與 e2e。**新定案 §3.6 放置點排版**（解決原 v0.2 遺留的 header `justify-center` 與 `CmsNav` `ml-auto` 插入細節）。 |
+| 0.2 | 2026-07-18 | 狀態更新為「已實作」：`ThemeToggle.tsx`、`globals.css` 淺色覆寫、`color-scheme` 處理、Toaster 跟隨 `useTheme`、FOUC guard、CmsNav / 首頁 header 放置點全部落地，含完整測試。淺色色值仍待 WCAG AA 驗證（OQ-2 維持開放）。 |
 
 ---
 
-最後更新：2026-07-18（v0.1，dev-ready；淺色色值仍待 AA 驗證）
+最後更新：2026-07-18（v0.2，已實作；OQ-2 淺色色值 AA 驗證待完成）

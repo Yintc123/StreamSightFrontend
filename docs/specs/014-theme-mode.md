@@ -1,6 +1,6 @@
 # Spec 014 — 深/淺色主題模式（一鍵切換）｜總覽索引
 
-狀態：**規格定案，dev-ready（未實作）**（v0.3，2026-07-18）
+狀態：**已實作（2026-07-18）**（v0.4）
 
 讓使用者以**單一按鈕**在深色 / 淺色主題間切換，偏好以**獨立持久 cookie** 保存，
 SSR 首屏直接畫對顏色（無閃爍），且**不受登入 / 登出影響**。
@@ -66,7 +66,8 @@ SSR 首屏直接畫對顏色（無閃爍），且**不受登入 / 登出影響**
 | 0.1 | 2026-07-18 | 初版：雙態深/淺主題、獨立持久 theme cookie（登出保留）、cookie SSR 直出防閃爍、`[data-theme]` token 覆寫架構、一鍵切換時序與 TDD 計畫。決策 D1–D6 定案；OQ-1~3 待決不阻塞。 |
 | 0.2 | 2026-07-18 | 實作前審查修訂：新增實作註記/陷阱（§I-1~7）——client 端 `Secure` 用 `process.env.NODE_ENV`、`schema.ts` 不可 server-only、Toaster 改讀 `useTheme`、`color-scheme` 落點、transition 首屏 FOUC guard、`data-theme="dark"` 免覆寫、root layout 動態化為預期。 |
 | 0.3 | 2026-07-18 | **拆分**：本檔改為總覽索引；業務邏輯→[`014a`](./014a-theme-logic.md)、UI 元件→[`014b`](./014b-theme-ui.md)。014b §3.6 新定案 header / `CmsNav` 放置點排版（解決 v0.2 遺留缺口）。 |
+| 0.4 | 2026-07-18 | 狀態更新為「已實作」：ThemeProvider、ThemeToggle、`[data-theme]` CSS token、cookie SSR 防閃爍、CmsNav 整合全部落地，含完整測試。 |
 
 ---
 
-最後更新：2026-07-18（v0.3，拆分為 014a / 014b）
+最後更新：2026-07-18（v0.4，標記已實作）

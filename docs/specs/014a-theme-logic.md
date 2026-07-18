@@ -1,6 +1,6 @@
 # Spec 014a — 主題狀態、持久化與 SSR 直出（業務邏輯）
 
-狀態：**規格定案，dev-ready（未實作）**（v0.1，2026-07-18）
+狀態：**已實作（2026-07-18）**（v0.2）
 父規格：[`014-theme-mode.md`](./014-theme-mode.md)｜姊妹規格：[`014b-theme-ui.md`](./014b-theme-ui.md)
 
 本規格負責主題功能的**非視覺**部分：狀態模型、cookie 持久化、SSR/CSR 一致、
@@ -183,7 +183,8 @@
 | 版本 | 日期 | 變更 |
 |---|---|---|
 | 0.1 | 2026-07-18 | 自 `014-theme-mode.md` v0.2 拆出「業務邏輯」部分：狀態模型、cookie 持久化、SSR 直出、即時切換資料流、token 間接引用機制、server-only 邊界、邏輯類 TDD。色值 / 元件 / 排版移至 `014b`。 |
+| 0.2 | 2026-07-18 | 狀態更新為「已實作」：`schema.ts`、`readThemeCookie.ts`、`ThemeProvider.tsx`、root layout 接線、providers 接線全部落地，含完整 Vitest 測試。 |
 
 ---
 
-最後更新：2026-07-18（v0.1，dev-ready）
+最後更新：2026-07-18（v0.2，已實作）

@@ -42,7 +42,6 @@
 │      │ 帳號 [____]     │        │
 │      │ 密碼 [____]     │        │
 │      │ [   登入後台   ] │        │ ← bg-brand text-white
-│      │ [   建立帳號   ] │        │ ← outline brand
 │      └─────────────────┘        │
 │                                 │
 │         demo              │ ← link → /donation
@@ -59,7 +58,6 @@
 | 進入 `/` | RSC 渲染 header + `<LoginCard />` + skip link |
 | 帳號 / 密碼任一空 | 「登入後台」按鈕 `disabled` |
 | 兩欄都有值 + 按「登入後台」 | `POST /api/auth/login` → 200 → `router.push('/cms')`；非 200 → 顯示 inline `<p role="alert">登入失敗 (HTTP {code})</p>`、不跳轉 |
-| 按「建立帳號」 | `router.push('/register')`，**不**打 API（v0.4 — 從 `/admin` 改為 `/register`） |
 | 按「demo」 | `<Link href="/donation">`，普通 navigate |
 | 登入 in-flight | 按鈕文字「登入中…」、disabled，避免重複送出（`useTransition` 管 isPending） |
 
@@ -168,19 +166,18 @@ export function useSmartBack(fallback: string = '/'): () => void {
 | # | 案例 | 期望 |
 |---|---|---|
 | 1 | 渲染 username + password input | `getByLabelText('帳號')` / `('密碼')` 都存在 |
-| 2 | 渲染「登入後台」+「建立帳號」按鈕 | 兩顆都在 DOM |
+| 2 | 只有「登入後台」按鈕，無「建立帳號」（spec 012b §1 移除公開自助註冊） | `getByRole('button',{name:'登入後台'})` 存在；無「建立帳號」按鈕 |
 | 3 | username 空 → 登入 disabled | OK |
 | 4 | password 空 → 登入 disabled | OK |
 | 5 | 兩欄都有值 → 登入 enabled | OK |
 | 6 | 登入成功 → POST /api/auth/login + push('/cms') | mock fetch 200，assert call args + router push |
 | 7 | 登入失敗 → 顯示 `role="alert"`、不 push | mock fetch 500 |
-| 8 | 「建立帳號」→ push('/register')、不打 API（v0.4 — `/admin` → `/register`） | OK |
 
 ### 5.2 e2e（`tests/e2e/smoke.spec.ts`）
 
 | 測試 | 涵蓋 |
 |---|---|
-| `/ 顯示登入卡片 + skip link 可進 /donation` | header / 帳密欄 / 兩顆按鈕 / skip link → /donation |
+| `/ 顯示登入卡片 + skip link 可進 /donation` | header / 帳密欄 / 登入後台按鈕 / skip link → /donation |
 | `/donation 直接訪問按返回 → 跳 /（smart back fallback）` | §4.2 + §4.4 「直接訪問」列 |
 | `/ → demo → /donation 按返回 → 回 /（smart back via router.back）` | §4.2 + §4.4 「站內 nav」列 |
 
@@ -220,3 +217,4 @@ export function useSmartBack(fallback: string = '/'): () => void {
 | 0.5 | 2026-06-16 | **`/dashboard` 路徑 → `/cms`**：後台主要做 charity / project / sale-item 三類資料 CRUD（對應 BE spec 020 三套 admin route），語意上是 content management 而非 analytics dashboard；改名讓路徑與業務領域對齊，也避開 Grafana 等觀測 dashboard 的命名噪音。`src/app/dashboard/` 整目錄移到 `src/app/cms/`、component 改名 `DashboardPage` → `CmsPage`；LoginCard `router.push('/cms')` + 對應 test、spec 007 RegisterCard `router.push('/cms')` + 對應 test 同步；spec 005 §1 路徑、§3 行為表、§4 placeholder 章節（標題改「/register 與 /cms」+ 新增「為何 v0.5 改路徑」段落）、§5.1 client test row、§6 OQ 同步；spec 007 §1 / §2 / §4 / §5.2 / §6 / §7.1 / §7.3 同步；brief.md §3 同步 |
 | 0.6 | 2026-06-16 | **`/cms` Auth Gate 上線**（Next.js 16 Proxy + RSC 雙層）：(a) 新 `src/proxy.ts`（Next 16 把 Middleware 改名 Proxy）matcher `['/cms', '/cms/:path*']`、edge runtime 做 `streamsight_session` cookie presence optimistic check，無 cookie → 307 `/`；(b) `src/app/cms/page.tsx` 改 async RSC、`await getSessionService().get()` 做 full validation（iron-session decrypt + Redis lookup），`null` → `redirect('/')`、render 改顯示 `session.user.name`；(c) 對齊 [Next.js 16 auth 指南](../../node_modules/next/dist/docs/01-app/02-guides/authentication.md) 「Optimistic checks with Proxy + Data Access Layer」雙層 pattern；本 spec §4a / §5.3a 為 stub，完整脈絡 / threat model / 行為矩陣 / OQ 抽到新 **[spec 010 `/cms` Auth Gate](./010-cms-auth-gate.md) v0.1** |
 | 0.7 | 2026-06-17 | **登入路徑改名 `/api/dev/login` → `/api/auth/login`**：原 dev-only 命名隨 v0.3 接真實 BE `/auth/login` 已不再貼切；本版同步搬到 `src/app/api/auth/login/`、移除 `ENABLE_DEV_LOGIN` env gate 與 `DEV_ADMIN_USERNAME / PASSWORD` body fallback，body schema 變成 required `{ identifier, password }`。`LoginCard.tsx` fetch URL + comment + `LoginCard.test.tsx` 第 6 case 斷言同步；本 spec §3、§5.1 同步 |
+| 0.8 | 2026-07-18 | **規格測試案例與實作對齊**（spec 012b §1 移除公開自助註冊後的落差補正）：§2 Layout 移除「建立帳號」按鈕；§3 行為表移除「按建立帳號」列；§5.1 case 2 改為「無建立帳號按鈕」斷言、刪除 case 8；§5.2 e2e 修正「兩顆按鈕」描述。 |
