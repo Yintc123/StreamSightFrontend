@@ -32,6 +32,12 @@
   --color-surface-page: #0b0f17;       /* page bg（最深） */
   --color-surface-card: #151c2b;       /* card / modal sheet bg */
 
+  /* Sidebar nav 互動填色（spec 016 §4.2 — 對齊 Streamlit hover 特效）：
+   * hover / active 皆為中性 overlay 填色，文字色不變。dark base 用淺色低透明；
+   * light 於 [data-theme="light"] 覆寫為 Streamlit 精確值 rgba(141,173,206,·)。 */
+  --color-nav-hover:  rgba(230, 237, 246, 0.08);
+  --color-nav-active: rgba(230, 237, 246, 0.14);
+
   /* Borders — 淺色低透明 */
   --color-line: rgba(230, 237, 246, 0.12);   /* 卡片 border / divider */
   --color-line-soft: rgba(230, 237, 246, 0.07); /* 細分隔線 */
@@ -99,18 +105,25 @@ html, body {
 html[data-theme="light"] {
   color-scheme: light;
 
-  --color-brand:         #0891b2;
-  --color-brand-400:     #0ea5e9;
-  --color-brand-overlay: rgba(8, 145, 178, 0.12);
-  --color-ink-on-brand:  #06121a;
+  /* spec 016 §5 — 淺色調色盤對齊 Streamlit（.streamlit/config.toml）：
+   * primaryColor #2563eb / backgroundColor #ffffff / secondaryBackgroundColor
+   * #f1f5f9 / textColor #0f172a，讓 CMS 淺色與 Streamlit 前端視覺一致。 */
+  --color-brand:         #2563eb;      /* Streamlit primaryColor（藍） */
+  --color-brand-400:     #3b82f6;      /* hover / 次強調（blue-500） */
+  --color-brand-overlay: rgba(37, 99, 235, 0.12);
+  --color-ink-on-brand:  #ffffff;      /* 白字疊在藍色 CTA 上 */
 
-  --color-ink-AAA:  rgba(15, 23, 42, 0.92);
+  --color-ink-AAA:  #0f172a;           /* Streamlit textColor（primary text） */
   --color-ink-AA:   rgba(15, 23, 42, 0.66);
   --color-ink-A:    rgba(15, 23, 42, 0.45);
-  --color-ink-link: #0e7490;
+  --color-ink-link: #2563eb;           /* 連結沿用 primary */
 
-  --color-surface-page: #f6f8fb;
-  --color-surface-card: #ffffff;
+  --color-surface-page: #ffffff;       /* Streamlit backgroundColor（主內容） */
+  --color-surface-card: #f1f5f9;       /* Streamlit secondaryBackgroundColor（側欄/卡片） */
+
+  /* Streamlit sidebar nav hover / active 精確填色（rgba(141,173,206,·)） */
+  --color-nav-hover:  rgba(141, 173, 206, 0.15);
+  --color-nav-active: rgba(141, 173, 206, 0.25);
 
   --color-line:      rgba(15, 23, 42, 0.12);
   --color-line-soft: rgba(15, 23, 42, 0.07);

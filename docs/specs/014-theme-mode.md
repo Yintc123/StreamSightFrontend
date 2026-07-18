@@ -1,6 +1,6 @@
 # Spec 014 — 深/淺色主題模式（一鍵切換）｜總覽索引
 
-狀態：**已實作（2026-07-18）**（v0.4）
+狀態：**已實作（2026-07-18）**（v0.6）
 
 讓使用者以**單一按鈕**在深色 / 淺色主題間切換，偏好以**獨立持久 cookie** 保存，
 SSR 首屏直接畫對顏色（無閃爍），且**不受登入 / 登出影響**。
@@ -50,12 +50,14 @@ SSR 首屏直接畫對顏色（無閃爍），且**不受登入 / 登出影響**
 | D4 token 架構 | dark base + `[data-theme="light"]` 覆寫；禁 `@theme inline`、不引入 `dark:` | 機制 014a §3.1／色值 014b §5 |
 | D5 切換機制 | client 直改 `dataset.theme` + 寫 cookie，無 round-trip、無 Route Handler | 014a |
 | D6 放置點 | 首頁 `header` + `CmsNav`；排版 014b §3.6 | 014b |
+| D7 淺色調色盤 | **對齊 Streamlit 前端**：背景/文字/主色（`#ffffff`/`#f1f5f9`/`#0f172a`/`#2563eb`）+ sidebar nav hover/active 互動填色（`rgba(141,173,206,·)`，實測）；深色 base 不變 | 背景 [016 §4.1](./016-cms-sidebar-streamlit-nav.md)／nav [016 §4.2](./016-cms-sidebar-streamlit-nav.md)／色值 014b §5 |
 
 ### Open Questions（不阻塞開工）
 
 - **OQ-1（三態）** → 014a：未來 cookie 值域擴 `light|dark|system`。
-- **OQ-2（淺色色值）** → 014b：§5 初稿，重構階段以 WCAG AA 驗證定稿。
+- **OQ-2（淺色色值）** → 014b：~~§5 初稿，重構階段以 WCAG AA 驗證定稿~~ → **已收斂**：v0.5 改為對齊 Streamlit 精確色值（見 D7）。
 - **OQ-3（root layout 動態化）** → 014a：本期接受動態；未來可改 middleware 邊緣設 `data-theme`。
+- **OQ-4（深色一致性）** → 016：Streamlit 無深色主題，前端深色時與 Streamlit 不對齊為預期（[016 OQ-5](./016-cms-sidebar-streamlit-nav.md)）。
 
 ---
 
@@ -67,7 +69,9 @@ SSR 首屏直接畫對顏色（無閃爍），且**不受登入 / 登出影響**
 | 0.2 | 2026-07-18 | 實作前審查修訂：新增實作註記/陷阱（§I-1~7）——client 端 `Secure` 用 `process.env.NODE_ENV`、`schema.ts` 不可 server-only、Toaster 改讀 `useTheme`、`color-scheme` 落點、transition 首屏 FOUC guard、`data-theme="dark"` 免覆寫、root layout 動態化為預期。 |
 | 0.3 | 2026-07-18 | **拆分**：本檔改為總覽索引；業務邏輯→[`014a`](./014a-theme-logic.md)、UI 元件→[`014b`](./014b-theme-ui.md)。014b §3.6 新定案 header / `CmsNav` 放置點排版（解決 v0.2 遺留缺口）。 |
 | 0.4 | 2026-07-18 | 狀態更新為「已實作」：ThemeProvider、ThemeToggle、`[data-theme]` CSS token、cookie SSR 防閃爍、CmsNav 整合全部落地，含完整測試。 |
+| 0.5 | 2026-07-18 | +D7 **淺色調色盤對齊 Streamlit**（隨 [spec 016](./016-cms-sidebar-streamlit-nav.md)）：accent 改藍 `#2563eb`、`surface-page`→`#ffffff`、`surface-card`→`#f1f5f9`（修正側欄/內容明暗對調）、`ink-AAA`→`#0f172a`；深色 base 不變。OQ-2 收斂、+OQ-4 深色一致性。細節見 [014b §5 v0.3](./014b-theme-ui.md)。 |
+| 0.6 | 2026-07-18 | D7 擴充涵蓋 sidebar nav 互動 token `--color-nav-hover` / `--color-nav-active`（Streamlit 實測 `rgba(141,173,206,·)`，[016 §4.2](./016-cms-sidebar-streamlit-nav.md)）；D7 出處補 016 §4.2。 |
 
 ---
 
-最後更新：2026-07-18（v0.4，標記已實作）
+最後更新：2026-07-18（v0.6，標記已實作；淺色調色盤 + nav 互動 token 對齊 Streamlit）

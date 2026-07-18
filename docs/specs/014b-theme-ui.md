@@ -1,6 +1,6 @@
 # Spec 014b — 主題 UI 元件與淺色調色盤（元件 / 視覺）
 
-狀態：**已實作（2026-07-18）**（v0.2）
+狀態：**已實作（2026-07-18）**（v0.4）
 父規格：[`014-theme-mode.md`](./014-theme-mode.md)｜姊妹規格：[`014a-theme-logic.md`](./014a-theme-logic.md)
 
 本規格負責主題功能的**視覺與元件**部分：`ThemeToggle` 元件、淺色調色盤色值、
@@ -127,28 +127,36 @@
 
 ---
 
-## 5. 淺色 token 對照（初稿 — 最終值待 AA 對比度驗證，OQ-2）
+## 5. 淺色 token 對照（v0.3 起對齊 Streamlit，見 [spec 016 §4.1（背景）](./016-cms-sidebar-streamlit-nav.md) / [§4.2（nav 互動）](./016-cms-sidebar-streamlit-nav.md)）
 
-沿用「電子青」品牌識別，light 版把 accent / 狀態色**加深**以在淺底維持對比。
+> **v0.3 修訂（2026-07-18）**：淺色調色盤改為**對齊 Streamlit 前端**（`.streamlit/config.toml`），
+> 讓 CMS 淺色模式與 Streamlit 視覺一致（背景 / 文字 / 主色）。**深色 base 不變**。
+> 原 v0.2「沿用電子青、加深 accent」的初稿已被 Streamlit 藍取代（accent `#0891b2`→`#2563eb`）。
 
-| Token | dark（現值，維持） | light（初稿） | 說明 |
+| Token | dark（現值，維持） | light（對齊 Streamlit） | 對應 Streamlit 設定 |
 |---|---|---|---|
-| `--color-brand` | `#22d3ee` | `#0891b2` | CTA fill；淺底需加深的 cyan-600 |
-| `--color-brand-400` | `#38bdf8` | `#0ea5e9` | hover / 次強調 |
-| `--color-brand-overlay` | `rgba(34,211,238,.14)` | `rgba(8,145,178,.12)` | 圖上疊字 |
-| `--color-ink-on-brand` | `#06121a` | `#06121a` | 疊在 brand 上的深字（兩套通用） |
-| `--color-ink-AAA` | `rgba(230,237,246,.95)` | `rgba(15,23,42,.92)` | primary text（深字疊淺底） |
-| `--color-ink-AA` | `rgba(230,237,246,.72)` | `rgba(15,23,42,.66)` | secondary |
-| `--color-ink-A` | `rgba(230,237,246,.45)` | `rgba(15,23,42,.45)` | muted / placeholder |
-| `--color-ink-link` | `#38bdf8` | `#0e7490` | 連結 |
-| `--color-surface-page` | `#0b0f17` | `#f6f8fb` | page bg |
-| `--color-surface-card` | `#151c2b` | `#ffffff` | card / sheet bg |
+| `--color-brand` | `#22d3ee` | `#2563eb` | `primaryColor`（藍） |
+| `--color-brand-400` | `#38bdf8` | `#3b82f6` | hover / 次強調（blue-500） |
+| `--color-brand-overlay` | `rgba(34,211,238,.14)` | `rgba(37,99,235,.12)` | primary 半透明 |
+| `--color-ink-on-brand` | `#06121a` | `#ffffff` | 白字疊藍色 CTA |
+| `--color-ink-AAA` | `rgba(230,237,246,.95)` | `#0f172a` | `textColor`（primary text） |
+| `--color-ink-AA` | `rgba(230,237,246,.72)` | `rgba(15,23,42,.66)` | textColor 派生（secondary） |
+| `--color-ink-A` | `rgba(230,237,246,.45)` | `rgba(15,23,42,.45)` | textColor 派生（muted） |
+| `--color-ink-link` | `#38bdf8` | `#2563eb` | 連結沿用 primary |
+| `--color-surface-page` | `#0b0f17` | `#ffffff` | `backgroundColor`（主內容） |
+| `--color-surface-card` | `#151c2b` | `#f1f5f9` | `secondaryBackgroundColor`（側欄/卡片） |
+| `--color-nav-hover` | `rgba(230,237,246,.08)` | `rgba(141,173,206,.15)` | sidebar nav hover 填色（Streamlit 實測，[016 §4.2](./016-cms-sidebar-streamlit-nav.md)） |
+| `--color-nav-active` | `rgba(230,237,246,.14)` | `rgba(141,173,206,.25)` | sidebar nav active 填色（Streamlit 實測） |
 | `--color-line` | `rgba(230,237,246,.12)` | `rgba(15,23,42,.12)` | border / divider |
 | `--color-line-soft` | `rgba(230,237,246,.07)` | `rgba(15,23,42,.07)` | 細分隔線 |
 | `--color-ok` | `#34d399` | `#059669` | healthy |
 | `--color-warn` | `#fbbf24` | `#b45309` | warning |
 | `--color-danger` | `#f87171` | `#dc2626` | error |
 | `color-scheme` | `dark` | `light` | 原生控件 |
+
+> **surface 對調（v0.3）**：`surface-page`（內容）由 `#f6f8fb`→`#ffffff`、`surface-card`（側欄/卡片）
+> 由 `#ffffff`→`#f1f5f9`。此舉同時修正了側邊欄與內容區明暗**與 Streamlit 相反**的問題
+> （Streamlit：側欄 `#f1f5f9`、內容 `#ffffff`）。
 
 ---
 
@@ -182,7 +190,7 @@
 
 ### Open Questions（不阻塞開工）
 
-- **OQ-2（淺色色值）**：§5 為初稿；實作重構階段以 WCAG AA（正文 4.5:1、大字 3:1）驗證後定稿。
+- **OQ-2（淺色色值）**：~~§5 為初稿~~ → v0.3 已改為對齊 Streamlit 精確色值定稿；AA 對比度以 Streamlit 官方淺色主題為準（白底 `#0f172a` 正文、藍 `#2563eb` 白字 CTA 皆過 AA）。
 
 ---
 
@@ -192,7 +200,9 @@
 |---|---|---|
 | 0.1 | 2026-07-18 | 自 `014-theme-mode.md` v0.2 拆出「UI 元件 / 視覺」部分：淺色調色盤、`globals.css` 覆寫、`ThemeToggle`、`color-scheme` / Toaster 跟隨、過渡 + FOUC guard、元件 TDD 與 e2e。**新定案 §3.6 放置點排版**（解決原 v0.2 遺留的 header `justify-center` 與 `CmsNav` `ml-auto` 插入細節）。 |
 | 0.2 | 2026-07-18 | 狀態更新為「已實作」：`ThemeToggle.tsx`、`globals.css` 淺色覆寫、`color-scheme` 處理、Toaster 跟隨 `useTheme`、FOUC guard、CmsNav / 首頁 header 放置點全部落地，含完整測試。淺色色值仍待 WCAG AA 驗證（OQ-2 維持開放）。 |
+| 0.3 | 2026-07-18 | **淺色調色盤對齊 Streamlit**（[spec 016](./016-cms-sidebar-streamlit-nav.md)）：accent `#0891b2`→`#2563eb`（藍）、`surface-page` `#f6f8fb`→`#ffffff`、`surface-card` `#ffffff`→`#f1f5f9`（同時修正側欄/內容明暗與 Streamlit 相反）、`ink-AAA`→`#0f172a`、`ink-on-brand`→`#ffffff`、`ink-link`→`#2563eb`。深色 base 不變。OQ-2 收斂。 |
+| 0.4 | 2026-07-18 | §5 補上 sidebar nav 互動 token `--color-nav-hover` / `--color-nav-active`（隨 [016 §4.2](./016-cms-sidebar-streamlit-nav.md) nav hover/尺寸對齊 Streamlit 實測值）；修正 §5 標題誤指的 016 §5 交叉引用（正確為 016 §4.1 背景 / §4.2 nav 互動）。 |
 
 ---
 
-最後更新：2026-07-18（v0.2，已實作；OQ-2 淺色色值 AA 驗證待完成）
+最後更新：2026-07-18（v0.4，已實作；淺色調色盤 + nav 互動 token 對齊 Streamlit，OQ-2 收斂）
