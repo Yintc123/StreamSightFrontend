@@ -49,9 +49,9 @@ resource "aws_ecs_task_definition" "app" {
       { name = "USE_MOCK", value = var.use_mock },
       { name = "BACKEND_API_URL", value = var.backend_api_url },
 
-      { name = "SESSION_COOKIE_NAME",   value = var.session_cookie_name },
+      { name = "SESSION_COOKIE_NAME", value = var.session_cookie_name },
       { name = "SESSION_COOKIE_DOMAIN", value = var.session_cookie_domain },
-      { name = "SESSION_TTL_SECONDS",   value = tostring(var.session_ttl_seconds) },
+      { name = "SESSION_TTL_SECONDS", value = tostring(var.session_ttl_seconds) },
 
       { name = "REDIS_HOST", value = data.aws_instance.datastore.private_ip },
       { name = "REDIS_PORT", value = "6379" },
