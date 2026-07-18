@@ -48,7 +48,7 @@ export type AdminRole = z.infer<typeof AdminRole>
 export const BackendTokenResponse = z.object({
   access_token: z.string().min(1),
   token_type: z.string(), // "bearer"; case-insensitive, not asserted
-  refresh_token: z.string().min(1),
+  refresh_token: z.string().min(1).nullable(), // null on admin auth line
   expires_in: z.number().int().positive(), // access seconds
 })
 export type BackendTokenResponse = z.infer<typeof BackendTokenResponse>
@@ -76,7 +76,7 @@ export const REFRESH_TTL_FALLBACK_MS = 14 * 24 * 60 * 60 * 1000
 export type AdaptedTokens = {
   accessToken: string
   accessTokenExpiresAt: number
-  refreshToken: string
+  refreshToken: string | null
   refreshTokenExpiresAt: number
 }
 
@@ -89,6 +89,6 @@ export function adaptTokenResponse(
     accessToken: raw.access_token,
     accessTokenExpiresAt: now + raw.expires_in * 1000,
     refreshToken: raw.refresh_token,
-    refreshTokenExpiresAt: now + REFRESH_TTL_FALLBACK_MS,
+    refreshTokenExpiresAt: raw.refresh_token ? now + REFRESH_TTL_FALLBACK_MS : 0,
   }
 }

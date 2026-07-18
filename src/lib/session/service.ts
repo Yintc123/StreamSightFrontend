@@ -132,6 +132,10 @@ export const getSessionService = cache((): SessionService => {
       const current = await store.get(sid)
       if (!current) throw new UnauthenticatedError('store has no entry')
 
+      // Admin auth line does not issue refresh tokens; return the live session
+      // as-is and let the access token expire naturally.
+      if (!current.refreshToken) return current
+
       const cached = await store.getCachedTokens(current.userId)
       if (cached) {
         const updated: StoredSession = { ...current, ...cached }

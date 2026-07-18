@@ -55,6 +55,10 @@ describe('BackendTokenResponse (snake_case)', () => {
   it('rejects non-positive expires_in', () => {
     expect(BackendTokenResponse.safeParse({ ...valid, expires_in: 0 }).success).toBe(false)
   })
+
+  it('accepts refresh_token: null (admin auth line does not issue refresh tokens)', () => {
+    expect(BackendTokenResponse.safeParse({ ...valid, refresh_token: null }).success).toBe(true)
+  })
 })
 
 describe('adaptTokenResponse', () => {
@@ -68,6 +72,15 @@ describe('adaptTokenResponse', () => {
     expect(out.accessToken).toBe('A')
     expect(out.refreshToken).toBe('R')
     expect(out.accessTokenExpiresAt).toBe(now + 1800 * 1000)
+  })
+
+  it('maps null refresh_token to null in adapted output', () => {
+    const out = adaptTokenResponse(
+      { access_token: 'A', token_type: 'bearer', refresh_token: null, expires_in: 1800 },
+      now,
+    )
+    expect(out.refreshToken).toBeNull()
+    expect(out.refreshTokenExpiresAt).toBe(0)
   })
 
   it('derives refresh expiry from the 14d fallback (BE returns no refresh expiry)', () => {

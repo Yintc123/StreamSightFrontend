@@ -23,7 +23,7 @@ export type StoredSession = {
   userId: string
   accessToken: string
   accessTokenExpiresAt: number
-  refreshToken: string
+  refreshToken: string | null
   refreshTokenExpiresAt: number
   user: { id: string; name: string }
   role: RoleValue
@@ -35,6 +35,6 @@ export type StoredSession = {
 export type TokenPair = {
   accessToken: string
   accessTokenExpiresAt: number
-  refreshToken: string
+  refreshToken: string | null
   refreshTokenExpiresAt: number
 }
