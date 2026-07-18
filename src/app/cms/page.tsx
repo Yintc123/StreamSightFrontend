@@ -21,7 +21,7 @@ export default async function CmsHomePage() {
         歡迎，{session.user.name}
       </h1>
       <p className="text-sm text-ink-AA">
-        使用左側導覽列前往各管理功能。
+        左側前往各管理功能；上方可切換至「資料平台」。
       </p>
     </main>
   )
