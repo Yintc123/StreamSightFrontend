@@ -196,6 +196,17 @@ describe('error mapping', () => {
     fetchSpy.mockRestore()
   })
 
+  it('204 No Content → data undefined, no JSON parse error', async () => {
+    mockBackend('post', 'http://backend.test/admin/me/password', () =>
+      new HttpResponse(null, { status: 204 }),
+    )
+    const { data } = await backendFetch('/admin/me/password', {
+      method: 'POST',
+      body: { current_password: 'a', new_password: 'bbbbbbbb' },
+    })
+    expect(data).toBeUndefined()
+  })
+
   it('non-JSON 2xx body → BACKEND_UPSTREAM_ERROR', async () => {
     mockBackend('get', 'http://backend.test/html', () =>
       new HttpResponse('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } }),
@@ -382,14 +393,14 @@ describe('mock dispatch (USE_MOCK=1)', () => {
     })
   })
 
-  it('passes query/body to handler', async () => {
+  it('passes query/body/method to handler', async () => {
     let captured: unknown
     registerMock('/echo', (opts) => {
       captured = opts
       return { received: opts }
     })
     await backendFetch('/echo', { method: 'POST', query: { q: 'x' }, body: { k: 1 } })
-    expect(captured).toEqual({ query: { q: 'x' }, body: { k: 1 } })
+    expect(captured).toEqual({ query: { q: 'x' }, body: { k: 1 }, method: 'POST' })
   })
 })
 

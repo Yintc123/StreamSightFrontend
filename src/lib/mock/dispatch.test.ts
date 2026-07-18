@@ -35,8 +35,8 @@ describe('mock/dispatch', () => {
     expect(captured).toEqual({ query: { q: 'x' }, body: { k: 1 } })
   })
 
-  describe('single-:param pattern', () => {
-    it('resolves a path matching the prefix and forwards captured value as `query.__<name>`', () => {
+  describe(':param patterns', () => {
+    it('resolves a trailing :param and forwards captured value as `query.__<name>`', () => {
       let captured: { query?: Record<string, unknown> } | undefined
       registerMock('/things/:id', (opts) => {
         captured = opts
@@ -48,7 +48,7 @@ describe('mock/dispatch', () => {
       expect(captured?.query).toEqual({ existing: 'kept', __id: 'abc123' })
     })
 
-    it('returns undefined when the captured segment contains a slash (no recursive prefix match)', () => {
+    it('returns undefined when the segment count differs (captured slash)', () => {
       registerMock('/things/:id', () => ({}))
       expect(resolveMock('/things/abc/def')).toBeUndefined()
     })
@@ -63,15 +63,36 @@ describe('mock/dispatch', () => {
       const pattern = () => 'P'
       registerMock('/things/abc', literal)
       registerMock('/things/:id', pattern)
-      // resolveMock returns the literal exactly, but the pattern resolver
-      // is a wrapper, so identity equality is only meaningful for literal.
       expect(resolveMock('/things/abc')).toBe(literal)
     })
 
-    it('only allows a trailing single :param segment', () => {
-      expect(() =>
-        registerMock('/things/:id/foo', () => ({})),
-      ).toThrow(/trailing single :param/)
+    // Spec 013a §3.3 — mid-segment :param (lifecycle endpoints like
+    // /admin/admins/:id/role|archive|restore).
+    it('resolves a mid-segment :param followed by a literal action', () => {
+      let captured: { query?: Record<string, unknown> } | undefined
+      registerMock('/admin/admins/:id/role', (opts) => {
+        captured = opts
+        return opts
+      })
+      const handler = resolveMock('/admin/admins/42/role')
+      expect(handler).toBeDefined()
+      handler?.({ query: {} })
+      expect(captured?.query).toEqual({ __id: '42' })
+    })
+
+    it('does not match a mid-param pattern when the trailing literal differs', () => {
+      registerMock('/admin/admins/:id/role', () => ({}))
+      expect(resolveMock('/admin/admins/42/archive')).toBeUndefined()
+    })
+
+    it('disambiguates trailing vs mid-param patterns by segment count', () => {
+      const detail = () => 'D'
+      const role = () => 'R'
+      registerMock('/admin/admins/:id', detail)
+      registerMock('/admin/admins/:id/role', role)
+      // 4 segments → detail; 5 segments → role
+      expect(resolveMock('/admin/admins/7')?.({ query: {} })).toBe('D')
+      expect(resolveMock('/admin/admins/7/role')?.({ query: {} })).toBe('R')
     })
   })
 })

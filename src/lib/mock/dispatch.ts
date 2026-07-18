@@ -3,11 +3,12 @@ import 'server-only'
 export type MockHandler = (opts: {
   query?: Record<string, unknown>
   body?: unknown
+  /** HTTP method, so one path handler can branch GET vs POST etc. */
+  method?: string
 }) => unknown
 
 interface PatternEntry {
-  prefix: string
-  paramKeys: readonly string[]
+  segments: readonly string[]
   handler: MockHandler
 }
 
@@ -15,23 +16,17 @@ const literals = new Map<string, MockHandler>()
 const patterns: PatternEntry[] = []
 
 /**
- * Register a mock handler for an exact path (`/user/v1/donation/charities`)
- * or a single-param pattern (`/user/v1/donation/charities/:id`). The captured
- * param value is forwarded to the handler as `query.__<paramName>`
+ * Register a mock handler for an exact path (`/admin/admins`) or a pattern
+ * with one or more `:param` segments in ANY position (spec 013a §3.3):
+ *   - trailing:    `/admin/admins/:id`
+ *   - mid-segment: `/admin/admins/:id/role`
+ *
+ * A captured param value is forwarded to the handler as `query.__<paramName>`
  * (double-underscored to avoid collision with real query params).
  */
 export function registerMock(path: string, handler: MockHandler): void {
   if (path.includes(':')) {
-    const segments = path.split('/')
-    const paramIdx = segments.findIndex((s) => s.startsWith(':'))
-    if (paramIdx === -1 || paramIdx !== segments.length - 1) {
-      throw new Error(
-        `registerMock: only trailing single :param patterns are supported (got ${path})`,
-      )
-    }
-    const paramName = segments[paramIdx]!.slice(1)
-    const prefix = segments.slice(0, paramIdx).join('/')
-    patterns.push({ prefix, paramKeys: [paramName], handler })
+    patterns.push({ segments: path.split('/'), handler })
     return
   }
   literals.set(path, handler)
@@ -40,16 +35,29 @@ export function registerMock(path: string, handler: MockHandler): void {
 export function resolveMock(path: string): MockHandler | undefined {
   const literal = literals.get(path)
   if (literal) return literal
+
+  const pathSegments = path.split('/')
   for (const p of patterns) {
-    if (!path.startsWith(`${p.prefix}/`)) continue
-    const rest = path.slice(p.prefix.length + 1)
-    if (rest.length === 0 || rest.includes('/')) continue
-    const paramValue = rest
+    if (p.segments.length !== pathSegments.length) continue
+    const captured: Record<string, string> = {}
+    let matched = true
+    for (let i = 0; i < p.segments.length; i++) {
+      const pat = p.segments[i]!
+      const seg = pathSegments[i]!
+      if (pat.startsWith(':')) {
+        if (seg.length === 0) {
+          matched = false
+          break
+        }
+        captured[`__${pat.slice(1)}`] = seg
+      } else if (pat !== seg) {
+        matched = false
+        break
+      }
+    }
+    if (!matched) continue
     return (opts) =>
-      p.handler({
-        ...opts,
-        query: { ...opts.query, [`__${p.paramKeys[0]!}`]: paramValue },
-      })
+      p.handler({ ...opts, query: { ...opts.query, ...captured } })
   }
   return undefined
 }

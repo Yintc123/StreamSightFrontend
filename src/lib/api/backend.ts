@@ -51,7 +51,11 @@ export async function backendFetch<T = unknown>(
       await ensureMocksRegistered()
       const handler = resolveMock(path)
       if (!handler) throw new BackendUpstreamError(`No mock registered for ${path}`)
-      const data = handler({ query: options.query, body: options.body }) as T
+      const data = handler({
+        query: options.query,
+        body: options.body,
+        method,
+      }) as T
       log.info(
         { requestId, durationMs: Date.now() - start },
         'bff.upstream.mock.ok',
@@ -145,6 +149,15 @@ export async function backendFetch<T = unknown>(
         throw new BackendClientError(response.status, beCode, message)
       }
       throw new BackendUpstreamError(`Unexpected backend status ${response.status}`)
+    }
+
+    // 204 No Content (e.g. POST /admin/me/password, logout) has no body.
+    if (response.status === 204) {
+      log.info(
+        { requestId, durationMs: Date.now() - start, status: 204 },
+        'bff.upstream.ok',
+      )
+      return { data: undefined as T, requestId }
     }
 
     let data: T
