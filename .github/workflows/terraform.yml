@@ -30,8 +30,12 @@ env:
   AWS_REGION: ap-northeast-2
   # Non-secret app config passed to Terraform. session_secret + redis_password
   # come from SSM (created by the overview stack), not from here.
+  #
+  # BOOTSTRAP: run the frontend without a backend for now. When
+  # StreamSightBackend is live, flip use_mock to '0' and set the backend URL
+  # (either hardcode it here or via the BACKEND_API_URL repo variable).
+  TF_VAR_use_mock: '1'
   TF_VAR_backend_api_url: ${{ vars.BACKEND_API_URL }}
-  TF_VAR_use_mock: ${{ vars.USE_MOCK || '0' }}
 
 jobs:
   terraform:
