@@ -26,7 +26,7 @@ const META: Record<
 > = {
   archive: { label: '封存', danger: false, confirm: '封存後此帳號將無法登入，可日後解除封存。', run: archiveAdmin },
   unarchive: { label: '解除封存', danger: false, confirm: '解除封存後此帳號可再次登入。', run: unarchiveAdmin },
-  delete: { label: '刪除', danger: true, confirm: '軟刪除後此帳號將被停用，可於「已刪除」中復原。', run: deleteAdmin },
+  delete: { label: '刪除', danger: true, confirm: '軟刪除後此帳號將被停用，日後仍可復原。', run: deleteAdmin },
   restore: { label: '復原', danger: false, confirm: '復原後此帳號回到啟用狀態。', run: restoreAdmin },
 }
 

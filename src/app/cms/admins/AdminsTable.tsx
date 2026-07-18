@@ -23,11 +23,13 @@ import { AdminLifecycleMenu } from './AdminLifecycleMenu'
 
 type StatusTab = AdminListQuery['status']
 
+// 已刪除（軟刪除）帳號不在一般列表出現 —— 復原入口另置他處（產品決策，偏離
+// spec 013b §2.1 原本的四 tab）。故此處只保留 全部 / 啟用 / 已封存；`deleted`
+// 仍是後端 status 列舉值與 restore 鏈的一環，只是不由這裡的 tab 觸發。
 const STATUS_TABS: { key: StatusTab; label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'active', label: '啟用' },
   { key: 'archived', label: '已封存' },
-  { key: 'deleted', label: '已刪除' },
 ]
 
 export function AdminsTable() {
@@ -48,8 +50,11 @@ export function AdminsTable() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ['cms-admins'] })
 
+  // Defensively drop soft-deleted rows: the backend `all` filter includes them
+  // (spec 013a §1.1), but the list must never surface deleted admins now that
+  // the 已刪除 tab is gone.
   const items = useMemo(
-    () => adminsQuery.data?.items ?? [],
+    () => (adminsQuery.data?.items ?? []).filter((a) => a.deletedAt == null),
     [adminsQuery.data],
   )
   const filtered = useMemo(() => {

@@ -124,4 +124,35 @@ describe('AdminsTable — status tabs', () => {
     fireEvent.click(screen.getByRole('tab', { name: '已封存' }))
     await waitFor(() => expect(fetchAdminsMock).toHaveBeenCalledWith('archived'))
   })
+
+  it('does not render a 已刪除 tab (soft-deleted admins live outside the list)', async () => {
+    render(<AdminsTable />, { wrapper })
+    await screen.findByTestId('admin-row-2')
+    expect(screen.queryByRole('tab', { name: '已刪除' })).not.toBeInTheDocument()
+    // the kept tabs still render
+    expect(screen.getByRole('tab', { name: '全部' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '啟用' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '已封存' })).toBeInTheDocument()
+  })
+
+  it('hides soft-deleted admins even when the backend returns them (e.g. under 全部)', async () => {
+    fetchAdminsMock.mockReset().mockResolvedValue({
+      items: [
+        admin({ id: 2, username: 'editor1', name: 'Editor One' }),
+        admin({
+          id: 5,
+          username: 'deleted1',
+          name: 'Deleted One',
+          isActive: false,
+          deletedAt: '2026-07-12T00:00:00Z',
+        }),
+      ],
+      total: 2,
+      limit: 200,
+      offset: 0,
+    })
+    render(<AdminsTable />, { wrapper })
+    await screen.findByTestId('admin-row-2')
+    expect(screen.queryByTestId('admin-row-5')).not.toBeInTheDocument()
+  })
 })

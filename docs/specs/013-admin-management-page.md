@@ -21,7 +21,9 @@ CMS 實際管理的是**其他 admin 帳號**（`username` + `name` + `admin_rol
 端點（見 [013a §1](./013a-admin-management-logic.md)）。
 
 **範圍（本期）**：
-- Admin 列表（狀態篩選 active/archived/deleted、分頁、搜尋）
+- Admin 列表（狀態篩選 全部/啟用(active)/已封存(archived)、搜尋）
+  > v0.5（2026-07-18）：列表**不含已刪除**——移除「已刪除」tab 且前端濾除軟刪除列；軟刪除/復原能力保留，
+  > 復原入口改置他處（待定）。後端 `status` 仍支援 `deleted|all`（[013a §1.1](./013a-admin-management-logic.md)）。詳見 [013b §2.1/§2.4](./013b-admin-management-ui.md)。
 - 新增 admin（username + name + password + admin_role）／明細檢視／更新顯示名／升降權
 - 生命週期：封存 / 解除封存 / 軟刪除 / 復原
 - 自助改密碼（`/cms/settings`，改自己密碼）
@@ -93,7 +95,8 @@ CMS 實際管理的是**其他 admin 帳號**（`username` + `name` + `admin_rol
 | 0.2 | 2026-07-18 | §11 五項決策全定案 + dev-ready 修訂。 |
 | 0.3 | 2026-07-18 | dev-ready 收尾：時間戳定 ISO 字串、`/api/cms/me*` 用 `createRoute`、標註 CMS layout/nav 為待建交付項。 |
 | 0.4 | 2026-07-18 | **依「業務邏輯 / UI 元件」拆分**為 [013a](./013a-admin-management-logic.md)（邏輯）+ [013b](./013b-admin-management-ui.md)（UI）；本檔轉索引。內容不變，僅重組。 |
+| 0.5 | 2026-07-18 | **設計修訂**：Admin 列表移除「已刪除」狀態 tab、前端濾除軟刪除列（§1 範圍）；軟刪除/復原能力保留，復原入口改置他處（待定）。同步 [013b v0.5](./013b-admin-management-ui.md)。 |
 
 ---
 
-最後更新：2026-07-18（v0.4，拆分為 013a 邏輯 + 013b UI，本檔轉索引）
+最後更新：2026-07-18（v0.5，列表移除「已刪除」tab；軟刪除/復原保留但入口改置他處。同步 013b v0.5）

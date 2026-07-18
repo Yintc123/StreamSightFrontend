@@ -43,7 +43,33 @@ const SEED = [
   summary({ id: 1, username: 'root', name: 'Root Admin', admin_role: 'super_admin', is_protected: true }),
   summary({ id: 2, username: 'editor1', name: 'Editor One', admin_role: 'editor' }),
   summary({ id: 3, username: 'viewer1', name: 'Viewer One', admin_role: 'viewer' }),
+  // Archived + deleted rows so the status filter returns distinct sets
+  // (已封存 tab shows the archived row; deleted rows only surface via an
+  // explicit status=deleted request — the list no longer has a 已刪除 tab).
+  summary({
+    id: 4,
+    username: 'archived1',
+    name: 'Archived One',
+    admin_role: 'viewer',
+    is_active: false,
+    archived_at: '2026-07-11T00:00:00Z',
+  }),
+  summary({
+    id: 5,
+    username: 'deleted1',
+    name: 'Deleted One',
+    admin_role: 'viewer',
+    is_active: false,
+    deleted_at: '2026-07-12T00:00:00Z',
+  }),
 ]
+
+/** Lifecycle bucket of a seed row — mirrors the backend `status` filter. */
+function statusOf(row: (typeof SEED)[number]): 'active' | 'archived' | 'deleted' {
+  if (row.deleted_at) return 'deleted'
+  if (row.archived_at) return 'archived'
+  return 'active'
+}
 
 function captured(opts: { query?: Record<string, unknown> }, key: string): string | undefined {
   const v = opts.query?.[`__${key}`]
@@ -65,7 +91,12 @@ export const adminCollectionHandler: MockHandler = (opts) => {
       admin_role: body.admin_role ?? 'viewer',
     }
   }
-  return { items: SEED, total: SEED.length, limit: 50, offset: 0 }
+  // Spec 013b §2.1 — honour the `status` tab filter (all/active/archived/
+  // deleted). The real backend filters server-side; the mock must too, or the
+  // /cms/admins tabs all show identical rows.
+  const status = typeof opts.query?.status === 'string' ? opts.query.status : 'active'
+  const items = status === 'all' ? SEED : SEED.filter((s) => statusOf(s) === status)
+  return { items, total: items.length, limit: 50, offset: 0 }
 }
 
 /** GET → detail summary; PATCH → renamed AdminResponse; DELETE → soft-deleted summary. */
