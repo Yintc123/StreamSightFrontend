@@ -86,8 +86,57 @@ html, body {
   font-family: var(--font-sans);
   background-color: var(--color-surface-page);
   color: var(--color-ink-AAA);
-  /* 深色主題：讓原生控件（input、scrollbar、autofill）跟著走暗色 */
+  /* 深色主題 base：讓原生控件（input、scrollbar、autofill）跟著走暗色
+   * spec 014b §3.2 — light 時由 [data-theme="light"] 覆寫 */
   color-scheme: dark;
+}
+
+/* ============================================================
+ * Spec 014b — 淺色主題覆寫
+ * 特異度 html[data-theme="light"](0,1,1) > :root(0,1,0)，cascade 穩定勝出。
+ * dark base 維持於 @theme，不需 [data-theme="dark"] 區塊（014b §I-6）。
+ * ============================================================ */
+html[data-theme="light"] {
+  color-scheme: light;
+
+  --color-brand:         #0891b2;
+  --color-brand-400:     #0ea5e9;
+  --color-brand-overlay: rgba(8, 145, 178, 0.12);
+  --color-ink-on-brand:  #06121a;
+
+  --color-ink-AAA:  rgba(15, 23, 42, 0.92);
+  --color-ink-AA:   rgba(15, 23, 42, 0.66);
+  --color-ink-A:    rgba(15, 23, 42, 0.45);
+  --color-ink-link: #0e7490;
+
+  --color-surface-page: #f6f8fb;
+  --color-surface-card: #ffffff;
+
+  --color-line:      rgba(15, 23, 42, 0.12);
+  --color-line-soft: rgba(15, 23, 42, 0.07);
+
+  --color-ok:     #059669;
+  --color-warn:   #b45309;
+  --color-danger: #dc2626;
+}
+
+/* ============================================================
+ * Spec 014b §3.4 — 平滑過渡 + 首屏 FOUC guard
+ * transition 僅在 [data-theme-ready] 後啟用（ThemeProvider mount 後掛上），
+ * 避免首屏初始色被 transition 動畫（014b §I-5）。
+ * ============================================================ */
+html[data-theme-ready],
+html[data-theme-ready] * {
+  transition-property: color, background-color, border-color;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme-ready],
+  html[data-theme-ready] * {
+    transition: none !important;
+  }
 }
 
 button:not(:disabled) {

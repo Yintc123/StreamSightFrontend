@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import type { AdminRole } from '@/lib/schemas/admin'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 export function CmsNav({ adminRole, name }: { adminRole?: AdminRole; name: string }) {
   const pathname = usePathname()
@@ -42,7 +43,11 @@ export function CmsNav({ adminRole, name }: { adminRole?: AdminRole; name: strin
           </Link>
         )
       })}
-      <span className="ml-auto text-xs text-ink-A truncate max-w-[40%]">{name}</span>
+      {/* spec 014b §3.6 — ml-auto 移至容器，name 與 ThemeToggle 並列靠右 */}
+      <div className="ml-auto flex items-center gap-2">
+        <span className="text-xs text-ink-A truncate max-w-[40%]">{name}</span>
+        <ThemeToggle />
+      </div>
     </nav>
   )
 }

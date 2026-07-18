@@ -30,8 +30,22 @@ import {
   handleGlobalQuerySuccess,
 } from '@/lib/errors/globalQueryError'
 import { InAppNavProvider } from '@/lib/hooks/useInAppNav'
+import { ThemeProvider, useTheme } from '@/lib/theme/ThemeProvider'
+import type { Theme } from '@/lib/theme/schema'
 
-export function Providers({ children }: { children: ReactNode }) {
+// spec 014b §3.3 — 消費 useTheme 讓 Toaster 即時跟隨切換
+function ThemedToaster() {
+  const { theme } = useTheme()
+  return <Toaster theme={theme} richColors position="top-center" closeButton />
+}
+
+export function Providers({
+  initialTheme,
+  children,
+}: {
+  initialTheme?: Theme
+  children: ReactNode
+}) {
   const [client] = useState(
     () =>
       new QueryClient({
@@ -58,17 +72,21 @@ export function Providers({ children }: { children: ReactNode }) {
       }),
   )
   return (
-    <QueryClientProvider client={client}>
-      {/* Spec 005 §4 — tracks in-app navigation so TopNav's smart back can
-          decide between router.back() vs push(fallback). In-memory only;
-          refresh resets on purpose. */}
-      <InAppNavProvider>{children}</InAppNavProvider>
-      {/* Spec 006 — sonner mount; toasts are upserted by stable id so
-          concurrent 5xx requests collapse into one banner. closeButton
-          gives the user an X to dismiss manually; per-toast duration
-          (3s) handles the auto-dismiss path. Position uses sonner default
-          (top-center, ~32px from top). */}
-      <Toaster theme="dark" richColors position="top-center" closeButton />
-    </QueryClientProvider>
+    // spec 014a: ThemeProvider 由 layout.tsx 傳 initialTheme（cookie SSR 值）
+    // spec 014b §3.3: ThemedToaster 需在 ThemeProvider 內層才能消費 useTheme
+    <ThemeProvider initialTheme={initialTheme}>
+      <QueryClientProvider client={client}>
+        {/* Spec 005 §4 — tracks in-app navigation so TopNav's smart back can
+            decide between router.back() vs push(fallback). In-memory only;
+            refresh resets on purpose. */}
+        <InAppNavProvider>{children}</InAppNavProvider>
+        {/* Spec 006 — sonner mount; toasts are upserted by stable id so
+            concurrent 5xx requests collapse into one banner. closeButton
+            gives the user an X to dismiss manually; per-toast duration
+            (3s) handles the auto-dismiss path. Position uses sonner default
+            (top-center, ~32px from top). */}
+        <ThemedToaster />
+      </QueryClientProvider>
+    </ThemeProvider>
   )
 }
