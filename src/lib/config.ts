@@ -31,6 +31,11 @@ const RawEnv = z
     APP_VERSION: z.string().default('0.0.0'),
     APP_COMMIT: z.string().optional(),
     NEXT_PUBLIC_APP_NAME: z.string().default('StreamSight'),
+
+    // Base URL of the Streamlit app (dashboard / data / monitor / analytics /
+    // admin). The CMS sidebar links out to it; both apps share the same ALB.
+    // Optional — when unset the sidebar falls back to root-relative paths.
+    STREAMLIT_BASE_URL: z.string().url().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.USE_MOCK === '0') {

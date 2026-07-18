@@ -128,4 +128,19 @@ describe('config', () => {
     })
     expect(env.SESSION_SECRET_PREVIOUS).toHaveLength(32)
   })
+
+  it('STREAMLIT_BASE_URL is optional', async () => {
+    const { env } = await loadConfig({})
+    expect(env.STREAMLIT_BASE_URL).toBeUndefined()
+  })
+
+  it('STREAMLIT_BASE_URL when provided must be a valid URL', async () => {
+    await expect(
+      loadConfig({ STREAMLIT_BASE_URL: 'not-a-url' }),
+    ).rejects.toThrow(/STREAMLIT_BASE_URL/)
+    const { env } = await loadConfig({
+      STREAMLIT_BASE_URL: 'https://app.streamsight.example',
+    })
+    expect(env.STREAMLIT_BASE_URL).toBe('https://app.streamsight.example')
+  })
 })
