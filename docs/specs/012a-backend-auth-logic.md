@@ -228,6 +228,19 @@ adaptTokenResponse(raw, now):
 - cache（`FRESH_TOKENS_TTL_MS=60s`）維持，讓 lock loser 讀新 token。
 - 多 session 互踩（M5）：後台單一 admin 暫可接受；長期改 cache/lock 鍵含 sessionId 或 family（見 索引 §OQ-Q4）。
 
+### 4.7b BFF 登出：撤銷後端 refresh token family
+
+BFF `POST /api/auth/logout` 的登出流程（`src/app/api/auth/logout/route.ts`）：
+
+1. 讀取現有 session（`svc.get()`）。
+2. 若 `session.refreshToken !== null`：呼叫後端 `POST /auth/logout`，body `{ refresh_token }`，`session: null`（不帶 Bearer）。
+   - **最盡力（best-effort）**：後端失敗 catch 靜默，不阻斷本地登出。
+   - 效果：後端撤銷整個 refresh token family（rotation / reuse-detection chain），防止 token 在 BFF session 銷毀後仍可用於取得新 access token。
+3. 若 `session.refreshToken === null`（admin 線現況，見 §OQ-Q7）：跳過後端呼叫。
+4. `svc.destroy()`——無論步驟 2 結果如何，本地 Redis session 一定清除。
+
+> **設計決策（2026-07-18）**：本地 destroy 優先於後端呼叫結果，避免後端暫時不可用時使用者無法登出。後端有 rotation + reuse-detection 作為二線防護。
+
 ### 4.8 admin_role 存入 session（**本期必做**——spec 013 gate 前置）
 
 - login route 讀 `/admin/me.admin_role`（child 現值、最新，優先）存進 session；`grade` claim 為輔（可能陳舊 ≤ 一個 TTL）。

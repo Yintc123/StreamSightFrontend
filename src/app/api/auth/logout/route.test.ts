@@ -16,9 +16,10 @@ vi.mock('@/lib/config', () => ({
   },
 }))
 
-const { getMock, destroyMock } = vi.hoisted(() => ({
+const { getMock, destroyMock, backendFetchMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
   destroyMock: vi.fn().mockResolvedValue(undefined),
+  backendFetchMock: vi.fn(),
 }))
 
 vi.mock('@/lib/session/service', () => ({
@@ -28,6 +29,10 @@ vi.mock('@/lib/session/service', () => ({
     touch: vi.fn().mockResolvedValue(undefined),
     wasMutated: vi.fn().mockReturnValue(true),
   }),
+}))
+
+vi.mock('@/lib/api/backend', () => ({
+  backendFetch: backendFetchMock,
 }))
 
 import { POST } from './route'
@@ -80,12 +85,18 @@ describe('POST /api/auth/logout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     destroyMock.mockResolvedValue(undefined)
+    backendFetchMock.mockResolvedValue({ data: null })
   })
 
-  it('test 7: valid session + allowed Origin + correct X-CSRF-Token → destroy called → 204', async () => {
+  it('test 7: valid session + allowed Origin + correct X-CSRF-Token → backend logout called → destroy called → 204', async () => {
     getMock.mockResolvedValue(makeSession())
     const res = await POST(postReq(), noParams)
     expect(res.status).toBe(204)
+    expect(backendFetchMock).toHaveBeenCalledWith('/auth/logout', {
+      method: 'POST',
+      body: { refresh_token: 'refresh-token-xyz' },
+      session: null,
+    })
     expect(destroyMock).toHaveBeenCalledOnce()
   })
 
@@ -129,23 +140,41 @@ describe('POST /api/auth/logout', () => {
     expect(destroyMock).not.toHaveBeenCalled()
   })
 
-  it('test 11: localhost:3000 origin also accepted', async () => {
+  it('test 11: localhost:3000 origin also accepted → backend logout called', async () => {
     getMock.mockResolvedValue(makeSession())
     const res = await POST(postReq({ origin: 'http://localhost:3000' }), noParams)
     expect(res.status).toBe(204)
+    expect(backendFetchMock).toHaveBeenCalledOnce()
     expect(destroyMock).toHaveBeenCalledOnce()
   })
 
   it('test 11b: after successful destroy, GET /api/auth/session → 401 UNAUTHENTICATED', async () => {
-    getMock.mockResolvedValueOnce(makeSession())
+    getMock.mockResolvedValue(makeSession())
     const logoutRes = await POST(postReq(), noParams)
     expect(logoutRes.status).toBe(204)
     expect(destroyMock).toHaveBeenCalledOnce()
 
-    getMock.mockResolvedValueOnce(null)
+    getMock.mockResolvedValue(null)
     const sessionRes = await GET(getReq(), noParams)
     expect(sessionRes.status).toBe(401)
     const body = await sessionRes.json()
     expect(body.error.code).toBe('UNAUTHENTICATED')
+  })
+
+  it('test 12: null refreshToken → backend logout NOT called, local session still destroyed → 204', async () => {
+    getMock.mockResolvedValue(makeSession({ refreshToken: null }))
+    const res = await POST(postReq(), noParams)
+    expect(res.status).toBe(204)
+    expect(backendFetchMock).not.toHaveBeenCalled()
+    expect(destroyMock).toHaveBeenCalledOnce()
+  })
+
+  it('test 13: backend logout fails (network error) → local session still destroyed → 204', async () => {
+    getMock.mockResolvedValue(makeSession())
+    backendFetchMock.mockRejectedValue(new Error('Network error'))
+    const res = await POST(postReq(), noParams)
+    expect(res.status).toBe(204)
+    expect(backendFetchMock).toHaveBeenCalledOnce()
+    expect(destroyMock).toHaveBeenCalledOnce()
   })
 })

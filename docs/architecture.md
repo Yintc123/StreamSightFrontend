@@ -37,36 +37,53 @@
 frontend/
 ├── docs/
 │   ├── architecture.md
-│   ├── specs/                            # 基建實作規格（001x / 005 / 006 / 007 / 010）
+│   ├── specs/                            # 基建實作規格（001x / 005–007 / 010–015）
 │   └── decisions/                        # ADR
 ├── public/                               # 靜態資產
 ├── src/
 │   ├── proxy.ts                          # Next 16 Proxy：/cms* auth-gate（optimistic）
-│   ├── instrumentation.ts                # Node runtime lifecycle + mock 註冊
+│   ├── instrumentation.ts                # Node runtime lifecycle + mock 註冊（USE_MOCK=1 限定）
 │   ├── app/
 │   │   ├── layout.tsx · providers.tsx · globals.css
 │   │   ├── page.tsx                      # 首頁 + LoginCard
-│   │   ├── register/                     # 註冊頁
 │   │   ├── auth/Field.tsx                # 共用表單欄位
+│   │   ├── cms/                          # CMS 後台（ADMIN gate）
+│   │   │   ├── layout.tsx · CmsNav.tsx
+│   │   │   ├── page.tsx                  # /cms 首頁
+│   │   │   ├── admins/page.tsx           # 管理員管理（SUPER_ADMIN gate）
+│   │   │   └── settings/page.tsx         # 個人設定（改密碼）
 │   │   └── api/                          # BFF Route Handlers
-│   │       ├── auth/{login,register}/route.ts
+│   │       ├── auth/
+│   │       │   ├── login/route.ts        # POST：admin 登入
+│   │       │   ├── logout/route.ts       # POST：登出（清 BFF session + 撤銷 BE refresh token）
+│   │       │   └── session/route.ts      # GET：session introspection（供 Streamlit）
+│   │       ├── cms/
+│   │       │   ├── admins/route.ts       # GET/POST：管理員列表與新增
+│   │       │   ├── admins/[id]/route.ts  # GET/PATCH/DELETE：單一管理員
+│   │       │   ├── admins/[id]/role/     # PUT：升降權
+│   │       │   ├── admins/[id]/archive/  # POST：封存
+│   │       │   ├── admins/[id]/unarchive/# POST：解封存
+│   │       │   ├── admins/[id]/restore/  # POST：復原
+│   │       │   ├── me/route.ts           # GET：目前登入者資料
+│   │       │   └── me/password/route.ts  # POST：改密碼
 │   │       ├── csrf/route.ts
 │   │       └── health/{,live}/route.ts
-│   ├── components/ui/                     # primitives：Spinner / EmptyState / InlineError / BottomSheet / FallbackImage
+│   ├── components/ui/                     # primitives：Spinner / EmptyState / InlineError / BottomSheet / FallbackImage / ThemeToggle
 │   └── lib/
 │       ├── api/                          # createRoute、backendFetch、responses、parsers、request-id、http-status
 │       ├── session/                      # iron-session cookie + Redis/in-memory store、requireAdmin
 │       ├── security/                     # verifyCsrf、origin 檢查
 │       ├── auth/                         # decodeJwtPayload
 │       ├── errors/                       # 錯誤型別階層 + toErrorResponse + 全域 query error
-│       ├── schemas/                      # 通用 Zod：envelope、pagination、auth
+│       ├── schemas/                      # 通用 Zod：envelope、pagination、auth、admin
+│       ├── theme/                        # ThemeProvider、readThemeCookie、schema
 │       ├── hooks/                        # useDebouncedValue、useUrlSync、useViewport、useSmartBack…
-│       ├── mock/                         # USE_MOCK dispatch 框架 + auth bridge
+│       ├── mock/                         # USE_MOCK dispatch 框架 + auth/admin bridge（e2e 專用）
 │       ├── config.ts · log.ts · lifecycle.ts · cn.ts
 │       └── client/csrf.ts                # 瀏覽器端取 CSRF token
 ├── tests/
-│   ├── e2e/                              # Playwright
-│   ├── mocks/                            # MSW（server + handlers）
+│   ├── e2e/                              # Playwright（dev server 以 USE_MOCK=1 啟動）
+│   ├── mocks/                            # MSW（server + handlers，unit/整合測試用）
 │   ├── helpers/ · contracts/
 ├── .env.example
 ├── next.config.ts · tsconfig.json · vitest.config.ts · playwright.config.ts
@@ -74,8 +91,7 @@ frontend/
 ```
 
 > 新增業務垂直時：在 `app/api/<feature>/route.ts` 用 `createRoute` 建 Route
-> Handler、在 `lib/schemas/` 加該 feature 的 Zod schema、在 `lib/mock/register.ts`
-> 註冊對應 mock、頁面放 `app/<feature>/`。
+> Handler、在 `lib/schemas/` 加該 feature 的 Zod schema、頁面放 `app/<feature>/`。
 
 ---
 
@@ -85,12 +101,9 @@ frontend/
 Browser ──fetch /api/<x>──▶ Next.js Route Handler
                                    │  createRoute：parse query/body/params（Zod）
                                    │
-                      ┌────────────┴────────────┐
-                      ▼                         ▼
-             USE_MOCK=1：resolveMock     USE_MOCK=0：backendFetch(BACKEND_API_URL)
-                      │                         │
-                      └────────────┬────────────┘
                                    ▼
+                          backendFetch(BACKEND_API_URL)
+                                   │
                             Zod parse + reshape（裁切 backend-only 欄位）
                                    │
                                    ▼
@@ -101,20 +114,24 @@ Browser ──fetch /api/<x>──▶ Next.js Route Handler
 - Client 端資料抓取用 TanStack Query(`Providers` 設定 staleTime / gcTime /
   全域錯誤攔截 → toast)。
 
+> **`USE_MOCK=1` 模式**（僅供 e2e 測試 / 無真後端環境）：`backendFetch` 轉向
+> `lib/mock/dispatch`，回傳 fixture。Playwright 的 `webServer` 固定帶 `USE_MOCK=1`
+> 啟動 dev server，確保 e2e 不依賴真後端。正常開發與 CI 使用 `USE_MOCK=0`（真後端）。
+
 ---
 
 ## 4. 與真後端的銜接
 
 - BFF → 真後端：`BACKEND_API_URL`（環境變數，僅 server 端可見），透過 `backendFetch`（含 timeout、request-id 轉發）。
-- `USE_MOCK=1` 時 Route Handler 走 `lib/mock/` 的 dispatch,對前端 contract 不變,未來切真後端無痛。
+- 正式環境一律 `USE_MOCK=0`；`.env.example` 預設值亦為 `0`。
 
 ---
 
 ## 5. 環境變數
 
-見 [`.env.example`](../.env.example)。重點:`SESSION_SECRET`(必填)、`USE_MOCK`、
-`BACKEND_API_URL`、`REDIS_HOST/PORT`、`ALLOWED_ORIGINS`(CSRF)、`SESSION_COOKIE_NAME`
-(預設 `streamsight_session`)、`REDIS_KEY_PREFIX`(預設 `streamsight-bff`)。
+見 [`.env.example`](../.env.example)。重點:`SESSION_SECRET`(必填)、`USE_MOCK`（預設 `0`）、
+`BACKEND_API_URL`（`USE_MOCK=0` 時必填）、`REDIS_HOST`（`USE_MOCK=0` 時必填）、
+`ALLOWED_ORIGINS`(CSRF)、`SESSION_COOKIE_NAME`（預設 `streamsight_session`）。
 
 ---
 
@@ -155,4 +172,4 @@ Browser ──fetch /api/<x>──▶ Next.js Route Handler
 
 ---
 
-最後更新：2026-07-17
+最後更新：2026-07-18

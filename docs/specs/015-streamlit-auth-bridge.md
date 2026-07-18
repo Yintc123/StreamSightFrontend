@@ -1,6 +1,6 @@
 # Spec 015：Streamlit Auth Bridge
 
-- **狀態**：Draft（v0.3 — 2026-07-18）
+- **狀態**：已實作（v0.3 — 2026-07-18）
 - **影響範圍**：
   - `src/app/api/auth/session/route.ts`（新增）
   - `src/app/api/auth/logout/route.ts`（新增）
@@ -235,11 +235,21 @@ export const GET = createRoute({
    - Origin 檢查（必須 ∈ ALLOWED_ORIGINS）→ 403 CSRF_INVALID
    - 取 session（null → 403 CSRF_INVALID，因無 csrfToken 可比對）
    - 比對 X-CSRF-Token vs session.csrfToken（不符 → 403 CSRF_INVALID）
-2. sessionService.destroy()
+2. handler 讀取 session（svc.get()）
+   - 若 session.refreshToken !== null：呼叫後端 POST /auth/logout
+     body: { refresh_token: session.refreshToken }，session: null（不帶 Bearer）
+     最盡力（best-effort）：後端失敗 catch 靜默，不影響本地登出
+   - 若 session.refreshToken === null（admin 線現況，見 spec 012a OQ-Q7）：跳過後端呼叫
+3. sessionService.destroy()
    - 先清 cookie Set-Cookie（BFF response header）
    - 再清 Redis entry（destroy 冪等，失敗 catch 靜默）
-3. 回 204 No Content
+   - 無論步驟 2 成功與否，此步必定執行
+4. 回 204 No Content
 ```
+
+> **後端 `POST /auth/logout` 的作用**：撤銷 refresh token family（rotation + reuse detection），
+> 防止 refresh token 在 BFF session 銷毀後仍可被用來取得新的 access token。
+> 當前 admin 線 `refresh_token: null`，故此步驟暫時跳過；後端補發 refresh token 後自動生效。
 
 ### 3.3 關於 Cookie 清除的限制
 
@@ -265,19 +275,32 @@ BFF 的 `Set-Cookie` 回傳給 **Streamlit 的 api_client**（Python httpx），
 - `X-CSRF-Token: <csrfToken>`（從 `GET /api/auth/session` 取得，存 `session_state`）
 - `Cookie: <forwarded browser session cookie>`
 
-### 3.5 實作骨架
+### 3.5 實作
 
 ```ts
 // src/app/api/auth/logout/route.ts
 import 'server-only'
 import { createRoute } from '@/lib/api'
+import { backendFetch } from '@/lib/api/backend'
 import { getSessionService } from '@/lib/session/service'
 
 export const POST = createRoute({
   // requireAuth not needed: verifyCsrf already ensures session exists
-  // (null session → CsrfError "No session for CSRF verification")
   handler: async () => {
-    await getSessionService().destroy()
+    const svc = getSessionService()
+    const session = await svc.get()
+
+    // Revoke the refresh token family on the backend (best-effort).
+    // Skipped when refresh_token is null (admin auth line, see spec 012a OQ-Q7).
+    if (session?.refreshToken) {
+      await backendFetch('/auth/logout', {
+        method: 'POST',
+        body: { refresh_token: session.refreshToken },
+        session: null,
+      }).catch(() => {})
+    }
+
+    await svc.destroy()
     return new Response(null, { status: 204 })
   },
 })
