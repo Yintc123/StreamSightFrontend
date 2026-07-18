@@ -31,6 +31,7 @@ vi.mock('@/lib/session/service', () => ({
 }))
 
 import { POST } from './route'
+import { GET } from '../session/route'
 
 const noParams = { params: Promise.resolve({}) }
 const NOW = Date.now()
@@ -49,6 +50,14 @@ function makeSession(overrides: Partial<StoredSession> = {}): StoredSession {
     createdAt: NOW - 60_000,
     ...overrides,
   }
+}
+
+function getReq(): Request {
+  return {
+    method: 'GET',
+    url: 'http://localhost:3000/api/auth/session',
+    headers: new Headers({ cookie: 'streamsight_session=sealed' }),
+  } as unknown as Request
 }
 
 function postReq(opts: {
@@ -125,5 +134,18 @@ describe('POST /api/auth/logout', () => {
     const res = await POST(postReq({ origin: 'http://localhost:3000' }), noParams)
     expect(res.status).toBe(204)
     expect(destroyMock).toHaveBeenCalledOnce()
+  })
+
+  it('test 11b: after successful destroy, GET /api/auth/session → 401 UNAUTHENTICATED', async () => {
+    getMock.mockResolvedValueOnce(makeSession())
+    const logoutRes = await POST(postReq(), noParams)
+    expect(logoutRes.status).toBe(204)
+    expect(destroyMock).toHaveBeenCalledOnce()
+
+    getMock.mockResolvedValueOnce(null)
+    const sessionRes = await GET(getReq(), noParams)
+    expect(sessionRes.status).toBe(401)
+    const body = await sessionRes.json()
+    expect(body.error.code).toBe('UNAUTHENTICATED')
   })
 })
