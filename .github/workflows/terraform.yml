@@ -21,6 +21,14 @@ on:
       - 'infra/terraform/**'
       - '.github/workflows/terraform.yml'
   workflow_dispatch:
+    inputs:
+      action:
+        description: 'apply = create/update the stack; destroy = tear it down to save cost (ALB etc.). Shared cluster/datastore/ECR image are untouched — re-apply anytime.'
+        type: choice
+        options:
+          - apply
+          - destroy
+        default: apply
 
 permissions:
   id-token: write # assume the AWS role via OIDC
@@ -72,9 +80,21 @@ jobs:
       - name: Validate
         run: terraform validate
 
+      # Preview: a normal plan for apply runs, a destroy plan for destroy runs.
       - name: Plan
+        if: '!(github.event_name == ''workflow_dispatch'' && inputs.action == ''destroy'')'
         run: terraform plan -no-color -input=false
 
+      - name: Plan (destroy)
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
+        run: terraform plan -destroy -no-color -input=false
+
+      # Apply on push-to-main and on a manual apply run (but not a destroy run).
       - name: Apply
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && !(github.event_name == 'workflow_dispatch' && inputs.action == 'destroy')
         run: terraform apply -no-color -input=false -auto-approve
+
+      # Manual teardown: Actions → Run workflow → action = destroy.
+      - name: Destroy
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
+        run: terraform destroy -no-color -input=false -auto-approve
