@@ -92,7 +92,10 @@
   admin session 壽命受限於 access token（預設 30 分），到期即強制重登。
   **後端需補實作**：admin 登入應同 user 登入一樣核發 opaque refresh token，使 BFF 現有的
   rotation / reuse-detection / lock 機制得以啟動（[012a §2.3](./012a-backend-auth-logic.md) 已完整設計）。
-  BFF 已做防禦處理（nullable schema + `!refreshToken` guard），後端補發後**不需改 BFF**，自動生效。
+  BFF 已做完整防禦處理，後端補發後**不需改 BFF**，自動生效：
+  - `BackendTokenResponse.refresh_token` 宣告 `.nullable()`；`StoredSession.refreshToken: string | null`。
+  - `service.refresh()` 無 token 時直接回傳現有 session（no-op guard）。
+  - `backendFetch` 401 handler 偵測 no-op refresh（`refresh()` 回傳 token 未變）→ 跳過重試，直接 destroy + logout。
 
 ---
 
@@ -106,6 +109,7 @@
 | 0.4 | 2026-07-18 | 補 OQ-Q7：後端 `/admin/auth/login` 回 `refresh_token: null` 缺口；記錄 BFF 防禦處理（nullable + guard）與後端補發需求。 |
 | 0.4 | 2026-07-18 | §5.7 `REFRESH_LOCK_TTL_MS` 定死 15s；校正 header/footer 版號。 |
 | 0.5 | 2026-07-18 | **依「業務邏輯 / UI 元件」拆分**為 [012a](./012a-backend-auth-logic.md)（邏輯）+ [012b](./012b-backend-auth-ui.md)（UI）；本檔轉索引（範圍/依賴/總順序/決策/章節重定向表）。內容不變，僅重組。 |
+| 0.6 | 2026-07-18 | OQ-Q7 補 BFF 完整防禦行為（no-op refresh 偵測，跳過無效重試）；同步更新 [001c §2.3/§4/§5.1.7](./001c-session-service.md)、[001e §1/§4/§5/§7](./001e-backend-fetch.md)、[012a §4.10/§7](./012a-backend-auth-logic.md)。 |
 
 ---
 

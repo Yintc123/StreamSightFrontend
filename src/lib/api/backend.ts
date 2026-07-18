@@ -118,6 +118,14 @@ export async function backendFetch<T = unknown>(
       // skip this so we don't recurse.
       if (activeSession) {
         const refreshed = await getSessionService().refresh()
+        // Spec 012a §4.10 / §OQ-Q7 — admin auth line returns refresh_token: null,
+        // so refresh() is a no-op that returns the same session unchanged. Retrying
+        // with the same expired token would produce another 401; skip the retry and
+        // destroy the session immediately so the caller redirects to login.
+        if (refreshed.accessToken === activeSession.accessToken) {
+          await getSessionService().destroy().catch(() => {})
+          throw new UnauthenticatedError('access token expired, no refresh token')
+        }
         headers.authorization = `Bearer ${refreshed.accessToken}`
         try {
           response = await fetch(url, {

@@ -345,6 +345,29 @@ describe('reactive refresh on 401 (flat contract)', () => {
     expect(destroyMock).not.toHaveBeenCalled() // nothing to revoke
   })
 
+  // Spec 012a §4.7 / §4.10 — admin auth line returns refresh_token: null (OQ-Q7).
+  // refresh() is a no-op (returns the same session unchanged). Retrying with
+  // the same expired token would produce another 401, so skip the retry.
+  it('session without refresh token: 401 → destroy + UnauthenticatedError (no retry)', async () => {
+    const session = makeSession({ refreshToken: null })
+    // refresh() returns the same session (no-op — service.ts guard)
+    refreshMock.mockResolvedValueOnce(session)
+
+    let callCount = 0
+    mockBackend('get', 'http://backend.test/items', () => {
+      callCount++
+      return HttpResponse.json({ error: 'unauthorized' }, { status: 401 })
+    })
+
+    await expect(
+      backendFetch('/items', { session }),
+    ).rejects.toMatchObject({ code: 'UNAUTHENTICATED' })
+
+    expect(callCount).toBe(1)           // no retry
+    expect(refreshMock).toHaveBeenCalledTimes(1)
+    expect(destroyMock).toHaveBeenCalledTimes(1)
+  })
+
   it('Redis fail-closed: refresh throws BackendUpstreamError → propagates as 502', async () => {
     const { BackendUpstreamError } = await import('@/lib/errors')
     refreshMock.mockRejectedValueOnce(new BackendUpstreamError('redis down'))

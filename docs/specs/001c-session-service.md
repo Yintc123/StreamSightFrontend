@@ -135,14 +135,17 @@ export interface SessionService {
 | Replay detection | 偵測到舊 refresh 二次使用 → backend 撤銷該 user 全部 refresh，BFF 收到後 `destroy()` |
 | Access 緊急撤銷 | backend 用 Redis blacklist（BFF 無需感知，由 backend 401 回應觸發） |
 
-### 2.3 Backend 回 401 的兩種解釋
+### 2.3 Backend 回 401 的解讀（spec 012a §4.10）
 
-| Backend 錯誤碼 | HTTP | BFF 解讀 |
-|---|---|---|
-| `AUTH_TOKEN_EXPIRED` | 401 | access token 過期。**觸發 refresh**，成功後重打原請求；失敗回 401 UNAUTHENTICATED |
-| `UNAUTHORIZED` | 401 | token 無效（簽章錯 / 被 blacklist / 缺漏）。**不**觸發 refresh，直接 `destroy()` 回 401 |
+後端**所有 401 共用同一扁平碼 `"unauthorized"`**（token 過期 / 無效 / 停用皆同），無 `AUTH_TOKEN_EXPIRED` 專碼。BFF 無法靠錯誤碼區分「應 refresh 還是應 destroy」，改以「有 session 就試一次 refresh」策略：
 
-**重要：絕不對通用 401 觸發 refresh** —— 必須明確判斷 `error.code === 'AUTH_TOKEN_EXPIRED'`。否則會浪費 refresh token 且掩蓋 token 被撤銷的訊號。
+| 情形 | BFF 行為 |
+|---|---|
+| 有 session，refresh 取得**新** access token | refresh + **重打一次**原請求；重打仍 401 → `destroy()` + `UNAUTHENTICATED` |
+| 有 session，refresh 為 **no-op**（session 無 refresh token） | **跳過重打**，直接 `destroy()` + `UNAUTHENTICATED` |
+| 無 session（公開呼叫 / refresh 自身） | 直接拋 `UnauthenticatedError`，無 refresh 無 destroy |
+
+**no-op 偵測**：`refresh()` 回傳的 `accessToken` 與呼叫前相同 → 代表 session 沒有 refresh token（admin auth 線現況，§OQ-Q7），此時跳過重打省掉一次無效 round-trip。
 
 ### 2.4 BFF Refresh 不輪換 CSRF token
 
@@ -300,6 +303,11 @@ export const getSessionService = cache((): SessionService => {
       const current = await store.get(sid)
       if (!current) throw new UnauthenticatedError('store has no entry')
 
+      // ── 0. no-op guard（admin auth 線，§OQ-Q7）─────────────────
+      // Admin 登入目前不核發 refresh token；直接回傳現有 session 讓
+      // backendFetch 偵測 no-op（比對 accessToken 是否相同）並決策。
+      if (!current.refreshToken) return current
+
       // ── 1. fresh-tokens cache（命中即用） ──────────────────────
       const cached = await store.getCachedTokens(current.userId)
       if (cached) {
@@ -421,6 +429,7 @@ function sleep(ms: number): Promise<void> {
 - 回傳新 token；後續 `get()` 反映新 csrfToken；其他欄位不變
 
 #### 5.1.7 `refresh()` — happy path
+- **no refresh token**（`session.refreshToken === null`）→ 立即回傳現有 session（no-op）；不打 backend、不改 store（backendFetch 偵測 accessToken 不變 → 決策 destroy）
 - cached tokens HIT → 不打 backend、直接用 cached pair 更新 session
 - 取得鎖 → 打 backend → 成功 → setCachedTokens + 更新 session + releaseLock
 - 取鎖失敗 → poll fresh-tokens 命中 → 更新 session

@@ -24,8 +24,8 @@
 | 認證標頭 | 取 `options.session.accessToken` 注入 `Authorization: Bearer <token>`；`options.session` 由呼叫端（典型為 createRoute）傳入；**backendFetch 不再呼叫 `SessionService.get()`** |
 | 公開 endpoint | 不傳 `session`（或傳 `null`）即跳過認證注入；不需要 `anonymous` 旗標 |
 | Access token pre-emptive refresh | `session.accessTokenExpiresAt < now + PRE_REFRESH_MARGIN_MS` → 呼叫 `SessionService.refresh()` |
-| Backend 401 `AUTH_TOKEN_EXPIRED` | `SessionService.refresh()` 後重打一次原請求；refresh 失敗則 401 UNAUTHENTICATED |
-| Backend 401 `UNAUTHORIZED` | **不** refresh，`SessionService.destroy()` + 401 |
+| Backend 401（有 session） | 試一次 `SessionService.refresh()`；若 refresh 為 no-op（回傳 token 未變，無 refresh token）→ `destroy()` + 401；否則重打一次；重打仍 401 → `destroy()` + 401 |
+| Backend 401（無 session） | 直接拋 `UnauthenticatedError`，不 refresh 不 destroy |
 | 並發 refresh | **Redis 分散式鎖 + fresh-tokens cache**（跨 Cloud Run instance；於 001c §3 與 ADR 006 §6） |
 | Request ID | 沿用呼叫端的 requestId（由 createRoute 產生）；若無則 fallback 自產 |
 | 連線失敗 / DNS / JSON parse 失敗 | `BACKEND_UPSTREAM_ERROR (502)` |
@@ -155,15 +155,22 @@ export async function backendFetch<T>(
       throw classifyNetworkError(err)   // → BackendTimeoutError / BackendUpstreamError
     }
 
-    // ── 5. Handle backend 401（僅在有 session 時）─────────────
+    // ── 5. Handle backend 401（spec 012a §4.10）────────────────
+    // 後端所有 401 共用扁平碼 "unauthorized"，無 AUTH_TOKEN_EXPIRED 專碼。
+    // 策略：有 session → 試一次 refresh + 重打；無 session → 直接 throw。
     let retried = false
-    if (response.status === 401 && activeSession) {
+    if (response.status === 401) {
       const errBody = await safeReadJson(response)
-      const backendCode = errBody?.error?.code
+      const backendCode = readBackendCode(errBody)
 
-      if (backendCode === 'AUTH_TOKEN_EXPIRED') {
-        // EXPIRED → refresh 並重打一次（只重打一次，避免無限循環）
+      if (activeSession) {
         const refreshed = await getSessionService().refresh()
+        // no-op 偵測：admin auth 線無 refresh token，refresh() 回傳同一 session。
+        // 重打同一個過期 token 必然再次 401，直接 destroy 省掉一次無效 round-trip。
+        if (refreshed.accessToken === activeSession.accessToken) {
+          await getSessionService().destroy().catch(() => {})
+          throw new UnauthenticatedError('access token expired, no refresh token')
+        }
         headers['authorization'] = `Bearer ${refreshed.accessToken}`
         try {
           response = await fetch(url, {
@@ -177,13 +184,12 @@ export async function backendFetch<T>(
         }
         retried = true
       } else {
-        // UNAUTHORIZED / 其他 401 code → 直接 destroy（不 refresh）
-        await getSessionService().destroy().catch(() => {})
+        // 無 session（公開呼叫 / refresh 自身）→ 不 refresh 不 destroy。
         throw new UnauthenticatedError(backendCode ?? 'UNAUTHORIZED')
       }
     }
 
-    // ── 6. 重打後若仍 401 → 視為 refresh 失效 ────────────────
+    // ── 6. 重打後若仍 401 → refresh 有效但帳號已停用/刪除 ────
     if (retried && response.status === 401) {
       await getSessionService().destroy().catch(() => {})
       throw new UnauthenticatedError('refresh succeeded but retry still 401')
@@ -250,11 +256,12 @@ async function safeReadJson(res: Response): Promise<{ error?: { code?: string } 
 
 ## 5. 流程關鍵不變式
 
-1. **同一請求最多打 backend 兩次**：原打 + 一次 refresh 後重打。第二次仍 401 即放棄
-2. **`AUTH_TOKEN_EXPIRED` 是唯一觸發 reactive refresh 的訊號**：通用 401 / 缺 Authorization / blacklist 命中都不 refresh
-3. **Refresh 過 1 次後不再 pre-emptive refresh**：避免極端時序下無限循環
-4. **`options.session` 缺省 / null 跳過所有 session 邏輯**：不注入 Authorization、不對 401 reactive refresh
-5. **Mock 模式跳過 session 邏輯**：但**不**跳過 createRoute 的 CSRF 檢查（001f §2 step 6）
+1. **同一請求最多打 backend 兩次**：原打 + 一次 refresh 後重打；若 refresh 為 no-op 則只打一次
+2. **有 session 的任何 401 都觸發 refresh 嘗試**（spec 012a §4.10）：後端無 `AUTH_TOKEN_EXPIRED` 專碼，無法靠碼區分過期 vs 失效
+3. **no-op refresh 偵測**：`refresh()` 回傳 accessToken 未變 → session 無 refresh token → 跳過重打，直接 destroy
+4. **Refresh 過 1 次後不再 pre-emptive refresh**：避免極端時序下無限循環
+5. **`options.session` 缺省 / null 跳過所有 session 邏輯**：不注入 Authorization、不對 401 reactive refresh
+6. **Mock 模式跳過 session 邏輯**：但**不**跳過 createRoute 的 CSRF 檢查（001f §2 step 6）
 
 ---
 
@@ -282,14 +289,15 @@ async function safeReadJson(res: Response): Promise<{ error?: { code?: string } 
 | 8 | DNS 失敗 ENOTFOUND | `BackendUpstreamError` |
 | 9 | 回應非 JSON | `BackendUpstreamError('not valid JSON')` |
 | 10 | Pre-emptive refresh（剩餘 < 30s） | refresh 被呼叫一次；headers 用新 token；backend 也用新 token 收 |
-| 11 | Backend 401 `AUTH_TOKEN_EXPIRED` | refresh 一次 → 重打 → 成功回 data |
-| 12 | Backend 401 `UNAUTHORIZED`（非 EXPIRED） | **不** refresh；`destroy()` 被呼叫；拋 `UnauthenticatedError` |
-| 13 | Refresh 後重打仍 401 | `destroy()` 被呼叫；拋 `UnauthenticatedError` |
-| 14 | `USE_MOCK=1` + 已註冊 path | 直接回 fixture，**不**打網路 |
-| 15 | `USE_MOCK=1` + 未註冊 path | `BackendUpstreamError('No mock registered')` |
-| 16 | Redis 不可用（refresh 時 store 拋錯） | `BackendUpstreamError` (502)；**不**降級為 anonymous |
-| 17 | requestId 沿用呼叫端傳入值 | 回傳值 `requestId === options.requestId` |
-| 18 | 未傳 requestId | 自產 `req_<date>_<8-char-base36>` 格式 |
+| 11 | Backend 401 + session（refresh 取得新 token） | refresh 一次 → 重打 → 成功回 data |
+| 12 | Backend 401 + session（no-op refresh，無 refresh token） | 不重打；`destroy()` 被呼叫；拋 `UnauthenticatedError` |
+| 13 | Backend 401 + session（refresh 取得新 token，但重打仍 401） | `destroy()` 被呼叫；拋 `UnauthenticatedError` |
+| 14 | Backend 401 無 session（公開呼叫） | 不 refresh 不 destroy；拋 `UnauthenticatedError` |
+| 15 | `USE_MOCK=1` + 已註冊 path | 直接回 fixture，**不**打網路 |
+| 16 | `USE_MOCK=1` + 未註冊 path | `BackendUpstreamError('No mock registered')` |
+| 17 | Redis 不可用（refresh 時 store 拋錯） | `BackendUpstreamError` (502)；**不**降級為 anonymous |
+| 18 | requestId 沿用呼叫端傳入值 | 回傳值 `requestId === options.requestId` |
+| 19 | 未傳 requestId | 自產 `req_<date>_<8-char-base36>` 格式 |
 
 ### 7.2 測試輔助
 

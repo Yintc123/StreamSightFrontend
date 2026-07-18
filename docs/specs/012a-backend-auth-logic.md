@@ -274,7 +274,8 @@ BFF `POST /api/auth/logout` 的登出流程（`src/app/api/auth/logout/route.ts`
 **修正 2 — 401 refresh 觸發策略（因後端無過期專碼）**：
 - 現行 `if (activeSession && backendCode === 'AUTH_TOKEN_EXPIRED')` **永不命中**（M8）→ 改為 **`if (activeSession)`**：帶 session 的已登入呼叫回 401 就**試一次 refresh + 重試一次**（沿用 `retried` 旗標，至多一次防迴圈）。
 - `refresh()` 自身失敗（refresh token 已死）→ 內部已 destroy + 丟 `UnauthenticatedError`，上拋。
-- refresh 成功但**重試仍 401**（停用/降權/刪除）→ `destroy()` + 丟 `UnauthenticatedError`（保留 `backend.ts:125-128`）。
+- `refresh()` 回傳的 `accessToken` 與 `activeSession.accessToken` **相同**（no-op refresh — session 無 refresh token，admin auth 線現況 §OQ-Q7）→ **跳過重試**，直接 `destroy()` + `UnauthenticatedError('access token expired, no refresh token')`。省掉一次必然失敗的 backend round-trip。
+- refresh 成功但**重試仍 401**（停用/降權/刪除）→ `destroy()` + 丟 `UnauthenticatedError('refresh succeeded but retry still 401')`。
 - **安全性**：401 代表請求在後端授權層即被擋、未執行，故即使非冪等 mutation 重試也不會重複套用。
 - `session: null` 的內部呼叫（如 `/auth/refresh` 本身）：`activeSession` 為 null → 不觸發遞迴 refresh。
 
@@ -340,6 +341,7 @@ BFF `POST /api/auth/logout` 的登出流程（`src/app/api/auth/logout/route.ts`
 - [x] session 帶 `adminRole`（super_admin/editor/viewer），供 spec 013 gate。（login test「stores adminRole…」）
 - [x] **backendFetch 扁平錯誤碼**：`passClientErrors` 對 `{error:'conflict',…}` 取得 `beCode='conflict'`。（`backend.test.ts`）
 - [x] **backendFetch 401 refresh**：扁平 `{error:'unauthorized'}` 401 → 一次 refresh + 重試；重試仍 401 → destroy；`session:null` 不遞迴。（`backend.test.ts`）
+- [x] **backendFetch no-op refresh 偵測**：session 無 refresh token → 401 → refresh 回傳同 token → **跳過重試**，直接 destroy + UnauthenticatedError（省一次 backend round-trip）。（`backend.test.ts`「session without refresh token」）
 
 （register 淘汰的驗收見 [spec 012b](./012b-backend-auth-ui.md)。）
 
