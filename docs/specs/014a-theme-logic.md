@@ -24,7 +24,7 @@
 ### 不在範圍（→ 014b）
 
 - 淺色調色盤色值、`globals.css` 的 `[data-theme="light"]` 覆寫內容。
-- `ThemeToggle` 元件、放置點（header / `CmsNav`）與排版。
+- `ThemeToggle` 元件、放置點（header / `CmsTopBar`，016 v0.4 前為 `CmsNav`）與排版。
 - `color-scheme` / Toaster 跟隨的視覺接線、過渡動畫與 FOUC guard 的 CSS。
 
 ### 不在範圍（本期整體）

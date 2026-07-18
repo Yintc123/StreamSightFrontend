@@ -1,6 +1,6 @@
 # Spec 014b — 主題 UI 元件與淺色調色盤（元件 / 視覺）
 
-狀態：**已實作（2026-07-18）**（v0.4）
+狀態：**已實作（2026-07-18）**（v0.5）
 父規格：[`014-theme-mode.md`](./014-theme-mode.md)｜姊妹規格：[`014a-theme-logic.md`](./014a-theme-logic.md)
 
 本規格負責主題功能的**視覺與元件**部分：`ThemeToggle` 元件、淺色調色盤色值、
@@ -16,7 +16,7 @@
 - **淺色調色盤**：為既有語義 token（`--color-*`）補一套 light 值（§5）。
 - **`globals.css` 覆寫**：新增 `html[data-theme="light"]` 區塊（依 014a §3.1 的間接引用機制）。
 - **`ThemeToggle` 元件**：一鍵按鈕、手寫 inline SVG（sun/moon）、a11y、鍵盤操作。
-- **放置點**：首頁 `header` + CMS `CmsNav`（含排版調整，§3.6）。
+- **放置點**：首頁 `header` + CMS `CmsTopBar`（含排版調整，§3.6；016 v0.4 前為 `CmsNav`）。
 - **`color-scheme` 跟隨**：原生控件（input / scrollbar / autofill）隨主題。
 - **Toaster 跟隨**：sonner `theme` 改讀 `useTheme()`。
 - **平滑過渡**：色彩 transition + 首屏 FOUC guard + `prefers-reduced-motion` 尊重。
@@ -42,10 +42,10 @@
 | `<Toaster theme="dark">` 寫死 | `src/app/providers.tsx:71` | 需改為讀當前主題（§3.3） |
 | 全庫**零 hardcoded hex、零 `dark:` variant** | `src/**/*.tsx`（實查 0/0） | 覆寫可行且乾淨 |
 | **本庫無圖示庫** | `package.json` | ThemeToggle 手寫 inline SVG（參照 `BottomSheet.tsx`／`Spinner.tsx`） |
-| `CmsNav` 為 `'use client'`，`ml-auto` 目前掛在 `<span>{name}</span>` | `src/app/cms/CmsNav.tsx:45` | 插入點需重整為容器（§3.6） |
+| CMS 導覽為 `'use client'`，`ml-auto` 容器含 name + ThemeToggle | `src/app/cms/CmsTopBar.tsx`（016 v0.4 前為 `CmsNav.tsx`） | 插入點為 `ml-auto` 容器（§3.6） |
 | 首頁 header 為 `justify-center`（標題置中） | `src/app/page.tsx:19` | 加右側 toggle 需保持標題置中（§3.6） |
 
-一般依賴：[`014a`](./014a-theme-logic.md)（`useTheme` API、`data-theme` / `data-theme-ready` 契約）、spec 013b（`CmsNav`）、首頁 `page.tsx` header。
+一般依賴：[`014a`](./014a-theme-logic.md)（`useTheme` API、`data-theme` / `data-theme-ready` 契約）、spec 013b / [016](./016-cms-sidebar-streamlit-nav.md)（CMS 導覽 `CmsTopBar`）、首頁 `page.tsx` header。
 
 ---
 
@@ -95,10 +95,9 @@
 - **首頁 header**（`page.tsx:19`，現 `justify-center`）：header 改為 `relative`，
   `<h1>` 維持置中，`<ThemeToggle>` 以 `absolute right-[14px] top-1/2 -translate-y-1/2` 疊放右側
   → 標題仍真正置中，不被 toggle 推移。
-- **`CmsNav`**（`CmsNav.tsx:45`）：把現有 `<span className="ml-auto …">{name}</span>` 的 `ml-auto`
-  上移到新容器 —— `<div className="ml-auto flex items-center gap-2">` 內含 name `<span>`（移除其 `ml-auto`）
-  + `<ThemeToggle>`，使兩者靠右並列、間距一致。
-- 兩處皆匿名訪客與已登入 admin 可見可切（header 屬未登入頁、`CmsNav` 屬已登入區）。
+- **CMS 導覽**（原 `CmsNav` 右側 `ml-auto` 容器；**016 v0.4 起移至 `CmsTopBar.tsx` 右側**）：
+  `<div className="ml-auto flex items-center gap-2">` 內含 name `<span>` + `<ThemeToggle>` + `登出`，靠右並列。
+- 兩處皆匿名訪客與已登入 admin 可見可切（header 屬未登入頁、`CmsTopBar` 屬已登入區）。
 
 ---
 
@@ -108,7 +107,7 @@
 |---|---|---|
 | `src/components/ui/ThemeToggle.tsx` | 新增 | §3.5：一鍵按鈕、手寫 inline SVG、`aria-label`/`aria-pressed`、鍵盤 Enter/Space；消費 014a `useTheme` |
 | `src/app/globals.css` | 改 | §3.1 加 `html[data-theme="light"]` 覆寫區塊（§5 色值）；§3.2 `color-scheme` 覆寫；§3.4 transition + `[data-theme-ready]` guard + `prefers-reduced-motion` |
-| `src/app/cms/CmsNav.tsx` | 改 | §3.6：`ml-auto` 容器內加 `<ThemeToggle>` |
+| `src/app/cms/CmsTopBar.tsx` | 改 | §3.6：頂部列右側 `ml-auto` 容器內含 `<ThemeToggle>`（016 v0.4 前為 `CmsNav.tsx`） |
 | `src/app/page.tsx` | 改 | §3.6：header 改 `relative`，右側 `absolute` 疊放 `<ThemeToggle>` |
 | `src/app/providers.tsx` | 改（**與 014a 共用**） | §3.3：`<Toaster>` 改讀 `useTheme()`（`ThemeProvider` 包法由 014a 定） |
 
@@ -186,7 +185,7 @@
 ## 7. 決策紀錄與待決
 
 - **D4 token 架構（色值面）**：✅ `@theme` 保留 dark base + `html[data-theme="light"]` 覆寫；色值見 §5。（機制面在 [`014a §3.1`](./014a-theme-logic.md)）
-- **D6 放置點**：✅ 首頁 `header` + `CmsNav`（匿名 + 已登入皆可切）；排版於 §3.6 定案。
+- **D6 放置點**：✅ 首頁 `header` + `CmsTopBar`（匿名 + 已登入皆可切；016 v0.4 前為 `CmsNav`）；排版於 §3.6 定案。
 
 ### Open Questions（不阻塞開工）
 
@@ -202,7 +201,8 @@
 | 0.2 | 2026-07-18 | 狀態更新為「已實作」：`ThemeToggle.tsx`、`globals.css` 淺色覆寫、`color-scheme` 處理、Toaster 跟隨 `useTheme`、FOUC guard、CmsNav / 首頁 header 放置點全部落地，含完整測試。淺色色值仍待 WCAG AA 驗證（OQ-2 維持開放）。 |
 | 0.3 | 2026-07-18 | **淺色調色盤對齊 Streamlit**（[spec 016](./016-cms-sidebar-streamlit-nav.md)）：accent `#0891b2`→`#2563eb`（藍）、`surface-page` `#f6f8fb`→`#ffffff`、`surface-card` `#ffffff`→`#f1f5f9`（同時修正側欄/內容明暗與 Streamlit 相反）、`ink-AAA`→`#0f172a`、`ink-on-brand`→`#ffffff`、`ink-link`→`#2563eb`。深色 base 不變。OQ-2 收斂。 |
 | 0.4 | 2026-07-18 | §5 補上 sidebar nav 互動 token `--color-nav-hover` / `--color-nav-active`（隨 [016 §4.2](./016-cms-sidebar-streamlit-nav.md) nav hover/尺寸對齊 Streamlit 實測值）；修正 §5 標題誤指的 016 §5 交叉引用（正確為 016 §4.1 背景 / §4.2 nav 互動）。 |
+| 0.5 | 2026-07-19 | ThemeToggle 放置點隨 [016 v0.4](./016-cms-sidebar-streamlit-nav.md) 兩層導覽由 `CmsNav` → `CmsTopBar`（頂部列右側 `ml-auto` 容器）；§3.6 / §0.2 / §4 檔案清單 / D6 同步更新。功能與排版不變。 |
 
 ---
 
-最後更新：2026-07-18（v0.4，已實作；淺色調色盤 + nav 互動 token 對齊 Streamlit，OQ-2 收斂）
+最後更新：2026-07-19（v0.5，已實作；ThemeToggle 放置點隨 016 v0.4 由 CmsNav → CmsTopBar）
