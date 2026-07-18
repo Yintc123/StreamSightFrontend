@@ -1,5 +1,11 @@
 # Spec 011：使用者管理模組（Admin 帳號管理 + 自助個人資料）
 
+> ⚠️ **已被 spec 013 取代（2026-07-18）**：本 spec 的資料模型假設（CMS 管理「User 帳號」，
+> `email` + `isActive`）**作廢**。本專案不碰一般 user；CMS 實際管理的是**其他 admin 帳號**
+> （`username` + `name` + `admin_role` + 封存/軟刪除生命週期 + 受保護 root），對接後端
+> `/admin/admins/...`。**權威規格改為 [spec 013（Admin 管理頁面）](./013-admin-management-page.md)**。
+> 本檔的靜態 UI（`/cms/users`）與視覺 token 決策仍可參考，但欄位/流程一律以 013 為準。
+
 - **狀態**：Draft（v0.2 — 對齊實作：A 子模組 `/cms/users` 的**靜態 UI 已落地**（可跑、無 fetch / 無 gate），本版把視覺契約從舊 spec 抄來的「brand 紅」修正為專案實際的**深色 observability + cyan** design system、登錄 prototype 檔案、回寫建置期的 UI 決策）
 - **建立日期**：2026-07-18（v0.1）
 - **設計系統**：深色 observability 主題（deep-slate 底 + electric cyan accent），token 定義見 [`src/app/globals.css`](../../src/app/globals.css)。**本 spec 一律用語義 token（`brand` / `ink-*` / `surface-*` / `line` / `ok`·`warn`·`danger`），不寫 hex、不沿用舊 spec 005/007 的「brand 紅」（那是深色化前的過時描述）。**
