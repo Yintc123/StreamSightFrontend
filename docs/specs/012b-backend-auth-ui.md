@@ -1,8 +1,11 @@
 # Spec 012b — Backend Auth：UI 面向（註冊面移除 / 登入表單）
 
-狀態：Draft **v0.1**（2026-07-18，自 spec 012 v0.4 拆出）
+狀態：**已實作（2026-07-18）**（v0.3；原 Draft v0.1，自 spec 012 v0.4 拆出）
 關係：本檔為 [spec 012（索引）](./012-backend-auth-integration.md) 的**UI 半**。
 契約 / BFF / adapter 等業務邏輯見 [spec 012a](./012a-backend-auth-logic.md)。
+
+> **實作對齊（2026-07-18）**：`RegisterCard` / `register/route.ts` / register schemas 已刪；
+> `/register` → `redirect('/')`（非 `/login`，見 §1.2）；`LoginCard` 移除「建立帳號」入口、登入提交流程不變。
 
 > **本檔刻意較薄**：spec 012 幾乎全是後端契約與 BFF 邏輯；面向瀏覽器的 UI 變更只有兩塊——
 > **移除公開自助註冊**、**登入表單維持不變**。兩者皆屬「純視覺 / user flow」，依 CLAUDE.md
@@ -23,7 +26,7 @@
 | 檔案 | 現況 | 處置 |
 |---|---|---|
 | `src/app/register/RegisterCard.tsx` | 存在（公開註冊表單） | **淘汰**（刪除，或整段移除） |
-| `src/app/register/page.tsx` | 存在（`/register` 頁） | **淘汰**，或改 `redirect('/login')`（擇一，見 §1.2） |
+| `src/app/register/page.tsx` | 存在（`/register` 頁） | **已改為 `redirect('/')`**（登入頁即首頁；見 §1.2） |
 | `src/app/api/auth/register/route.ts` | 存在（對接 `/auth/register` 一般 user） | **淘汰**（本專案不碰一般 user） |
 | 首頁「建立帳號」入口連結 | （若有）指向 `/register` | 移除 |
 | register 相關 mock / 測試 | 存在 | 一併移除，避免殘留失敗 |
@@ -34,8 +37,9 @@
 
 ### 1.2 `/register` 的處置：刪除 vs redirect
 
-- **建議**：`page.tsx` 改為 `redirect('/login')`（保留 URL 不 404，對舊書籤友善），並刪 `RegisterCard`。
-- 或整條路由刪除（`/register` → 404）。二擇一，屬視覺/路由決策，e2e 覆蓋「訪 `/register` 的結果」即可。
+- **定案（已實作）**：`page.tsx` 改為 **`redirect('/')`**，並刪 `RegisterCard`。
+  > ⚠️ 原 v0.1 寫 `redirect('/login')`，但**本專案無 `/login` 路由——登入頁就是首頁 `/`**（`LoginCard` 掛在 `page.tsx`）。故導向 `/` 才對，保留 URL 不 404、對舊書籤友善。
+- （備選：整條路由刪除 → `/register` 404。未採用。）
 
 ### 1.3 Admin 帳號從哪裡建
 
@@ -57,16 +61,16 @@
 > 對應 [012a §6](./012a-backend-auth-logic.md) 實作順序的 step 7（可與邏輯步驟並行，建議排在邏輯 login/refresh 綠之後，避免同時動太多）。
 
 1. 移除 `RegisterCard` / `register/route.ts` / 首頁註冊入口 / 相關 mock 與測試（§1.1）。
-2. `/register/page.tsx` 改 `redirect('/login')` 或刪路由（§1.2）。
+2. `/register/page.tsx` 改 `redirect('/')`（§1.2）。
 3. 確認 `LoginCard` 無需改動（§2），只跑既有測試確保綠。
 
 ## 4. 驗收（UI / e2e）
 
-- [ ] register 相關檔案（`RegisterCard`/`/register`/`register/route.ts`/mock）已淘汰、無殘留測試失敗。
-- [ ] 訪 `/register` 依 §1.2 決策：redirect 到 `/login`（或 404），不再顯示註冊表單。
-- [ ] 首頁無「建立帳號」公開入口。
-- [ ] LoginCard 以 username/password 登入成功 → 進 `/cms`（沿用 [012a](./012a-backend-auth-logic.md) 的 e2e happy path）。
+- [x] register 相關檔案（`RegisterCard`/`register/route.ts`/其 tests）已淘汰、無殘留測試失敗。
+- [x] 訪 `/register` → `redirect('/')`（登入首頁），不再顯示註冊表單。
+- [x] 首頁無「建立帳號」公開入口（`LoginCard` 已移除按鈕；`LoginCard.test.tsx` 斷言其不存在）。
+- [x] LoginCard 以 username/password 登入成功 → 進 `/cms`（e2e `smoke.spec.ts` + `cms-admins.spec.ts`；unit 覆蓋提交流程）。
 
 ---
 
-最後更新：2026-07-18（v0.2，自 spec 012 v0.4 拆出 UI 半；+§1 RegisterCard pattern 搬移提醒）
+最後更新：2026-07-18（v0.3，實作對齊：`/register`→`/`、LoginCard 移除註冊入口、驗收項打勾）

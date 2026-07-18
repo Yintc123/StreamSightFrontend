@@ -1,6 +1,6 @@
 # Spec 013 — Admin 管理頁面（CMS）（索引）
 
-狀態：Draft **v0.4**（2026-07-18）
+狀態：**已實作（2026-07-18）**（索引 v0.5）— 子檔 [013a](./013a-admin-management-logic.md) / [013b](./013b-admin-management-ui.md) 皆已落地並對齊
 取代：**覆寫 spec 011「使用者管理」的資料模型假設**。spec 011 假設 CMS 管理的是「User 帳號」
 （`email` + `isActive`）；**本專案不碰一般 user**（見 [spec 012a §2.1 名詞 / 012 §OQ-Q5](./012-backend-auth-integration.md)），
 CMS 實際管理的是**其他 admin 帳號**（`username` + `name` + `admin_role` + 封存/軟刪除生命週期 + 受保護 root）。

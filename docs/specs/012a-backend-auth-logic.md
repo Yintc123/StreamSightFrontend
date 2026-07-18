@@ -1,9 +1,15 @@
 # Spec 012a — Backend Auth：業務邏輯（契約 / BFF / adapter）
 
-狀態：Draft **v0.1**（2026-07-18，自 spec 012 v0.4 拆出）
+狀態：**已實作（2026-07-18）**（v0.3；原 Draft v0.1，自 spec 012 v0.4 拆出）
 關係：本檔為 [spec 012（索引）](./012-backend-auth-integration.md) 的**業務邏輯半**。
 UI 面向（移除公開註冊、LoginCard 行為）見 [spec 012b](./012b-backend-auth-ui.md)。
 **後端契約 source of truth = 本檔 §2**（2026-07-18 讀 `/StreamSightBackend` 原始碼驗證）。
+
+> **實作對齊（2026-07-18）**：§4 全數落地——`schemas/auth.ts`（`BackendTokenResponse`/`adaptTokenResponse`/
+> `BackendAdminMeResponse`/`AdminRole`）、`Role` 翻正 `{USER:0,ADMIN:1}` + `adminRole`、`backend.ts` 扁平錯誤碼 +
+> `if(activeSession)` 401 refresh、login route 打 `/admin/*` + `userId=sub` + 存 `adminRole`、`service.refresh()`
+> snake+Zod+adapter、`REFRESH_LOCK_TTL_MS=15s`、mock 對齊。§7 驗收全數對應到測試（見章末勾選）。
+> 額外：`backend.ts` 加 **204 No Content** 處理（供 013a `/me/password` 等）。
 
 > 章節號對照（供外部引用定位）：本檔 §2＝原 012 §3、§3＝原 §4、§4＝原 §5（邏輯部分）、
 > §5＝原 §6、§6＝原 §7（邏輯步驟）、§7＝原 §8（邏輯驗收）。原 §5.3（註冊移除）移至 012b。
@@ -295,23 +301,23 @@ adaptTokenResponse(raw, now):
 
 每步：先紅 → 綠 → 重構。
 
-## 7. 驗收清單（邏輯 Contract Tests）
+## 7. 驗收清單（邏輯 Contract Tests）— 全數實作並有測試（2026-07-18）
 
-- [ ] `/api/auth/login` 以 **username**/密碼 → 200，session role=ADMIN(1)，`/cms` 放行。
-- [ ] 後端回 snake token → BFF 正確解析，`expiresAt` 為未來時間（非 NaN）。
-- [ ] JWT `role=1` → ADMIN；`role=0` → USER；缺/未知 → USER。
-- [ ] `/admin/me` 回 `{id,username,name,admin_role}` → 正確映射（不因缺 email/createdAt 而 502）。
-- [ ] session `userId` == JWT `sub`（principal_id），非 `/admin/me.id`。
-- [ ] refresh：BFF 送 `{refresh_token}`，回應經 Zod + adapter，session token **確實更新**。
-- [ ] refresh 失敗（401）→ session destroy + 清 cookie。
-- [ ] 併發 refresh：僅一次打後端（鎖），其餘讀 cache，不觸發 reuse detection。
-- [ ] Role 常數翻轉後：所有既有 admin gate 測試/mock 斷言仍正確（無靜默倒置）。
-- [ ] session 帶 `adminRole`（super_admin/editor/viewer），供 spec 013 gate。
-- [ ] **backendFetch 扁平錯誤碼**：`passClientErrors` 對 `{error:'conflict',...}` 取得 `beCode='conflict'`。
-- [ ] **backendFetch 401 refresh**：已登入呼叫回扁平 `{error:'unauthorized'}` 401 → 觸發一次 refresh + 重試；重試仍 401 → destroy；`session:null` 呼叫不觸發遞迴 refresh。
+- [x] `/api/auth/login` 以 **username**/密碼 → 200，session role=ADMIN(1)。（`login/route.test.ts`；`/cms` 放行由 013a gate）
+- [x] 後端回 snake token → BFF 正確解析，`expiresAt` 為未來時間（非 NaN）。（login test「access ttl…」）
+- [x] JWT `role=1` → ADMIN；`role=0` → USER；缺/未知 → USER。（login test + `resolveRole`）
+- [x] `/admin/me` 回 `{id,username,name,admin_role}` → 正確映射（不因缺 email 而 502）。（`schemas/auth.test.ts`）
+- [x] session `userId` == JWT `sub`（principal_id），非 `/admin/me.id`。（login test：`SUB ≠ ADMIN_CHILD_ID`）
+- [x] refresh：BFF 送 `{refresh_token}`，回應經 Zod + adapter，session token **確實更新**。（`service.test.ts`）
+- [x] refresh 失敗（401）→ session destroy + 清 cookie。（`service.test.ts`「backend rejects…destroys local session」）
+- [x] 併發 refresh：僅一次打後端（鎖），其餘讀 cache。（`service.test.ts`「5 parallel…once」）
+- [x] Role 常數翻轉後：既有 admin gate 測試/mock 斷言仍正確（無靜默倒置）。（全套綠燈；斷言改用 `Role.ADMIN` 常數）
+- [x] session 帶 `adminRole`（super_admin/editor/viewer），供 spec 013 gate。（login test「stores adminRole…」）
+- [x] **backendFetch 扁平錯誤碼**：`passClientErrors` 對 `{error:'conflict',…}` 取得 `beCode='conflict'`。（`backend.test.ts`）
+- [x] **backendFetch 401 refresh**：扁平 `{error:'unauthorized'}` 401 → 一次 refresh + 重試；重試仍 401 → destroy；`session:null` 不遞迴。（`backend.test.ts`）
 
 （register 淘汰的驗收見 [spec 012b](./012b-backend-auth-ui.md)。）
 
 ---
 
-最後更新：2026-07-18（v0.2，自 spec 012 v0.4 拆出業務邏輯半；+§5b 復用對照）
+最後更新：2026-07-18（v0.3，實作對齊：檔頭已實作標記、§7 驗收全數勾選並註明對應測試）

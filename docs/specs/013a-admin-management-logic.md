@@ -1,9 +1,15 @@
 # Spec 013a — Admin 管理：業務邏輯（契約 / 授權 / BFF / mutation）
 
-狀態：Draft **v0.1**（2026-07-18，自 spec 013 v0.3 拆出）
+狀態：**已實作（2026-07-18）**（v0.3；原 Draft v0.1，自 spec 013 v0.3 拆出）
 關係：本檔為 [spec 013（索引）](./013-admin-management-page.md) 的**業務邏輯半**。
 頁面 / 元件 / 視覺 / 遷移 / e2e 見 [spec 013b](./013b-admin-management-ui.md)。
 後端契約權威 = [spec 012a](./012a-backend-auth-logic.md)。
+
+> **實作對齊（2026-07-18）**：`createAdminRoute`、`schemas/admin.ts`（Zod + snake↔camel adapter）、
+> `admin-fetch.ts`（validate→adapt）、`admin-routes.ts` 工廠 + `src/app/api/cms/admins*` / `/api/cms/me[/password]`
+> 路由、`admin-mock.ts` 皆已落地並有測試。差異：(1) §3.3 dispatch 擴充成**任意段 `:param` + 方法感知**（見 §3.3）；
+> (2) create 路由對外回 **201**、`/me/password` 成功回 **204** 並在 BFF `destroy()` session；(3) `backendFetch` 加了
+> **204 無 body** 處理。
 
 > 章節號對照（供引用定位）：本檔 §1＝原 013 §3、§2＝原 §4（授權）、§3＝原 §5（BFF）、
 > §4＝原 §6（Zod）、§5＝原 §8（mutation）、§6＝原 §9（邏輯測試）。頁面/元件（原 §7/§10）移至 013b。
@@ -204,11 +210,15 @@ export function createAdminRoute<TBody, TQuery, TParams>(
 - **執行期 mock（`USE_MOCK=1`，dev server / e2e smoke 無真後端）**：走 `src/lib/mock`
   （`registerMock`/`resolveMock`），需新增 `admin-mock` handlers 覆蓋 `/admin/admins`、`/admin/me` 等。
 
-執行期 mock harness 兩個限制的處置（Q6 已定案）：
-1. **中段參數（本期擴充）**：`registerMock` 現只支援結尾單一 `:param`（`dispatch.ts:27-29` 對中段參數 throw，
-   `dispatch.test.ts:71` 有守）。本頁需 `/admin/admins/:id/role|archive|unarchive|restore`（中段 `:id` + 結尾動作）→
-   **本期擴充 `registerMock`/`resolveMock` 支援中段 `:param`**（多段 pattern 比對），否則生命週期端點在
-   `USE_MOCK=1` 下連 happy path 都跑不了。小範圍 `dispatch.ts` 修改，**需先寫測試**（現有結尾 `:param` 行為不可回歸）。
+執行期 mock harness 兩個限制的處置（Q6 已定案；**已實作**）：
+1. **任意段參數（已擴充，範圍比原規劃大）**：原規劃只擴充「中段 `:param`」；**實作改為 `:param` 可在任意段**
+   （`resolveMock` 以「段數相同 + 逐段比對」比對，`registerMock` 存整條 `path.split('/')`）。除中段 `:id`
+   （`/admin/admins/:id/role|archive|unarchive|restore`）外，結尾 `:id`（`/admin/admins/:id`）也走同一機制。
+   舊「結尾單一 `:param`」行為由 `dispatch.test.ts` 保護不回歸。
+   - **額外實作：mock 層改為方法感知**——`backendFetch` 把 HTTP method 傳進 handler（`opts.method`）。因為
+     `GET/POST /admin/admins`（list vs create）與 `GET/PATCH/DELETE /admin/admins/:id`（detail vs rename vs
+     delete）**共用路徑但需不同回應**，執行期 mock 本是 method-agnostic，故一併擴充讓單一 handler 依 method 分流
+     （`admin-mock.ts` 的 `adminCollectionHandler` / `adminItemHandler`）。`dispatch.test.ts` + `backend.test.ts` 有守。
 2. **無狀態碼（不擴充）**：mock handler 只回成功 body，無法模擬 409/422/404。**刻意不擴充**（過度工程）。→
    `USE_MOCK=1` e2e **只覆蓋 happy path**；錯誤與守衛一律靠上面的 **MSW 單元/整合測試**。
 

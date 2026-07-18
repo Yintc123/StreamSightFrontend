@@ -1,6 +1,6 @@
 # Spec 012 — Backend Auth 契約與 BFF 對接重規劃（索引）
 
-狀態：Draft **v0.5**（2026-07-18）
+狀態：**已實作（2026-07-18）**（索引 v0.6）— 子檔 [012a](./012a-backend-auth-logic.md) / [012b](./012b-backend-auth-ui.md) 皆已落地並對齊
 取代：本組規格為 **BFF ↔ 後端 auth 對接的權威契約**，覆寫 spec 005 / 007 / 010 中對「舊 JKODonation
 後端」的過時假設（欄位名、`/auth/me`、role 值、token 形狀）。
 
