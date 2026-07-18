@@ -21,10 +21,10 @@ describe('LoginCard', () => {
     expect(screen.getByLabelText('密碼')).toBeInTheDocument()
   })
 
-  it('渲染「登入後台」+「建立帳號」兩顆按鈕', () => {
+  it('只渲染「登入後台」按鈕，無公開註冊入口（spec 012b §1）', () => {
     render(<LoginCard />)
     expect(screen.getByRole('button', { name: '登入後台' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '建立帳號' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '建立帳號' })).not.toBeInTheDocument()
   })
 
   it('username 為空 → 登入按鈕 disabled', () => {
@@ -75,12 +75,4 @@ describe('LoginCard', () => {
     expect(routerPushMock).not.toHaveBeenCalled()
   })
 
-  it('「建立帳號」按鈕 → 跳 /register（spec 007 v0.2；不打 API）', () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
-    render(<LoginCard />)
-    fireEvent.click(screen.getByRole('button', { name: '建立帳號' }))
-    expect(routerPushMock).toHaveBeenCalledWith('/register')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
 })

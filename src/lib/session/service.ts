@@ -4,8 +4,10 @@ import { randomBytes } from 'node:crypto'
 import { readSessionId, writeSessionId, clearSessionCookie, newSessionId } from './cookie'
 import { getSessionStore } from './store'
 import { backendFetch } from '@/lib/api/backend'
+import { BackendTokenResponse, adaptTokenResponse } from '@/lib/schemas/auth'
 import { UnauthenticatedError } from '@/lib/errors/UnauthenticatedError'
 import { BackendUpstreamError } from '@/lib/errors/BackendUpstreamError'
+import { ContractViolationError } from '@/lib/errors/ContractViolationError'
 import {
   REFRESH_LOCK_TTL_MS,
   REFRESH_POLLER_TIMEOUT_MS,
@@ -13,11 +15,13 @@ import {
   FRESH_TOKENS_TTL_MS,
   CSRF_TOKEN_BYTES,
 } from '@/lib/api/constants'
-import type { RoleValue, StoredSession, TokenPair } from './types'
+import type { AdminRole, RoleValue, StoredSession, TokenPair } from './types'
 
 export interface CreateSessionInput {
   user: { id: string; name: string }
   role: RoleValue
+  /** admin_role ladder; only set for admin sessions (spec 012a §4.8). */
+  adminRole?: AdminRole
   tokens: TokenPair
 }
 
@@ -73,6 +77,7 @@ export const getSessionService = cache((): SessionService => {
         refreshTokenExpiresAt: input.tokens.refreshTokenExpiresAt,
         user: input.user,
         role: input.role,
+        ...(input.adminRole ? { adminRole: input.adminRole } : {}),
         csrfToken,
         createdAt: Date.now(),
       }
@@ -149,12 +154,22 @@ export const getSessionService = cache((): SessionService => {
           }
           let data: TokenPair
           try {
-            const res = await backendFetch<TokenPair>('/auth/refresh', {
+            // Spec 012a §4.7 — send snake body, Zod-validate the snake
+            // response, then adapt to camel + absolute time. Do NOT spread the
+            // raw response (key mismatch would silently keep the old token →
+            // reuse detection → family revocation → forced logout).
+            const res = await backendFetch<unknown>('/auth/refresh', {
               method: 'POST',
-              body: { refreshToken: current.refreshToken },
+              body: { refresh_token: current.refreshToken },
               session: null, // explicit per spec 001c §3.2
             })
-            data = res.data
+            const parsed = BackendTokenResponse.safeParse(res.data)
+            if (!parsed.success) {
+              throw new ContractViolationError(
+                `BE /auth/refresh response shape mismatch: ${parsed.error.message}`,
+              )
+            }
+            data = adaptTokenResponse(parsed.data, Date.now())
           } catch (err) {
             // Backend rejected the refresh token (or any other auth failure).
             // Per spec 001c §3 step "401 UNAUTHORIZED → destroy() + 401":

@@ -1,18 +1,16 @@
-// Spec 007 v0.2 §4.1 — Auth-related Zod schemas (register flow).
+// Auth-related Zod schemas.
 //
-// Boundary contracts:
-//   - RegisterRequest:        client + BFF inbound body
-//   - BackendRegisterResponse: shape BE 008 §8.1 returns from POST /auth/register
-//   - BackendMeResponse:       shape BE 008 §6.4 returns from GET /auth/me
-//   - ClientUser:              shape FE persists in iron-session and shows in UI
+// Spec 012a §2/§4.4 — the backend admin auth line (POST /admin/auth/login,
+// GET /admin/me, POST /auth/refresh) speaks snake_case with no camelCase
+// alias; the BFF absorbs the gap here + in a single `adaptTokenResponse`.
 //
-// Rules mirror BE spec 008 v0.6 verbatim so client / BFF / backend agree
-// on lengths and regex; client validation is pre-flight UX, BE is source
-// of truth and will reject anything the client failed to catch.
+// The public self-registration flow (spec 007) was removed by spec 012b;
+// its schemas are gone. Field rule constants stay — spec 013 admin schemas
+// reuse the same length/regex conventions.
 
 import { z } from 'zod'
 
-// ─── Field rules (BE 008 §3.2 / §3.4) ──────────────────────────────
+// ─── Field rules (username / password) ─────────────────────────────
 
 export const USERNAME_MIN = 3
 export const USERNAME_MAX = 30
@@ -32,48 +30,65 @@ export const Password = z
   .min(PASSWORD_MIN, '密碼至少 8 個字元')
   .max(PASSWORD_MAX, '密碼最多 256 字元')
 
-// ─── Request body (client + BFF; passwordConfirm NOT sent) ────────
+// ─── Backend auth contract (spec 012a §2/§4.4) ────────────────────
+//
+// The backend speaks snake_case with no global camelCase alias. The BFF
+// absorbs the gap in a single adapter (`adaptTokenResponse`) rather than
+// scattering field renames across routes.
 
-export const RegisterRequest = z.object({
-  username: Username,
-  password: Password,
+/** admin_role ladder within the admin principal (spec 012a §1). */
+export const AdminRole = z.enum(['super_admin', 'editor', 'viewer'])
+export type AdminRole = z.infer<typeof AdminRole>
+
+/**
+ * `TokenResponse` (spec 012a §2.4): snake_case, `token_type` lowercase
+ * `"bearer"`, `expires_in` is the ACCESS token's remaining seconds. There
+ * is no refresh-token expiry field — the BFF derives it from a fallback.
+ */
+export const BackendTokenResponse = z.object({
+  access_token: z.string().min(1),
+  token_type: z.string(), // "bearer"; case-insensitive, not asserted
+  refresh_token: z.string().min(1),
+  expires_in: z.number().int().positive(), // access seconds
 })
-export type RegisterRequest = z.infer<typeof RegisterRequest>
+export type BackendTokenResponse = z.infer<typeof BackendTokenResponse>
 
-// ─── Backend responses ────────────────────────────────────────────
-
-export const BackendRegisterResponse = z.object({
-  accessToken: z.string().min(1),
-  accessExpiresIn: z.number().int().positive(), // seconds
-  refreshToken: z.string().min(1),
-  refreshExpiresIn: z.number().int().positive(), // seconds
-  tokenType: z.literal('Bearer'),
+/**
+ * `/admin/me` (spec 012a §2.5): `{ id, username, name, admin_role }`. No
+ * email / is_active / role. `id` is the admin child PK (int), NOT the JWT
+ * `sub` (principal_id) — do not persist it as the session userId (§4.5).
+ */
+export const BackendAdminMeResponse = z.object({
+  id: z.number().int(),
+  username: z.string(),
+  name: z.string(),
+  admin_role: AdminRole,
 })
-export type BackendRegisterResponse = z.infer<typeof BackendRegisterResponse>
+export type BackendAdminMeResponse = z.infer<typeof BackendAdminMeResponse>
 
-export const BackendMeResponse = z.object({
-  id: z.string().min(1),
-  username: z.string().nullable(),
-  email: z.string().nullable(),
-  displayOrder: z.number().int().nullable().optional(),
-  // v0.2 — role is optional: BE 008 §6.4 doesn't list it in the /me
-  // response table, but the JWT carries `role` per spec 007 §10.10.
-  // Until /me is confirmed to return it we accept absence and the BFF
-  // can fall back to USER (1).
-  role: z.number().int().optional(),
-  createdAt: z.string(),
-  updatedAt: z.string().optional(),
-  lastLoginAt: z.string().nullable().optional(),
-  lastLoginType: z.string().nullable().optional(),
-})
-export type BackendMeResponse = z.infer<typeof BackendMeResponse>
+/**
+ * BE returns no refresh-token expiry (spec 012a §4.4 / 索引 §OQ-Q2). Track
+ * it optimistically with the backend default (14d); reuse detection on the
+ * backend is the real guard, so a slightly stale local expiry is safe.
+ */
+export const REFRESH_TTL_FALLBACK_MS = 14 * 24 * 60 * 60 * 1000
 
-// ─── Client-facing user (what BFF returns + what session stores) ──
+export type AdaptedTokens = {
+  accessToken: string
+  accessTokenExpiresAt: number
+  refreshToken: string
+  refreshTokenExpiresAt: number
+}
 
-export type ClientUser = {
-  id: string
-  /** display name for UI; BE returns `username` (may be null if email-only) */
-  name: string
-  email: string | null
-  role: number
+/** snake → camel + relative seconds → absolute epoch-ms (spec 012a §4.4). */
+export function adaptTokenResponse(
+  raw: BackendTokenResponse,
+  now: number,
+): AdaptedTokens {
+  return {
+    accessToken: raw.access_token,
+    accessTokenExpiresAt: now + raw.expires_in * 1000,
+    refreshToken: raw.refresh_token,
+    refreshTokenExpiresAt: now + REFRESH_TTL_FALLBACK_MS,
+  }
 }

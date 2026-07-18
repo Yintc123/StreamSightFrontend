@@ -93,9 +93,16 @@ export async function backendFetch<T = unknown>(
     let retried = false
     if (response.status === 401) {
       const errBody = await safeReadJson(response)
-      const backendCode = errBody?.error?.code
+      const backendCode = readBackendCode(errBody)
 
-      if (activeSession && backendCode === 'AUTH_TOKEN_EXPIRED') {
+      // Spec 012a §4.10 — the backend collapses every 401 (expired / invalid
+      // / disabled) to a single generic `unauthorized` code, so we cannot
+      // gate the refresh on a specific code. Instead: any logged-in call that
+      // 401s gets ONE refresh + retry. A 401 in a non-safe mutation means the
+      // backend rejected it at the authz layer BEFORE executing, so retrying
+      // it is safe. Internal `session: null` calls (e.g. /auth/refresh itself)
+      // skip this so we don't recurse.
+      if (activeSession) {
         const refreshed = await getSessionService().refresh()
         headers.authorization = `Bearer ${refreshed.accessToken}`
         try {
@@ -110,14 +117,8 @@ export async function backendFetch<T = unknown>(
         }
         retried = true
       } else {
-        // Both session and non-session 401s collapse to UNAUTHENTICATED at the
-        // BFF boundary. The destroy step only applies when we actually have a
-        // session to revoke; the no-session case (e.g. internal /auth/refresh
-        // when the refresh token itself is rejected) still surfaces as 401 so
-        // SessionService.refresh() can wire its own destroy.
-        if (activeSession) {
-          await getSessionService().destroy().catch(() => {})
-        }
+        // No session to refresh/revoke — collapse to UNAUTHENTICATED so the
+        // caller (e.g. SessionService.refresh) can wire its own destroy.
         throw new UnauthenticatedError(backendCode ?? 'UNAUTHORIZED')
       }
     }
@@ -137,13 +138,10 @@ export async function backendFetch<T = unknown>(
       // status to reach the FE opt in via `passClientErrors`.
       if (options.passClientErrors) {
         const errBody = await safeReadJson(response)
-        const beCode = errBody?.error?.code ?? null
-        const beMsg =
-          (errBody?.error as { message?: unknown } | undefined)?.message
+        const beCode = readBackendCode(errBody)
+        const beMsg = readBackendMessage(errBody)
         const message =
-          typeof beMsg === 'string' && beMsg.length > 0
-            ? beMsg
-            : `Backend ${response.status}`
+          beMsg && beMsg.length > 0 ? beMsg : `Backend ${response.status}`
         throw new BackendClientError(response.status, beCode, message)
       }
       throw new BackendUpstreamError(`Unexpected backend status ${response.status}`)
@@ -210,12 +208,37 @@ function classifyNetworkError(err: unknown): BffError {
   return new BackendUpstreamError('Network error', err)
 }
 
-async function safeReadJson(
-  res: Response,
-): Promise<{ error?: { code?: string } } | null> {
+async function safeReadJson(res: Response): Promise<unknown> {
   try {
     return await res.clone().json()
   } catch {
     return null
   }
+}
+
+/**
+ * Spec 012a §4.10 — the backend error body is `{ error: '<code>', message,
+ * details }` where `error` is a FLAT string code. A legacy defensive branch
+ * still reads a nested `error.code` object shape in case anything upstream
+ * has not migrated.
+ */
+function readBackendCode(errBody: unknown): string | null {
+  const e = (errBody as { error?: unknown } | null | undefined)?.error
+  if (typeof e === 'string') return e
+  if (e && typeof e === 'object') {
+    return (e as { code?: string }).code ?? null
+  }
+  return null
+}
+
+/** Prefer the top-level `message`; fall back to a nested `error.message`. */
+function readBackendMessage(errBody: unknown): string | null {
+  const top = (errBody as { message?: unknown } | null | undefined)?.message
+  if (typeof top === 'string' && top.length > 0) return top
+  const e = (errBody as { error?: unknown } | null | undefined)?.error
+  if (e && typeof e === 'object') {
+    const m = (e as { message?: unknown }).message
+    if (typeof m === 'string' && m.length > 0) return m
+  }
+  return null
 }

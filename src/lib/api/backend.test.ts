@@ -237,8 +237,11 @@ describe('pre-emptive refresh', () => {
   })
 })
 
-describe('reactive refresh on 401', () => {
-  it('AUTH_TOKEN_EXPIRED → refresh + retry → success', async () => {
+// Spec 012a §4.10 — the backend has NO per-expiry 401 code; every 401 is a
+// flat `{ error: 'unauthorized', ... }`. So a logged-in call retries via a
+// single refresh on ANY 401, rather than gating on a specific code.
+describe('reactive refresh on 401 (flat contract)', () => {
+  it('flat unauthorized 401 + session → refresh + retry → success', async () => {
     refreshMock.mockResolvedValueOnce({
       ...makeSession(),
       accessToken: 'refreshed-token',
@@ -250,7 +253,7 @@ describe('reactive refresh on 401', () => {
       callCount++
       if (callCount === 1) {
         return HttpResponse.json(
-          { error: { code: 'AUTH_TOKEN_EXPIRED' } },
+          { error: 'unauthorized', message: 'token expired' },
           { status: 401 },
         )
       }
@@ -268,24 +271,13 @@ describe('reactive refresh on 401', () => {
     expect(destroyMock).not.toHaveBeenCalled()
   })
 
-  it('UNAUTHORIZED → destroy + UnauthenticatedError, no refresh', async () => {
-    mockBackend('get', 'http://backend.test/items', () =>
-      HttpResponse.json({ error: { code: 'UNAUTHORIZED' } }, { status: 401 }),
-    )
-    await expect(
-      backendFetch('/items', { session: makeSession() }),
-    ).rejects.toMatchObject({ code: 'UNAUTHENTICATED', httpStatus: 401 })
-    expect(refreshMock).not.toHaveBeenCalled()
-    expect(destroyMock).toHaveBeenCalledTimes(1)
-  })
-
   it('refresh succeeded but retry still 401 → destroy + UnauthenticatedError', async () => {
     refreshMock.mockResolvedValueOnce({
       ...makeSession(),
       accessToken: 'refreshed-token',
     })
     mockBackend('get', 'http://backend.test/items', () =>
-      HttpResponse.json({ error: { code: 'AUTH_TOKEN_EXPIRED' } }, { status: 401 }),
+      HttpResponse.json({ error: 'unauthorized' }, { status: 401 }),
     )
 
     await expect(
@@ -295,9 +287,9 @@ describe('reactive refresh on 401', () => {
     expect(destroyMock).toHaveBeenCalledTimes(1)
   })
 
-  it('no session: 401 still becomes UnauthenticatedError but skips destroy', async () => {
+  it('no session: 401 becomes UnauthenticatedError, no refresh, no destroy', async () => {
     mockBackend('get', 'http://backend.test/items', () =>
-      HttpResponse.json({ error: { code: 'UNAUTHORIZED' } }, { status: 401 }),
+      HttpResponse.json({ error: 'unauthorized' }, { status: 401 }),
     )
     await expect(backendFetch('/items')).rejects.toMatchObject({
       code: 'UNAUTHENTICATED',
@@ -311,7 +303,7 @@ describe('reactive refresh on 401', () => {
     const { BackendUpstreamError } = await import('@/lib/errors')
     refreshMock.mockRejectedValueOnce(new BackendUpstreamError('redis down'))
     mockBackend('get', 'http://backend.test/items', () =>
-      HttpResponse.json({ error: { code: 'AUTH_TOKEN_EXPIRED' } }, { status: 401 }),
+      HttpResponse.json({ error: 'unauthorized' }, { status: 401 }),
     )
     await expect(
       backendFetch('/items', { session: makeSession() }),
@@ -319,9 +311,50 @@ describe('reactive refresh on 401', () => {
       code: 'BACKEND_UPSTREAM_ERROR',
       httpStatus: 502,
     })
-    // The spec'd fail-closed invariant: we did NOT silently degrade to a
-    // session-less anonymous retry. Backend should be hit once (the original
-    // 401) and never again.
+    // Fail-closed: no silent degrade to a session-less anonymous retry.
+  })
+})
+
+describe('passClientErrors (flat error contract)', () => {
+  it('reads the flat `error` string as the upstream code + top-level message', async () => {
+    mockBackend('post', 'http://backend.test/admin/admins', () =>
+      HttpResponse.json(
+        { error: 'conflict', message: '帳號已被使用', details: {} },
+        { status: 409 },
+      ),
+    )
+    await expect(
+      backendFetch('/admin/admins', {
+        method: 'POST',
+        body: { username: 'dup' },
+        passClientErrors: true,
+      }),
+    ).rejects.toMatchObject({
+      code: 'BACKEND_CLIENT_ERROR',
+      upstreamStatus: 409,
+      upstreamCode: 'conflict',
+      message: '帳號已被使用',
+    })
+  })
+
+  it('422 validation_error with details is surfaced', async () => {
+    mockBackend('post', 'http://backend.test/admin/admins', () =>
+      HttpResponse.json(
+        { error: 'business_rule_violation', message: 'cannot demote root' },
+        { status: 422 },
+      ),
+    )
+    await expect(
+      backendFetch('/admin/admins', {
+        method: 'POST',
+        body: {},
+        passClientErrors: true,
+      }),
+    ).rejects.toMatchObject({
+      upstreamStatus: 422,
+      upstreamCode: 'business_rule_violation',
+      message: 'cannot demote root',
+    })
   })
 })
 

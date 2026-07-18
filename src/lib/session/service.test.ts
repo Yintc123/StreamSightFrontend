@@ -224,23 +224,45 @@ describe('refresh — happy paths', () => {
     expect(got.accessToken).toBe('at-fresh')
   })
 
-  it('lock acquired: hits backend, writes cache, updates session', async () => {
+  it('lock acquired: hits backend, validates+adapts snake body, writes cache, updates session', async () => {
     const svc = getSessionService()
     await svc.create({ user: USER, role: Role.USER, tokens: tokens() })
 
-    const newTokens = tokens('-new')
-    backendFetchMock.mockResolvedValueOnce({ data: newTokens })
+    // Spec 012a §4.7 — the backend returns snake_case; refresh() must
+    // Zod-validate + adapt to absolute time before persisting.
+    backendFetchMock.mockResolvedValueOnce({
+      data: {
+        access_token: 'at-new',
+        token_type: 'bearer',
+        refresh_token: 'rt-new',
+        expires_in: 1800,
+      },
+    })
 
     const result = await svc.refresh()
     expect(backendFetchMock).toHaveBeenCalledTimes(1)
     const [path, opts] = backendFetchMock.mock.calls[0]
     expect(path).toBe('/auth/refresh')
     expect(opts.method).toBe('POST')
-    expect(opts.body).toEqual({ refreshToken: 'rt' })
+    expect(opts.body).toEqual({ refresh_token: 'rt' }) // snake body
     expect(opts.session).toBeNull() // §3.2: refresh path explicitly omits old session
 
     expect(result.accessToken).toBe('at-new')
-    expect(await sharedStore.getCachedTokens(USER.id)).toEqual(newTokens)
+    expect(result.refreshToken).toBe('rt-new')
+    // adapter converts expires_in → absolute epoch-ms (future)
+    expect(result.accessTokenExpiresAt).toBeGreaterThan(Date.now())
+    const cached = await sharedStore.getCachedTokens(USER.id)
+    expect(cached!.accessToken).toBe('at-new')
+    expect(cached!.refreshToken).toBe('rt-new')
+  })
+
+  it('rejects a malformed (camelCase) refresh response → ContractViolationError', async () => {
+    const svc = getSessionService()
+    await svc.create({ user: USER, role: Role.USER, tokens: tokens() })
+    backendFetchMock.mockResolvedValueOnce({
+      data: { accessToken: 'x', refreshToken: 'y', accessExpiresIn: 1 },
+    })
+    await expect(svc.refresh()).rejects.toThrow(/contract|shape|mismatch|invalid/i)
   })
 })
 
@@ -249,11 +271,17 @@ describe('refresh — concurrent dedup (critical, §5.2)', () => {
     const svc = getSessionService()
     await svc.create({ user: USER, role: Role.USER, tokens: tokens() })
 
-    const newTokens = tokens('-dedup')
+    const snakeResponse = {
+      data: {
+        access_token: 'at-dedup',
+        token_type: 'bearer',
+        refresh_token: 'rt-dedup',
+        expires_in: 1800,
+      },
+    }
     // backend call takes a measurable amount of time so pollers actually wait
     backendFetchMock.mockImplementation(
-      () =>
-        new Promise((r) => setTimeout(() => r({ data: newTokens }), 120)),
+      () => new Promise((r) => setTimeout(() => r(snakeResponse), 120)),
     )
 
     const results = await Promise.all([

@@ -4,14 +4,14 @@ import { useRouter } from 'next/navigation'
 import { Field } from './auth/Field'
 
 /**
- * Spec 005 — 首頁登入卡片
+ * Spec 005 — 首頁登入卡片（登入 only）
  *
  * 帳密欄位目前**僅做客端非空驗證**；送出時呼叫 POST /api/auth/login，BFF
- * 橋接 BE /auth/login + /auth/me → iron-session。成功 → /cms；失敗 → 顯示
- * inline 錯誤。
+ * 橋接 BE /admin/auth/login + /admin/me → iron-session（spec 012a §4.1）。
+ * 成功 → /cms；失敗 → 顯示 inline 錯誤。
  *
- * 「建立帳號」按鈕純前端導航 → /register（spec 007 v0.2；目前 placeholder，
- * spec 已對齊 BE spec 008 v0.6 帳密註冊 contract，待 hook + BFF 實作）。
+ * 公開自助註冊已移除（spec 012b §1）：新增 admin 一律由已登入的 SUPER_ADMIN
+ * 於 CMS 內建立（spec 013b）。故本卡片不再有「建立帳號」入口。
  */
 export function LoginCard() {
   const router = useRouter()
@@ -91,15 +91,6 @@ export function LoginCard() {
                      hover:bg-brand-400"
         >
           {isPending ? '登入中…' : '登入後台'}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push('/register')}
-          className="h-11 rounded-lg bg-surface-card border border-brand text-brand text-base font-medium leading-6
-                     focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand
-                     hover:bg-brand/5"
-        >
-          建立帳號
         </button>
       </form>
     </section>

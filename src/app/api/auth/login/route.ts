@@ -1,11 +1,15 @@
-// Spec 005 §3 — homepage password login. Bridges to BE /auth/login so the
-// issued session carries a real JWT. Symmetric with /api/auth/register.
+// Spec 012a §4.1/§4.4/§4.8 — admin password login. The BFF drives the
+// backend's admin auth line and hides the snake_case contract:
 //
-//   1. POST /auth/login  { identifier, password }  → tokens
-//   2. GET  /auth/me     Bearer ${access}          → user (role from JWT)
-//   3. getSessionService().create(...)
+//   1. POST /admin/auth/login  { username, password }  → TokenResponse
+//   2. GET  /admin/me          Bearer ${access}        → AdminResponse
+//   3. getSessionService().create(...) with adminRole embedded
 //
-// csrfExempt=true — unauthenticated anonymous POST has no session to defend.
+// The public browser contract is unchanged (§4.9):
+//   { data: { sessionId, csrfToken, user: { id, name }, expiresAt } }
+//
+// csrfExempt=true — an unauthenticated anonymous POST has no session to
+// defend; Origin is still checked by createRoute.
 
 import 'server-only'
 import { z } from 'zod'
@@ -17,8 +21,9 @@ import { ContractViolationError } from '@/lib/errors/ContractViolationError'
 import { getSessionService } from '@/lib/session/service'
 import { Role, type RoleValue } from '@/lib/session/types'
 import {
-  BackendMeResponse,
-  BackendRegisterResponse as BackendLoginResponse,
+  BackendTokenResponse,
+  BackendAdminMeResponse,
+  adaptTokenResponse,
 } from '@/lib/schemas/auth'
 
 const LoginBody = z.object({
@@ -31,17 +36,12 @@ const NO_STORE_HEADERS = {
   'cache-control': 'no-store, private',
 } as const
 
-function resolveRole(
-  meRole: number | null | undefined,
-  accessToken: string,
-): RoleValue {
-  // /me wins if BE ships role there in a future API rev.
-  if (meRole === Role.ADMIN || meRole === Role.USER) {
-    return meRole
-  }
+// Spec 012a §4.6 — the JWT `role` claim is the principal-type discriminator
+// (0=USER, 1=ADMIN). Read it straight from the token; unknown → USER
+// (fail-safe). /admin/me carries no `role`, so there is no /me override.
+function resolveRole(accessToken: string): RoleValue {
   const claims = decodeJwtPayload(accessToken)
-  const claimRole = claims?.role
-  return claimRole === Role.ADMIN ? Role.ADMIN : Role.USER
+  return claims?.role === Role.ADMIN ? Role.ADMIN : Role.USER
 }
 
 export const POST = createRoute({
@@ -50,57 +50,54 @@ export const POST = createRoute({
   handler: async ({ body, requestId }) => {
     const { identifier, password } = body
 
-    // Step 1 — BE /auth/login
-    const { data: rawTokens } = await backendFetch<unknown>('/auth/login', {
-      method: 'POST',
-      body: { identifier, password },
-      requestId,
-      passClientErrors: true,
-    })
-    const tokensParsed = BackendLoginResponse.safeParse(rawTokens)
+    // Step 1 — BE /admin/auth/login. `identifier` carries username semantics
+    // (admins have no email); the backend DTO normalises (strip + lower).
+    const { data: rawTokens } = await backendFetch<unknown>(
+      '/admin/auth/login',
+      {
+        method: 'POST',
+        body: { username: identifier, password },
+        requestId,
+        passClientErrors: true,
+      },
+    )
+    const tokensParsed = BackendTokenResponse.safeParse(rawTokens)
     if (!tokensParsed.success) {
       throw new ContractViolationError(
-        `BE /auth/login response shape mismatch: ${tokensParsed.error.message}`,
+        `BE /admin/auth/login response shape mismatch: ${tokensParsed.error.message}`,
       )
     }
-    const tokens = tokensParsed.data
+    const now = Date.now()
+    const tokens = adaptTokenResponse(tokensParsed.data, now)
 
-    // Step 2 — BE /auth/me with Bearer.
-    const { data: rawMe } = await backendFetch<unknown>('/auth/me', {
+    // Step 2 — BE /admin/me with Bearer for the display name + admin_role.
+    const { data: rawMe } = await backendFetch<unknown>('/admin/me', {
       method: 'GET',
       headers: { authorization: `Bearer ${tokens.accessToken}` },
       requestId,
     })
-    const meParsed = BackendMeResponse.safeParse(rawMe)
+    const meParsed = BackendAdminMeResponse.safeParse(rawMe)
     if (!meParsed.success) {
       throw new ContractViolationError(
-        `BE /auth/me response shape mismatch: ${meParsed.error.message}`,
+        `BE /admin/me response shape mismatch: ${meParsed.error.message}`,
       )
     }
     const me = meParsed.data
 
-    // Step 3 — session.create with the real tokens.
-    //
-    // BE /auth/me does NOT return `role` (BE 008 §6.4 — role lives only
-    // in the JWT claims per spec 007 §10.10). Decode the access token to
-    // read it; the response Zod schema accepts `role` as optional so we
-    // fall back to JWT only when BE omits it from /me.
-    const now = Date.now()
-    const accessTokenExpiresAt = now + tokens.accessExpiresIn * 1000
-    const refreshTokenExpiresAt = now + tokens.refreshExpiresIn * 1000
-    const name = me.username ?? me.email ?? 'User'
-    const role = resolveRole(me.role, tokens.accessToken)
-    const user = { id: me.id, name }
+    // Step 3 — session.create. The stable user identity is the JWT `sub`
+    // (principal_id), NOT me.id (admin child PK) — see §2.7/§4.5.
+    const claims = decodeJwtPayload(tokens.accessToken)
+    const principalId =
+      typeof claims?.sub === 'string' ? claims.sub : String(claims?.sub ?? me.id)
+    const role = resolveRole(tokens.accessToken)
+    const user = { id: principalId, name: me.name }
 
     const result = await getSessionService().create({
       user,
       role,
-      tokens: {
-        accessToken: tokens.accessToken,
-        accessTokenExpiresAt,
-        refreshToken: tokens.refreshToken,
-        refreshTokenExpiresAt,
-      },
+      // admin_role from /admin/me is the freshest authoritative value (§4.8).
+      adminRole: me.admin_role,
+      tokens,
     })
 
     return new Response(
@@ -109,7 +106,7 @@ export const POST = createRoute({
           sessionId: result.sessionId,
           csrfToken: result.csrfToken,
           user,
-          expiresAt: accessTokenExpiresAt,
+          expiresAt: tokens.accessTokenExpiresAt,
         },
       }),
       { status: 200, headers: NO_STORE_HEADERS },
