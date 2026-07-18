@@ -88,6 +88,11 @@
 - **Q5（登入分流）**：✅ **已決**——本專案**不碰一般 user**，只做後台 admin 線。
 - **Q6（admin_role UI）**：✅ **已釘為本期必做**——`adminRole` 存 session（[012a §4.8](./012a-backend-auth-logic.md)），供
   spec 013 gate。
+- **Q7（admin refresh token 核發）**：⚠️ **後端待補**——`POST /admin/auth/login` 目前回傳 `refresh_token: null`，
+  admin session 壽命受限於 access token（預設 30 分），到期即強制重登。
+  **後端需補實作**：admin 登入應同 user 登入一樣核發 opaque refresh token，使 BFF 現有的
+  rotation / reuse-detection / lock 機制得以啟動（[012a §2.3](./012a-backend-auth-logic.md) 已完整設計）。
+  BFF 已做防禦處理（nullable schema + `!refreshToken` guard），後端補發後**不需改 BFF**，自動生效。
 
 ---
 
@@ -98,6 +103,7 @@
 | 0.1 | 2026-07-17 | 初版（對舊 admin 契約假設，後被 v0.2 修正）。 |
 | 0.2 | 2026-07-18 | 對 2026-07-18 後端原始碼重新驗證：admin username 登入、`/admin/me` 形狀、`grade` claim、註冊最終定案（移除公開自助）。 |
 | 0.3 | 2026-07-18 | dev-ready 修訂：補 C9/M8（`backendFetch` 舊巢狀錯誤契約）→ §5.10；`adminRole` 存 session 升為本期必做。 |
+| 0.4 | 2026-07-18 | 補 OQ-Q7：後端 `/admin/auth/login` 回 `refresh_token: null` 缺口；記錄 BFF 防禦處理（nullable + guard）與後端補發需求。 |
 | 0.4 | 2026-07-18 | §5.7 `REFRESH_LOCK_TTL_MS` 定死 15s；校正 header/footer 版號。 |
 | 0.5 | 2026-07-18 | **依「業務邏輯 / UI 元件」拆分**為 [012a](./012a-backend-auth-logic.md)（邏輯）+ [012b](./012b-backend-auth-ui.md)（UI）；本檔轉索引（範圍/依賴/總順序/決策/章節重定向表）。內容不變，僅重組。 |
 

@@ -11,6 +11,10 @@ UI 面向（移除公開註冊、LoginCard 行為）見 [spec 012b](./012b-backe
 > snake+Zod+adapter、`REFRESH_LOCK_TTL_MS=15s`、mock 對齊。§7 驗收全數對應到測試（見章末勾選）。
 > 額外：`backend.ts` 加 **204 No Content** 處理（供 013a `/me/password` 等）。
 
+> **已知缺口（2026-07-18）**：後端 `/admin/auth/login` 實際回傳 `refresh_token: null`，BFF 已做防禦處理
+>（`BackendTokenResponse.refresh_token` nullable、`service.refresh()` 無 token 時直接回傳現有 session）。
+> Session 壽命目前受限於 access token 有效期（預設 30 分）。後端補發後自動生效，見 §2.4 / §4.7 / 索引 OQ-Q7。
+
 > 章節號對照（供外部引用定位）：本檔 §2＝原 012 §3、§3＝原 §4、§4＝原 §5（邏輯部分）、
 > §5＝原 §6、§6＝原 §7（邏輯步驟）、§7＝原 §8（邏輯驗收）。原 §5.3（註冊移除）移至 012b。
 
@@ -88,6 +92,8 @@ UI 面向（移除公開註冊、LoginCard 行為）見 [spec 012b](./012b-backe
 - **snake_case**；`token_type` 字面值 **`"bearer"`（小寫）**。
 - `expires_in` = **access token 剩餘秒數**（相對值）；**無 refresh 到期欄位**。
 - `refresh_token` 型別為 `str | None`（login/register/refresh 都會帶）。
+- ⚠️ **現況**：後端 `/admin/auth/login` 目前回傳 `refresh_token: null`（admin auth 線尚未核發 refresh token）。
+  後端需補實作，使 admin 登入也回傳有效的 opaque refresh token（見 [索引 OQ-Q7](./012-backend-auth-integration.md)）。
 
 ### 2.5 `/admin/me` 回應形狀（`AdminResponse`）
 
@@ -183,12 +189,16 @@ UI 面向（移除公開註冊、LoginCard 行為）見 [spec 012b](./012b-backe
 ```
 adaptTokenResponse(raw, now):
   access_token   → accessToken
-  refresh_token  → refreshToken
+  refresh_token  → refreshToken         (string | null)
   expires_in(秒) → accessTokenExpiresAt = now + expires_in*1000
-  refresh 到期   → refreshTokenExpiresAt = now + REFRESH_TTL_FALLBACK_MS（14d fallback；見 索引 §OQ-Q2）
+  refresh 到期   → refreshTokenExpiresAt = raw.refresh_token
+                     ? now + REFRESH_TTL_FALLBACK_MS  (14d fallback；見 索引 §OQ-Q2)
+                     : 0                              (null token → 無法 refresh)
   token_type     → 忽略（或 assert 大小寫不敏感 == 'bearer'）
 ```
 - Zod 改驗 **snake_case**（新 `BackendTokenResponse`），移除 `z.literal('Bearer')`、移除必填 `refreshExpiresIn`。
+- `BackendTokenResponse.refresh_token` 宣告為 `.nullable()`；`AdaptedTokens.refreshToken: string | null`。
+- `StoredSession.refreshToken` / `TokenPair.refreshToken` 改為 `string | null`（對齊 adapter 輸出）。
 - `/admin/me` adapter：`BackendAdminMeResponse = { id:number, username, name, admin_role:enum }` → 顯示名用 `name`；`id`（child PK）**不進 session userId**（見 4.5）。
 
 ### 4.5 使用者識別：改用 JWT `sub`
@@ -206,10 +216,12 @@ adaptTokenResponse(raw, now):
 ### 4.7 Refresh path 修正（關鍵）
 
 `service.refresh()` 現直接 spread 未驗證回應 → 改為：
-1. 送 body **`{ refresh_token: current.refreshToken }`**（snake）。
-2. 用 `BackendTokenResponse` **Zod 驗證** 回應。
-3. 走 `adaptTokenResponse` 轉絕對時間，**確實覆蓋** `accessToken/refreshToken/accessTokenExpiresAt`。
-4. 401 → clear cookie + destroy session。
+1. **Guard**：`if (!current.refreshToken) return current`——無 refresh token（admin auth 線現況）時直接回傳現有
+   session，不打後端。Access token 到期後 BFF 回 401，使用者須重新登入。後端補發 refresh token 後此分支自動失效。
+2. 送 body **`{ refresh_token: current.refreshToken }`**（snake）。
+3. 用 `BackendTokenResponse` **Zod 驗證** 回應。
+4. 走 `adaptTokenResponse` 轉絕對時間，**確實覆蓋** `accessToken/refreshToken/accessTokenExpiresAt`。
+5. 401 → clear cookie + destroy session。
 
 **時序安全（對齊 reuse detection）**：
 - `REFRESH_LOCK_TTL_MS`（`src/lib/api/constants.ts`）**從 `10_000` 改為 `15_000`（15s）**，使鎖 TTL > 後端 grace（10s）+ refresh 最壞延遲，避免「鎖過期→重放舊 token→超過 grace→family 連坐」。
