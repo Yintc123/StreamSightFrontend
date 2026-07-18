@@ -200,15 +200,16 @@ export function createAdminRoute<TBody, TQuery, TParams>(
 - **時間戳格式（定案）**：所有 `*_at`／`*At` 一律**保留後端 ISO 字串**（Zod 用 `z.string()`），**不轉 epoch-ms**。
   對齊 spec 011 `BackendUserResponse` 既有慣例；格式化交 UI 層。
 
-### 3.3 Mock 與測試分層（**重要：CI 跑 `USE_MOCK=1`**）
+### 3.3 Mock 與測試分層（**重要：CI 跑 `USE_MOCK=0`**）
 
 兩種 mock 層級，**別混用**：
 
 - **單元/整合測試（Vitest + MSW）**：MSW 在 HTTP 層攔截 `backendFetch` 對後端的 fetch，handlers 放
   `tests/mocks/handlers.ts`。**可自由回任意路徑與狀態碼（409/422/404/403）**，故**所有錯誤路徑與生命週期
   端點的測試走這裡**。BFF route 測試以此為主。
-- **執行期 mock（`USE_MOCK=1`，dev server / e2e smoke 無真後端）**：走 `src/lib/mock`
-  （`registerMock`/`resolveMock`），需新增 `admin-mock` handlers 覆蓋 `/admin/admins`、`/admin/me` 等。
+- **執行期 mock（`USE_MOCK=1`，僅限無真後端環境）**：走 `src/lib/mock`
+  （`registerMock`/`resolveMock`），`admin-mock` handlers 覆蓋 `/admin/admins`、`/admin/me` 等。
+  後端 API 已全部實作，正常開發與 e2e 應使用 `USE_MOCK=0`。
 
 執行期 mock harness 兩個限制的處置（Q6 已定案；**已實作**）：
 1. **任意段參數（已擴充，範圍比原規劃大）**：原規劃只擴充「中段 `:param`」；**實作改為 `:param` 可在任意段**

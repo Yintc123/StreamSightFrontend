@@ -261,8 +261,8 @@ export interface SessionStore {
 
 | 條件 | Store | 場景 |
 |---|---|---|
-| `USE_MOCK=1` **或** `REDIS_HOST` 未設 | `InMemorySessionStore` | dev / e2e / CI（零外部依賴，重啟即失） |
-| `USE_MOCK=0` **且** `REDIS_HOST` 已設 | `RedisSessionStore` | staging / production（ADR 006） |
+| `USE_MOCK=1` **或** `REDIS_HOST` 未設 | `InMemorySessionStore` | 無真後端環境（重啟即失） |
+| `USE_MOCK=0` **且** `REDIS_HOST` 已設 | `RedisSessionStore` | **本地開發 / e2e / CI / staging / production**（ADR 006） |
 
 > 為何用 `USE_MOCK` 而非「只看 `REDIS_HOST`」選 store：store 選擇與「後端資料來源」應保持同一個心智模型（`USE_MOCK=1` = 全部自足）。若改看 `REDIS_HOST`，`.env.example` 內建的 `REDIS_HOST=localhost` 會讓 `USE_MOCK=1` 的新人被迫先開 Redis，破壞零依賴保證。
 

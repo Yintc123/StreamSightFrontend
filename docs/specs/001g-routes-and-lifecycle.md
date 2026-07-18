@@ -179,8 +179,8 @@ export const POST = createRoute({
 
 | 組合 | 結果 | 用途 |
 |---|---|---|
-| `USE_MOCK=1` + `/api/auth/login` | BFF 把 `{ identifier, password }` 打到 mock `/auth/login`（[`src/lib/mock/auth-mock.ts`](../../src/lib/mock/auth-mock.ts)），mock 不驗證任何欄位，固定回 admin token bundle | **dev / e2e 預設模式** |
-| `USE_MOCK=0` + `/api/auth/login` | BFF 打真 BE `/auth/login`，session 帶真 JWT；後續 backendFetch 帶 Bearer 通過 | 整合測試 / production |
+| `USE_MOCK=1` + `/api/auth/login` | BFF 把 `{ identifier, password }` 打到 mock `/auth/login`（[`src/lib/mock/auth-mock.ts`](../../src/lib/mock/auth-mock.ts)），mock 不驗證任何欄位，固定回 admin token bundle | mock 模式（無真後端） |
+| `USE_MOCK=0` + `/api/auth/login` | BFF 打真 BE `/auth/login`，session 帶真 JWT；後續 backendFetch 帶 Bearer 通過 | **本地開發 / e2e / 整合測試 / production** |
 
 ### 4.4 CSRF 與 Origin
 
