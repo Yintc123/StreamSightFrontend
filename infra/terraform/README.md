@@ -98,21 +98,22 @@ SSM (created by the overview stack) and are read by ARN.
 
 The deploy job builds the image and rolls out this service. Terraform ignores
 `task_definition`/`desired_count` on the service, so pipeline deploys won't be
-reverted. Point the pipeline at this stack's outputs:
+reverted. `pipeline.yml` is already wired to these (matching the overview repo's
+`deploy.yml`); the only repo secret to set is the deploy role:
 
-| pipeline env / secret        | value                                                       |
-|------------------------------|-------------------------------------------------------------|
-| `AWS_REGION`                 | `ap-northeast-2` (match this stack)                         |
-| `ECR_REPOSITORY`             | `streamsight-frontend`                                       |
-| `ECS_CLUSTER`                | `terraform output -raw ecs_cluster`                        |
-| `ECS_SERVICE`                | `terraform output -raw ecs_service`                        |
-| `CONTAINER_NAME`             | `streamsight-frontend`                                       |
-| `secrets.AWS_DEPLOY_ROLE_ARN`| overview: `terraform output -json deploy_role_arns` → `frontend` |
+| pipeline env / secret     | value                                                          |
+|---------------------------|----------------------------------------------------------------|
+| `AWS_REGION`              | `ap-northeast-2` (match this stack)                            |
+| `ECR_REPOSITORY`          | `streamsight-frontend`                                          |
+| `ECS_CLUSTER`             | `streamsight`                                                   |
+| `ECS_SERVICE`             | `streamsight-frontend`                                          |
+| `CONTAINER_NAME`          | `streamsight-frontend`                                          |
+| `secrets.DEPLOY_ROLE_ARN` | overview: `terraform output -json deploy_role_arns` → `frontend`|
 
-Because Terraform owns the task definition (it wires SSM secrets + the datastore
-IP), the simplest pipeline flow is: build+push the image, then
-`aws ecs update-service --force-new-deployment` — no `.aws/task-definition.json`
-registration needed. (The task def only changes when you re-`apply` this stack.)
+The deploy job build+pushes the image, fetches the LIVE task definition (Terraform
+owns it — SSM secrets + datastore IP), swaps in the new image, and rolls out. No
+`.aws/task-definition.json` is kept in the repo; the task def only changes when you
+re-`apply` this stack.
 
 ## Day-to-day
 
