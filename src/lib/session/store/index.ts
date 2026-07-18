@@ -4,29 +4,34 @@ import type { SessionStore } from './types'
 import { InMemorySessionStore } from './in-memory'
 import { RedisSessionStore } from './redis'
 
-let instance: SessionStore | undefined
-
 /**
- * Pick a session store at first use, decoupled from USE_MOCK:
- *   - REDIS_HOST set → Redis-backed (dev with local Redis, staging, prod)
- *   - REDIS_HOST unset → in-memory (cheap, zero external dep, lost on restart)
+ * Pick a session store at first use:
+ *   - USE_MOCK=1 or REDIS_HOST unset → in-memory (dev / e2e / CI — cheap,
+ *     zero external dep, lost on restart)
+ *   - otherwise (USE_MOCK=0 with REDIS_HOST) → Redis-backed (staging / prod)
  *
- * The store choice is independent of USE_MOCK — that flag only governs the
- * backend *fetch* mock, not where sessions live. This matters in `next dev`:
- * Turbopack compiles Route Handlers and RSC into separate module graphs, each
- * with its own in-memory singleton, so a session written by the login route
- * is invisible to the `/cms` RSC gate → the CMS bounces to login. A shared
- * Redis store fixes it; run `docker compose up -d redis` and set REDIS_HOST.
+ * USE_MOCK stays the single "fully self-contained" switch: =1 needs no Redis
+ * and no real backend.
  *
- * Memoised so the choice is made once per process, not per request.
+ * Memoised on `globalThis`, NOT a module-local variable. `next dev`
+ * (Turbopack) compiles Route Handlers and RSC into separate module graphs, so
+ * a module-local singleton gives each graph its own empty in-memory Map — a
+ * session written by the login route would be invisible to the `/cms` RSC gate
+ * and the CMS would bounce to login. Route handlers + RSC share one process
+ * (hence one `globalThis`), so stashing the instance there makes the in-memory
+ * store shared across graphs (verified in dev). It also prevents duplicate
+ * Redis clients across HMR reloads.
  */
+const g = globalThis as unknown as { __sessionStore?: SessionStore }
+
 export function getSessionStore(): SessionStore {
-  if (!instance) {
-    instance = env.REDIS_HOST
-      ? new RedisSessionStore()
-      : new InMemorySessionStore()
+  if (!g.__sessionStore) {
+    g.__sessionStore =
+      env.USE_MOCK === '1' || !env.REDIS_HOST
+        ? new InMemorySessionStore()
+        : new RedisSessionStore()
   }
-  return instance
+  return g.__sessionStore
 }
 
 export type { SessionStore } from './types'
