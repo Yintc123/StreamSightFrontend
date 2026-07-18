@@ -49,8 +49,9 @@ resource "aws_ecs_task_definition" "app" {
       { name = "USE_MOCK", value = var.use_mock },
       { name = "BACKEND_API_URL", value = var.backend_api_url },
 
-      { name = "SESSION_COOKIE_NAME", value = var.session_cookie_name },
-      { name = "SESSION_TTL_SECONDS", value = tostring(var.session_ttl_seconds) },
+      { name = "SESSION_COOKIE_NAME",   value = var.session_cookie_name },
+      { name = "SESSION_COOKIE_DOMAIN", value = var.session_cookie_domain },
+      { name = "SESSION_TTL_SECONDS",   value = tostring(var.session_ttl_seconds) },
 
       { name = "REDIS_HOST", value = data.aws_instance.datastore.private_ip },
       { name = "REDIS_PORT", value = "6379" },
@@ -63,10 +64,15 @@ resource "aws_ecs_task_definition" "app" {
       { name = "NEXT_PUBLIC_APP_NAME", value = var.app_name },
     ]
 
-    secrets = [
-      { name = "SESSION_SECRET", valueFrom = data.aws_ssm_parameter.session_secret.arn },
-      { name = "REDIS_PASSWORD", valueFrom = data.aws_ssm_parameter.redis_password.arn },
-    ]
+    secrets = concat(
+      [
+        { name = "SESSION_SECRET", valueFrom = data.aws_ssm_parameter.session_secret.arn },
+        { name = "REDIS_PASSWORD", valueFrom = data.aws_ssm_parameter.redis_password.arn },
+      ],
+      var.use_session_secret_previous ? [
+        { name = "SESSION_SECRET_PREVIOUS", valueFrom = data.aws_ssm_parameter.session_secret_previous[0].arn },
+      ] : [],
+    )
 
     logConfiguration = {
       logDriver = "awslogs"

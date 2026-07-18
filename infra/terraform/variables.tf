@@ -91,6 +91,18 @@ variable "session_ttl_seconds" {
   default     = 2592000
 }
 
+variable "session_cookie_domain" {
+  description = "SESSION_COOKIE_DOMAIN for the iron-session cookie. Empty = host-only (single-host deployments). For Streamlit SSO (spec 015) set to the shared parent domain, e.g. \".example.com\", so the browser sends the cookie to both Next.js and Streamlit hosts."
+  type        = string
+  default     = ""
+}
+
+variable "use_session_secret_previous" {
+  description = "Enable during a SESSION_SECRET rotation window. When true, /streamsight/frontend/session_secret_previous is fetched from SSM and injected so iron-session can still verify cookies signed with the old key. Flip back to false and remove the SSM parameter once all old cookies have expired (≤ session_ttl_seconds)."
+  type        = bool
+  default     = false
+}
+
 variable "redis_key_prefix" {
   description = "REDIS_KEY_PREFIX — namespaces the frontend's keys in the shared Redis so apps don't collide."
   type        = string
@@ -104,7 +116,7 @@ variable "app_name" {
 }
 
 variable "extra_allowed_origins" {
-  description = "Additional CSRF origins appended to the CloudFront URL, e.g. a custom domain [\"https://app.example.com\"]."
+  description = "Additional CSRF-allowed origins appended to the CloudFront URL. For Streamlit SSO (spec 015) include the Streamlit app URL so its logout POST passes the origin check, e.g. [\"https://dash.example.com\"]."
   type        = list(string)
   default     = []
 }

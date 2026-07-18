@@ -9,8 +9,22 @@ project = "streamsight"
 # backend_api_url = "https://<backend-id>.cloudfront.net"
 # use_mock        = "1"
 
-# --- Optional: custom domain CSRF origins (besides the CloudFront URL) ---
-# extra_allowed_origins = ["https://app.example.com"]
+# --- Streamlit SSO (spec 015) ---
+# Required when Next.js and Streamlit run on different subdomains.
+# session_cookie_domain must be the shared parent domain (dot-prefixed) so the
+# browser sends the iron-session cookie to both hosts.
+# extra_allowed_origins must include the Streamlit URL so its server-to-server
+# logout POST passes the CSRF origin check.
+# session_cookie_domain = ".example.com"
+# extra_allowed_origins = ["https://dash.example.com"]
+
+# --- SESSION_SECRET rotation ---
+# During a key rotation window: put the old secret at
+# /streamsight/frontend/session_secret_previous in SSM, flip this to true, and
+# apply. Iron-session will accept cookies signed by either key. Flip back to
+# false and delete the SSM parameter once all old cookies have expired
+# (≤ session_ttl_seconds, default 30 d).
+# use_session_secret_previous = true
 
 # --- Optional sizing overrides ---
 # desired_count = 1

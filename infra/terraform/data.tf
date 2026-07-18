@@ -53,6 +53,14 @@ data "aws_ssm_parameter" "session_secret" {
   name = "/${var.project}/frontend/session_secret"
 }
 
+# Only fetched during a SESSION_SECRET rotation window (use_session_secret_previous = true).
+# Create /streamsight/frontend/session_secret_previous in SSM before flipping the flag;
+# the overview stack does not provision this parameter by default.
+data "aws_ssm_parameter" "session_secret_previous" {
+  count = var.use_session_secret_previous ? 1 : 0
+  name  = "/${var.project}/frontend/session_secret_previous"
+}
+
 # Datastore EC2 (MariaDB + Redis) — the BFF session store lives on its Redis.
 data "aws_instance" "datastore" {
   filter {
