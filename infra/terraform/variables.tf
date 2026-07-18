@@ -70,7 +70,7 @@ variable "use_mock" {
 }
 
 variable "backend_api_url" {
-  description = "BACKEND_API_URL the BFF calls. REQUIRED when use_mock = \"0\" (config.ts fails fast at boot otherwise). Use the backend's public/CloudFront URL once it deploys."
+  description = "BACKEND_API_URL the BFF calls. REQUIRED when use_mock = \"0\" (config.ts fails fast at boot otherwise). Prefer the VPC-internal Cloud Map address (http://backend.streamsight.local:8000) over the public CloudFront URL — it is stable across CloudFront rebuilds and avoids egress costs. The CloudFront URL works as a fallback but changes on every rebuild."
   type        = string
   default     = ""
 

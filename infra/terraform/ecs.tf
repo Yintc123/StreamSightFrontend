@@ -85,6 +85,30 @@ resource "aws_ecs_task_definition" "app" {
   }])
 }
 
+# Registers the frontend BFF under frontend.streamsight.local so other ECS
+# tasks (Streamlit) can reach it via VPC-internal DNS. ECS manages instance
+# registration/deregistration automatically via health_check_custom_config.
+#
+# NOTE: Adding service_registries to an existing aws_ecs_service is a
+# force-new in Terraform — the service will be briefly replaced on first apply.
+resource "aws_service_discovery_service" "frontend" {
+  name = "frontend"
+
+  dns_config {
+    namespace_id = data.aws_service_discovery_dns_namespace.main.id
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+    routing_policy = "MULTIVALUE"
+  }
+
+  # ECS controls registration; Cloud Map does not probe health independently.
+  health_check_custom_config {
+    failure_threshold = 1
+  }
+}
+
 resource "aws_ecs_service" "app" {
   name            = local.app
   cluster         = data.aws_ecs_cluster.main.arn
@@ -100,8 +124,8 @@ resource "aws_ecs_service" "app" {
 
   network_configuration {
     subnets = data.aws_subnets.default.ids
-    # Own SG (ALB -> 3000) + the shared ECS SG so the datastore accepts Redis.
-    security_groups  = [aws_security_group.ecs.id, data.aws_security_group.shared_ecs.id]
+    # Own SG (ALB → 3000) + shared ECS SG (datastore Redis) + internal SG (Cloud Map).
+    security_groups  = [aws_security_group.ecs.id, data.aws_security_group.shared_ecs.id, data.aws_security_group.internal.id]
     assign_public_ip = true # required to pull from ECR in the default VPC (no NAT)
   }
 
@@ -109,6 +133,10 @@ resource "aws_ecs_service" "app" {
     target_group_arn = aws_lb_target_group.frontend.arn
     container_name   = local.app
     container_port   = var.container_port
+  }
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.frontend.arn
   }
 
   health_check_grace_period_seconds = 60

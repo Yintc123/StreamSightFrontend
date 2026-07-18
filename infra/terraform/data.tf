@@ -83,3 +83,20 @@ data "aws_security_group" "shared_ecs" {
   }
   vpc_id = data.aws_vpc.default.id
 }
+
+# Private DNS namespace and inter-task SG provisioned by the overview stack.
+# The frontend registers itself here so Streamlit can reach it via
+# frontend.streamsight.local, and so the BFF can reach the FastAPI backend
+# via backend.streamsight.local instead of the unstable CloudFront URL.
+data "aws_service_discovery_dns_namespace" "main" {
+  name = "${var.project}.local"
+  type = "DNS_PRIVATE"
+}
+
+data "aws_security_group" "internal" {
+  filter {
+    name   = "tag:Name"
+    values = ["${var.project}-internal"]
+  }
+  vpc_id = data.aws_vpc.default.id
+}
