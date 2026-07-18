@@ -5,6 +5,8 @@
 本檔為 Claude Code 在 `frontend/` 啟動時的指示。
 與專案根 `CLAUDE.md` 並存，本檔規則優先於根檔。
 
+> **用繁體中文回應。**
+
 > 上面 `@AGENTS.md` 是 Next.js 16 `create-next-app` 帶來的官方 agent 規範引用，提醒 Next.js 16 與訓練資料可能有 breaking changes，動手前先讀 `node_modules/next/dist/docs/`。
 
 ---
