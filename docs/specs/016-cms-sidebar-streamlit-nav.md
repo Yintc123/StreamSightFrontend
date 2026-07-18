@@ -1,6 +1,6 @@
 # Spec 016 — CMS 兩層導覽（頂部系統切換 + 左欄功能）+ Streamlit 整合
 
-狀態：**已實作（2026-07-19）**（v0.4.1）
+狀態：**已實作（2026-07-19）**（v0.5.1）
 
 CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄ 資料平台 Streamlit），
 **左欄**只顯示**當前系統**的功能。跨系統唯一共用的 chrome 是那條**扁平頂部列**，
@@ -92,13 +92,13 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 │ StreamSight  [管理後台][資料平台]  Alice 🌓 登出 │ ← CmsTopBar（h-12，系統切換）
 ├──────────┬──────────────────────────────────┤
 │ 管理員管理 │                                 │
-│ 設定      │        {children}               │ ← CmsSideNav（w-56）＋ 內容區（flex-1）
+│ 設定      │        {children}               │ ← CmsSideNav（可調寬，預設 256）＋ 內容區（flex-1）
 │          │                                  │
 └──────────┴──────────────────────────────────┘
 ```
 
 - `cms/layout.tsx`：`min-h-dvh bg-surface-page flex flex-col` → 內含 `CmsTopBar` + `flex-1 min-h-0 flex`（列）。
-- 列內：`CmsSideNav`（`w-56 shrink-0 border-r`）+ `flex-1 min-w-0 flex flex-col`（包 `{children}`）。
+- 列內：`CmsSideNav`（`shrink-0`，**自管寬度 / 收合**，預設 256、無 border，見 §4.3）+ `flex-1 min-w-0 flex flex-col`（包 `{children}`）。
 - 頂部列 `header`：`h-12 border-b bg-surface-card`，右側 chrome 以 `ml-auto` 靠右。
 - 樣式沿用語義 token（`brand`/`brand-overlay`/`nav-hover`/`nav-active`/`ink-*`/`surface-*`/`line`），不寫 hex。
 
@@ -143,6 +143,34 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
   但 `CmsTopBar` 屬橫向頂部列，**尺寸另為 `px-3 h-8 text-sm`（見 §3.1），不套上表左欄尺寸**。
 - **深色**無 Streamlit 對照，採等效中性淺色 overlay，維持「hover 填色、文字不變」的一致行為。
 
+### 4.3 左欄可調寬 + 收合（對齊 Streamlit 側欄，v0.5）
+
+> **需求**：對齊 Streamlit 左欄「右緣可拖曳調寬窄 + 一顆收放鈕」的操作手感。實作於 `CmsSideNav`
+> 內部，`cms/layout.tsx` 不動（左欄自管寬度，內容區沿用 `flex-1` 自適應）。
+
+> **來源**：以 Playwright 實測 Streamlit（`localhost:8501`）`section[data-testid="stSidebar"]` 及其
+> resize handle / 收合鈕 computed style（2026-07-19）。下列尺寸與行為皆照實測值。
+
+| 屬性 | Streamlit 實測 | 本實作 |
+|---|---|---|
+| 預設 / 最小 / 最大寬 | `256px` / `200px` / `600px` | 同（`SIDEBAR_DEFAULT/MIN/MAX_WIDTH`） |
+| 邊框 | **無 border**（靠 `surface-card` vs `surface-page` 對比分隔） | 同（移除 `border-r`） |
+| resize handle | `div` 8px 寬、`height:100%`、`right:-6px`（跨邊）、`cursor:col-resize`、`user-select:none`，內含一條 hover 才上色的細條 | `role="separator"` 8px hit 區、`-right-1` 跨邊、內 `w-px` hover/focus 顯示 `bg-brand` |
+| 收合動畫 | `min/max-width→0` + `transform:translateX(-256px)`，`transition .3s` | 外層寬度動畫 `width 0.3s`（拖曳中關掉求即時）；nav 轉 `aria-hidden`+`inert` |
+| 收合鈕圖示 | material `keyboard_double_arrow_left`（«） | 雙箭頭 SVG（左） |
+| 收合後控制 | 左上浮出 `stExpandSidebarButton`（`keyboard_double_arrow_right` »，28×28） | 左上 `absolute` 浮出展開鈕（雙箭頭右） |
+
+- **拖曳調寬**：右緣 8px 透明 `role="separator"`（`aria-orientation="vertical"`）hit 區，指標拖曳即時
+  改寬（拖曳中 `transition:none`）；亦支援鍵盤 `←/→`（步進 16px，`aria-valuenow/min/max` 曝露現值）。
+- **收合 / 展開**：側欄**常駐掛載**，收合＝寬度動畫收到 0 並將 nav `aria-hidden`+`inert`（移出 a11y 樹、
+  不可 focus）；左上浮出展開鈕。對齊 Streamlit「完全隱藏 + 重開」（非收成 icon 軌）。
+- **寬度界限**：`[200, 600]`，預設 `256`；`clampWidth` 夾住並取整、防 NaN。
+- **持久化**：寬度 + 收合態存 `localStorage['cms.sidebar']`（`{ width, collapsed }`），跨重新整理 /
+  跨分頁保留。以 `useSyncExternalStore`（非 `useEffect`+`setState`）讀取 → SSR 首繪用預設、
+  避免 hydration mismatch 與 `react-hooks/set-state-in-effect`。
+- **邏輯抽離**：`useSidebarPanel.ts`（`clampWidth` + hook）承載全部狀態邏輯，`CmsSideNav` 只綁
+  拖曳 / 鍵盤 / 版面。屬**強制 TDD**（client 互動邏輯），紅→綠→重構。
+
 ---
 
 ## 5. 設定（env）
@@ -170,10 +198,11 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 強制 TDD（導覽邏輯屬邏輯類，不豁免）。紅 → 綠 → 重構。
 
 - **`config.test.ts`（+2）**：`STREAMLIT_BASE_URL` 選填 / 非法 URL throw。
-- **`CmsSideNav.test.tsx`（+3）**：super_admin 顯示 `管理員管理`→`/cms/admins` + `設定`→`/cms/settings`；非 super_admin 隱藏前者；**不含** Streamlit 頁連結。
+- **`CmsSideNav.test.tsx`（+3；v0.5 +5＝8）**：super_admin 顯示 `管理員管理`→`/cms/admins` + `設定`→`/cms/settings`；非 super_admin 隱藏前者；**不含** Streamlit 頁連結。v0.5 增：收合→連結移出 a11y 樹 + 顯「展開側欄」鈕、展開還原、`localStorage` collapsed 掛載即收合、`separator` 預設 `aria-valuenow`、鍵盤 `←→` 調寬。
+- **`useSidebarPanel.test.ts`（v0.5，+9）**：`clampWidth` 夾範圍 / 取整 / 防 NaN（4 案）；hook 預設值、還原 localStorage、`toggleCollapsed` / `setWidth` 寫回、毀損 JSON 安全退回（5 案）。
 - **`CmsTopBar.test.tsx`（+8）**：`管理後台`→`/cms`、`資料平台`→`streamlitBaseUrl`、空值退回 `'/'`、顯示 user 名稱；登出流程 4 案（取 CSRF → POST logout → push('/')、例外 / 非 2xx → toast.error）。
-- **迴歸**：全套件 `pnpm test` 綠（560 passed）、`pnpm lint`、`pnpm typecheck` 皆過。
-- **未覆蓋**：兩層導覽**純視覺**未加 Playwright e2e（OQ-3）。
+- **迴歸**：全套件 `pnpm test` 綠（v0.5 起 **574 passed**）、`pnpm lint`、`pnpm typecheck` 皆過。
+- **未覆蓋**：兩層導覽**純視覺** + 左欄拖曳/收合**動畫**未加 Playwright e2e（OQ-3）；拖曳的指標數學屬薄綁定，靠 hook 純邏輯 + 鍵盤路徑覆蓋。
 
 ---
 
@@ -199,7 +228,9 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 |---|---|
 | `src/lib/config.ts` / `config.test.ts` | `STREAMLIT_BASE_URL`（optional URL）+2 測試 |
 | `src/app/cms/CmsTopBar.tsx`（新）/ `CmsTopBar.test.tsx`（新，+8） | 頂部列：系統切換 + user/主題/登出 |
-| `src/app/cms/CmsSideNav.tsx`（新）/ `CmsSideNav.test.tsx`（新，+3） | 左欄：管理員管理 / 設定 |
+| `src/app/cms/CmsSideNav.tsx`（新）/ `CmsSideNav.test.tsx`（新，+3；v0.5 +5＝8） | 左欄：管理員管理 / 設定；v0.5 加可調寬 + 收合 |
+| `src/app/cms/useSidebarPanel.ts` / `useSidebarPanel.test.ts`（新，v0.5，+9） | 左欄寬度 / 收合狀態邏輯（clampWidth + useSyncExternalStore 持久化） |
+| `vitest.setup.ts` | v0.5：補 Map-backed localStorage polyfill（Node 20 實驗性 Web Storage 遮蔽 happy-dom） |
 | `src/app/cms/CmsNav.tsx` / `CmsNav.test.tsx` | **移除**（舊單一左欄 + 5 連結模型） |
 | `src/app/cms/layout.tsx` | 頂部列 + （左欄 + 內容）巢狀版面；傳 props |
 | `src/app/cms/page.tsx` | landing 文案改述兩層導覽 |
@@ -210,7 +241,8 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 
 ## 10. Open Questions
 
-- **OQ-2（RWD / 行動版）**：頂部列 + `w-56` 左欄未做窄螢幕收合 / 漢堡；未來可加。
+- **OQ-2（RWD / 行動版）**：桌面版左欄**可拖曳調寬 + 收合**已於 v0.5 補上（見 §4.3）；
+  惟窄螢幕**自動**收合 / 漢堡（依斷點自動切換）仍未做，未來可加。
 - **OQ-3（e2e）**：兩層導覽視覺未有 Playwright 覆蓋；如列為關鍵畫面可補。
 - **OQ-4（active 態 for 外部連結）**：`資料平台` 於 Next.js 端無法得知是否停留 Streamlit，恆非 active；可接受。
 - **OQ-5（深色一致性）**：Streamlit 無深色主題；前端深色時與 Streamlit 不對齊為預期。
@@ -227,7 +259,9 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 | 0.3 | 2026-07-18 | +§4.2 nav hover/尺寸對齊 Streamlit（Playwright 實測）：hover/active 改**背景填色、文字不變**；`--color-nav-hover/active` token。+D7/D8。 |
 | 0.4 | 2026-07-19 | **架構轉向：兩層導覽**。頂部列切換系統（管理後台 / 資料平台）、左欄只放本系統功能；`CmsNav`（單一左欄 + 5 連結）**拆為** `CmsTopBar` + `CmsSideNav` 並移除；資料平台改**單一連結**（5 頁歸 Streamlit 自身左欄）；user/主題/登出上移頂部列。測試改 CmsSideNav +3 / CmsTopBar +8（取代 CmsNav +6），全套件 560 綠。+D6/D9、+OQ-6；移除已不適用的 OQ-1（5 頁 path）。本期僅 Next.js 端（Streamlit 端頂部列見 OQ-6）。 |
 | 0.4.1 | 2026-07-19 | 文件對齊修訂（實作/規格核對後）：§3.1 補**品牌連結列**與**頂部列項目尺寸**（`px-3 h-8 text-sm font-medium`）；§4.2 釐清「互動語言」僅指 **hover 填色行為**，上表尺寸（`px-2 h-7 text-base`）僅適用 `CmsSideNav` 左欄、頂部列尺寸另屬 §3.1。無程式碼變更。 |
+| 0.5 | 2026-07-19 | **左欄可調寬 + 收合**（對齊 Streamlit）：右緣 8px 透明 `separator` 拖曳 / 鍵盤 `←→` 調寬；收合＝寬度動畫收 0 + nav `aria-hidden`/`inert`、左上浮出展開鈕；寬度/收合態存 `localStorage['cms.sidebar']`，以 `useSyncExternalStore` 讀取（SSR 安全）。新增 `useSidebarPanel.ts`（clampWidth + hook，+9 測試）、`CmsSideNav` +5 測試；`vitest.setup.ts` 補 localStorage polyfill（Node 20 實驗性 Web Storage 遮蔽 happy-dom）。全套件 574 綠。+§4.3、更新 OQ-2。`layout.tsx` 不變。 |
+| 0.5.1 | 2026-07-19 | **實測校準**：以 Playwright 量 Streamlit `stSidebar` computed style，校正 §4.3 尺寸/行為——寬 `256/200/600`（原 224/180/480）、**去 border**、resize handle 改 8px 透明跨邊條（hover 顯示 brand 細條）、收合改**寬度動畫**（非卸載）、雙箭頭圖示、收合後左上浮出展開鈕。僅視覺/尺寸校準，測試契約不變（574 綠）。 |
 
 ---
 
-最後更新：2026-07-19（v0.4.1，標記已實作；文件對齊修訂：頂部列尺寸/品牌列、§4.2 措辭釐清）
+最後更新：2026-07-19（v0.5.1，左欄可調寬 + 收合，尺寸/行為以 Streamlit 實測校準）

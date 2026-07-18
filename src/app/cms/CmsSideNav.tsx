@@ -5,16 +5,33 @@
 //
 // 「管理員管理」可見性 gate 於 adminRole==='super_admin'（UX affordance；真正邊界為
 // /cms/admins 上的 requireSuperAdminSession，013a §2）。
+//
+// 016 §4.3（對齊 Streamlit 側欄，實測 stSidebar 2026-07-19）：
+//  - 右緣 8px 透明 col-resize 拖曳條（hover 顯示 brand 細條），可拖曳調寬 + 鍵盤 ←→。
+//  - 收合＝寬度動畫收到 0（transition .3s），nav 轉 aria-hidden + inert；左上浮出展開鈕。
+//  - 雙箭頭圖示（« / »）、無 border（靠 surface-card vs surface-page 對比分隔）。
+// 寬度 / 收合態由 useSidebarPanel 持久化到 localStorage。
 
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import type { AdminRole } from '@/lib/schemas/admin'
+import {
+  useSidebarPanel,
+  SIDEBAR_MIN_WIDTH,
+  SIDEBAR_MAX_WIDTH,
+} from './useSidebarPanel'
+
+const RESIZE_STEP = 16 // 鍵盤每次調整寬度的像素步進
 
 export function CmsSideNav({ adminRole }: { adminRole?: AdminRole }) {
   const pathname = usePathname()
-  const isSuperAdmin = adminRole === 'super_admin'
+  const { collapsed, width, toggleCollapsed, setWidth } = useSidebarPanel()
+  const [dragging, setDragging] = useState(false)
+  const dragStart = useRef<{ x: number; width: number } | null>(null)
 
+  const isSuperAdmin = adminRole === 'super_admin'
   const links: { href: string; label: string }[] = [
     ...(isSuperAdmin ? [{ href: '/cms/admins', label: '管理員管理' }] : []),
     { href: '/cms/settings', label: '設定' },
@@ -27,21 +44,144 @@ export function CmsSideNav({ adminRole }: { adminRole?: AdminRole }) {
       ? 'bg-nav-active text-ink-AAA font-semibold'
       : 'text-ink-AA font-normal hover:bg-nav-hover')
 
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault()
+    dragStart.current = { x: e.clientX, width }
+    setDragging(true)
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const start = dragStart.current
+    if (!start) return
+    setWidth(start.width + (e.clientX - start.x))
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    dragStart.current = null
+    setDragging(false)
+    e.currentTarget.releasePointerCapture?.(e.pointerId)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      setWidth(width - RESIZE_STEP)
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      setWidth(width + RESIZE_STEP)
+    }
+  }
+
   return (
-    <nav className="w-56 shrink-0 border-r border-line bg-surface-card flex flex-col gap-0.5 px-3 py-3">
-      {links.map((link) => {
-        const active = pathname === link.href || pathname.startsWith(`${link.href}/`)
-        return (
-          <Link
-            key={link.href}
-            href={link.href}
-            aria-current={active ? 'page' : undefined}
-            className={itemClass(active)}
-          >
-            {link.label}
-          </Link>
-        )
-      })}
-    </nav>
+    // 外層：寬度動畫收合（拖曳中關掉 transition 求即時），無 border（同 Streamlit）。
+    <div
+      className="relative shrink-0 bg-surface-card"
+      style={{
+        width: collapsed ? 0 : width,
+        transition: dragging ? 'none' : 'width 0.3s ease',
+      }}
+    >
+      {/* nav 內容：收合時整段 aria-hidden + inert（移出 a11y 樹、不可 focus），寬度固定避免動畫中折行 */}
+      <div
+        className="h-full overflow-hidden"
+        aria-hidden={collapsed}
+        inert={collapsed}
+      >
+        <nav
+          className="flex h-full flex-col gap-0.5 px-3 py-3"
+          style={{ width }}
+        >
+          <div className="mb-1 flex justify-end">
+            <button
+              type="button"
+              aria-label="收合側欄"
+              title="收合側欄"
+              onClick={toggleCollapsed}
+              tabIndex={collapsed ? -1 : undefined}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-AA hover:bg-nav-hover"
+            >
+              <DoubleChevron dir="left" />
+            </button>
+          </div>
+
+          {links.map((link) => {
+            const active =
+              pathname === link.href || pathname.startsWith(`${link.href}/`)
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={active ? 'page' : undefined}
+                className={itemClass(active)}
+              >
+                {link.label}
+              </Link>
+            )
+          })}
+        </nav>
+      </div>
+
+      {/* 右緣拖曳把手：8px 透明 hit 區跨邊（同 Streamlit right:-6px），hover/focus 顯示 brand 細條 */}
+      {!collapsed && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="調整側欄寬度"
+          aria-valuenow={width}
+          aria-valuemin={SIDEBAR_MIN_WIDTH}
+          aria-valuemax={SIDEBAR_MAX_WIDTH}
+          tabIndex={0}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onKeyDown={handleKeyDown}
+          className="group absolute inset-y-0 -right-1 z-10 flex w-2 cursor-col-resize touch-none select-none justify-center focus-visible:outline-none"
+        >
+          <span className="h-full w-px bg-transparent transition-colors group-hover:bg-brand group-focus-visible:bg-brand" />
+        </div>
+      )}
+
+      {/* 收合後：左上浮出展開鈕（同 Streamlit stExpandSidebarButton，keyboard_double_arrow_right） */}
+      {collapsed && (
+        <button
+          type="button"
+          aria-label="展開側欄"
+          title="展開側欄"
+          onClick={toggleCollapsed}
+          className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-surface-card text-ink-AA hover:bg-nav-hover"
+        >
+          <DoubleChevron dir="right" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+// 雙箭頭（對齊 Streamlit material keyboard_double_arrow_left / right）。
+function DoubleChevron({ dir }: { dir: 'left' | 'right' }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-4 h-4"
+    >
+      {dir === 'left' ? (
+        <>
+          <polyline points="17 17 12 12 17 7" />
+          <polyline points="11 17 6 12 11 7" />
+        </>
+      ) : (
+        <>
+          <polyline points="7 17 12 12 7 7" />
+          <polyline points="13 17 18 12 13 7" />
+        </>
+      )}
+    </svg>
   )
 }
