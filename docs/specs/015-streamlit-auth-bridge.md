@@ -51,7 +51,10 @@ StreamSight 有兩個前端：
 | 情境 | 需要什麼 |
 |---|---|
 | 本機開發（`localhost:3000` ↔ `localhost:8501`） | **不需 Domain**（同 host，port 不影響 cookie 共享） |
+| **同 ALB 不同 path（已定案部署架構，2026-07-18）** | **不需 Domain**（同 host，瀏覽器對所有 path 送同一顆 cookie） |
 | Staging / Production（不同子網域） | `SESSION_COOKIE_DOMAIN=.example.com`（dot 開頭） |
+
+> **已定案（2026-07-18）**：Streamlit 與 Next.js 掛同一個 ALB，path-based routing（`/` → Next.js；`/streamlit` → Streamlit）。兩者共享同一個 CloudFront domain，`SESSION_COOKIE_DOMAIN` **保持空字串即可**，terraform `session_cookie_domain` 無需設定。
 
 **本 spec 新增 env**：
 ```
@@ -76,12 +79,21 @@ SESSION_COOKIE_DOMAIN: z.string().optional(),
 
 Streamlit 呼叫 `POST /api/auth/logout` 時必須帶 `Origin` header（httpx 預設不帶；Streamlit api_client 必須主動設定），且 origin 必須在 `ALLOWED_ORIGINS` 白名單中。
 
-**BFF 無需新增 env var**：直接把 Streamlit URL 加入已有的 `ALLOWED_ORIGINS` 字串（逗號分隔）：
+**已定案部署架構（同 ALB，2026-07-18）**：Streamlit server 對 BFF 發 server-to-server 請求時，`Origin` 為 CloudFront domain（`https://<cf>.cloudfront.net`），與主前端相同。此 URL 已在 `ALLOWED_ORIGINS`（terraform `local.allowed_origins` 第一個元素），**無需額外設定 `extra_allowed_origins`**。
+
+Streamlit `lib/config.py` 中：
+```python
+streamlit_origin: str = "http://localhost:8501"
+# staging/prod：改為 CloudFront URL，例如 "https://xxxx.cloudfront.net"
+# 若有自訂 domain 則填自訂 domain，但必須與 BFF ALLOWED_ORIGINS 一致
 ```
-# .env.local（開發）
+
+不同子網域部署時才需調整：
+```
+# .env.local（開發，不同 port 仍需列 Streamlit）
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8501
 
-# staging/prod
+# staging/prod（不同子網域）
 ALLOWED_ORIGINS=https://app.example.com,https://dash.example.com
 ```
 
@@ -596,6 +608,6 @@ S7. bff_csrf_path 欄位不再存在
 - [x] **JWT 交給 Streamlit**：已定案（2026-07-18）。底線為「JWT 不進瀏覽器」；Streamlit server 記憶體持有 token 為可接受取捨（見 §0）
 - [x] **csrfToken 取得方式**：已定案（2026-07-18）。introspection 一併回傳，不需額外打 `/api/csrf`；`GET /api/csrf` 端點保留供主前端 CMS 使用（見 §7.1 A）
 - [ ] **Streamlit `Origin` header（阻斷性）**：Streamlit 端 `_do_logout_bff()` 需補送 `Origin: <streamlit_origin>`，並於 `lib/config.py` 新增 `streamlit_origin` 設定（見 §7.1 B）；BFF 不需改動
-- [ ] **SESSION_COOKIE_DOMAIN 部署值**：staging/prod 的父網域是什麼（`app.example.com` / `dash.example.com` 的共同父）
-- [ ] **ALLOWED_ORIGINS 的 Streamlit URL**：staging = `?` / prod = `?`（需與 infra 確認）
+- [x] **SESSION_COOKIE_DOMAIN 部署值**：已定案（2026-07-18）。Streamlit 與 Next.js 同 ALB 不同 path，`SESSION_COOKIE_DOMAIN` 保持空字串，無需設定
+- [x] **ALLOWED_ORIGINS 的 Streamlit URL**：已定案（2026-07-18）。同 ALB 同 host，Streamlit server 送出的 `Origin` 即為 CloudFront URL，已在白名單，無需額外設定 `extra_allowed_origins`
 - [ ] **browser cookie 清除**：logout 後 Streamlit 是否需主動導向主前端清 cookie（見 §3.3）；或接受 cookie 自然過期
