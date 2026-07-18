@@ -16,3 +16,9 @@ export const SESSION_ID_BYTES = 32
 // 001g §5.1: graceful shutdown deadline. Cloud Run gives 10s before SIGKILL;
 // leave 2s headroom for the runtime + log flush.
 export const SHUTDOWN_DEADLINE_MS = 8_000
+
+// 015 §2.2 — proactively refresh before returning to Streamlit if token
+// expires within this window. 60s gives enough runway for Streamlit's
+// next request even under worst-case latency. Different from
+// PRE_REFRESH_MARGIN_MS (30s), which is used on the backendFetch path.
+export const STREAMLIT_PRE_REFRESH_THRESHOLD_MS = 60_000

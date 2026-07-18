@@ -15,6 +15,7 @@ export const sessionOptions: SessionOptions = {
     sameSite: 'lax',
     maxAge: env.SESSION_TTL_SECONDS,
     path: '/',
+    ...(env.SESSION_COOKIE_DOMAIN ? { domain: env.SESSION_COOKIE_DOMAIN } : {}),
   },
   ttl: env.SESSION_TTL_SECONDS,
 }

@@ -14,6 +14,7 @@ const RawEnv = z
     SESSION_COOKIE_NAME: z.string().default('streamsight_session'),
     SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 60 * 24 * 30),
     ALLOWED_ORIGINS: z.string().optional(),
+    SESSION_COOKIE_DOMAIN: z.string().optional(),
 
     // Discrete connection parts — symmetric with backend's spec 001 §3.3
     // pattern. ioredis accepts { host, port, password } directly so no URL
