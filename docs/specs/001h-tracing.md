@@ -40,9 +40,14 @@
 - **瀏覽器換頁到 Streamlit 的 handoff 契約**（§5.3——最易做錯處）。
 
 **範圍外**
-- **瀏覽器 / 客戶端 RUM tracing（定案：本期不做）**：從使用者點擊起 trace（OTel browser SDK）。本期 trace 從
-  **BFF / RSC 進站**起算即可——理由：CMS 為內部 admin 工具，server-side trace 已足夠診斷後端鏈路；瀏覽器 RUM
-  的成本 / 隱私 / CORS-traceparent 傳遞較高。**列為未來**（屆時另開 spec，含 `document` 端 propagation 與同意機制）。
+- **完整瀏覽器 RUM（定案：本期不做）**：OTel browser SDK（page-load span、Web Vitals、client JS error、從點擊起 trace）。
+  理由：CMS 為**內部 admin 工具**、流量低，server-side trace 已足夠診斷後端鏈路；完整 RUM 的 bundle / 對外
+  ingest（CORS、公開端點、濫用防護）/ 隱私（需同意機制）成本高，ROI 低。**列為未來**，且屆時應優先評估
+  Streamlit（若為真實 end-user 產品）而非本 CMS，並考慮成品化 RUM / 產品分析工具而非手刻 OTel browser SDK。
+  - **中間路線（候選，非本期）**：只在 CMS SPA **對自家 BFF 的 same-origin fetch** 注入 `traceparent`（同源 XHR/fetch
+    **可**設 header，與 §5.3 換頁到 Streamlit 的 top-level 導航不同）。這能讓 trace「從使用者動作」起算而**不需**
+    browser SDK / 對外 ingest / Web Vitals——成本遠低於完整 RUM。**建議**：本期先不做（server-side 已夠），未來若需
+    「哪個使用者動作觸發了這條後端 trace」再以此輕量方案補，優先於完整 RUM。
 - 各服務內部細粒度 span 佈建（交各服務自行 instrument）。
 - Streamlit / 後端內部實作（僅在 §9 定義它們必須遵守的契約）。
 - 認證 handoff 本身（token/SSO/cookie）——另立 spec；本檔只規範 correlation id 如何搭它便車（§5.3）。
@@ -171,14 +176,17 @@ export function baggageFieldsForLog(): { sessionId: string | null; userId: strin
 
 ## 7. 匯出與部署（Cloud Run / GCP）
 
-**兩條路徑（依 observability backend 選一；定案預設走 (A) 保持供應商中立）**：
+**定案（2026-07-18）：本期走 (A) OTel Collector（OTLP）；(B) Cloud Trace 暫不採用但保留為未來選項。**
 
-- **(A) OTel Collector（OTLP，供應商中立，預設）**：Cloud Run app → OTLP →
+- **(A) OTel Collector（OTLP，供應商中立，✅ 本期採用）**：Cloud Run app → OTLP →
   **Collector（獨立 Cloud Run service 或 sidecar）** → trace backend（Tempo / Jaeger / Datadog…）。
   用 `@vercel/otel` 預設 OTLP exporter；Collector 可做 §6(b) tail sampling、批次、重試。
-- **(B) GCP Cloud Trace 直匯（GCP 原生，最省運維）**：
+  - **彈性如何體現**：app 只認 OTLP，**trace backend 藏在 Collector 之後**——日後要換後端、或**加上 Cloud Trace
+    exporter**（含同時多送）都只改 **Collector config，零 app code 變更**。這正是「先不走 Cloud Trace 但保留彈性」的落點。
+- **(B) GCP Cloud Trace 直匯（GCP 原生，最省運維，⏸ 未採用）**：
   `@google-cloud/opentelemetry-cloud-trace-exporter` 直送 Cloud Trace，免自架 Collector；需 custom exporter 設定。
-  適合「就是要留在 GCP 生態、不跨雲」。
+  代價：app 直綁 GCP、跨雲/換供應商需改 app。**保留為未來**（例如想省掉 Collector 運維時，可在 Collector 端多接
+  Cloud Trace exporter，而非讓 app 直綁）。
 
 **⚠️ Cloud Run 特有重點 — span flush（**必做**，接 001g）**：
 - Cloud Run instance 會 **scale-to-zero / SIGTERM 回收**。用 **`BatchSpanProcessor`**（批次匯出）時，**未 flush 的尾端
@@ -254,4 +262,4 @@ export function baggageFieldsForLog(): { sessionId: string | null; userId: strin
 
 ---
 
-最後更新：2026-07-18（v0.2，補：§5.4 Baggage、§6 取樣、§7 Cloud Run/GCP 匯出與 span flush、§1 RUM 範圍外定案、§3 精確依賴 + Next 專屬設定；核心決策經 Next 16 官方 doc 驗證）
+最後更新：2026-07-18（v0.2，補 §5.4 Baggage、§6 取樣、§7 匯出、§3 依賴；決策定案：prod 取樣 0.1、匯出走 (A) OTLP Collector（Cloud Trace 保留為 Collector 端未來選項）、完整 RUM 本期不做（保留 same-origin `traceparent` 輕量中間路線為未來優先方案）；核心決策經 Next 16 官方 doc 驗證）
