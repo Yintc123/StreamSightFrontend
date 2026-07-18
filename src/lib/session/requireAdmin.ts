@@ -24,6 +24,27 @@ export async function requireAdminSession(): Promise<StoredSession> {
 }
 
 /**
+ * Spec 013a §2 — SUPER_ADMIN-only page gate (e.g. /cms/admins).
+ *
+ * A missing / non-admin session redirects to the homepage like
+ * `requireAdminSession`. An admin who is NOT super_admin is authenticated
+ * for the CMS but lacks admin-management rights, so they bounce back to
+ * `/cms?reason=not-super-admin` (not the homepage). Nav visibility is a
+ * separate UX affordance; this is the real gate. Backend 403/422 remain
+ * authoritative.
+ */
+export async function requireSuperAdminSession(): Promise<StoredSession> {
+  const session = await getSessionService().get()
+  if (!session || session.role !== Role.ADMIN) {
+    redirect('/?reason=cms-not-admin')
+  }
+  if (session.adminRole !== 'super_admin') {
+    redirect('/cms?reason=not-super-admin')
+  }
+  return session
+}
+
+/**
  * Spec 011 §3.5 — wrap RSC admin fetches.
  *
  * `requireAdminSession()` guards the page entry, but fetches *inside* the

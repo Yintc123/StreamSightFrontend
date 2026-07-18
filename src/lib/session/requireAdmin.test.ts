@@ -16,7 +16,11 @@ vi.mock('next/navigation', () => ({
   redirect: (path: string) => redirectMock(path),
 }))
 
-import { ensureAdminAccess, requireAdminSession } from './requireAdmin'
+import {
+  ensureAdminAccess,
+  requireAdminSession,
+  requireSuperAdminSession,
+} from './requireAdmin'
 
 beforeEach(() => {
   getMock.mockReset()
@@ -56,6 +60,33 @@ describe('requireAdminSession', () => {
     const s = adminSession()
     getMock.mockResolvedValue(s)
     await expect(requireAdminSession()).resolves.toBe(s)
+    expect(redirectMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('requireSuperAdminSession', () => {
+  it('session=null → redirect /?reason=cms-not-admin', async () => {
+    getMock.mockResolvedValue(null)
+    await expect(requireSuperAdminSession()).rejects.toThrow(/REDIRECT/)
+    expect(redirectMock).toHaveBeenCalledWith('/?reason=cms-not-admin')
+  })
+
+  it('non-admin role → redirect /?reason=cms-not-admin', async () => {
+    getMock.mockResolvedValue({ ...adminSession(), role: Role.USER })
+    await expect(requireSuperAdminSession()).rejects.toThrow(/REDIRECT/)
+    expect(redirectMock).toHaveBeenCalledWith('/?reason=cms-not-admin')
+  })
+
+  it('admin but not super_admin → redirect /cms?reason=not-super-admin', async () => {
+    getMock.mockResolvedValue({ ...adminSession(), adminRole: 'editor' })
+    await expect(requireSuperAdminSession()).rejects.toThrow(/REDIRECT/)
+    expect(redirectMock).toHaveBeenCalledWith('/cms?reason=not-super-admin')
+  })
+
+  it('super_admin → return session, no redirect', async () => {
+    const s = { ...adminSession(), adminRole: 'super_admin' as const }
+    getMock.mockResolvedValue(s)
+    await expect(requireSuperAdminSession()).resolves.toBe(s)
     expect(redirectMock).not.toHaveBeenCalled()
   })
 })
