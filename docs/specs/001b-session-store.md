@@ -255,20 +255,41 @@ export interface SessionStore {
 
 ## 7. DI（`src/lib/session/store/index.ts`）
 
+### 7.1 Store 選擇（`USE_MOCK` 為總開關）
+
+`USE_MOCK` 是「完全自足模式」的單一開關，**與 backend fetch mock 共用**——`=1` 時不需 Redis、不需真後端：
+
+| 條件 | Store | 場景 |
+|---|---|---|
+| `USE_MOCK=1` **或** `REDIS_HOST` 未設 | `InMemorySessionStore` | dev / e2e / CI（零外部依賴，重啟即失） |
+| `USE_MOCK=0` **且** `REDIS_HOST` 已設 | `RedisSessionStore` | staging / production（ADR 006） |
+
+> 為何用 `USE_MOCK` 而非「只看 `REDIS_HOST`」選 store：store 選擇與「後端資料來源」應保持同一個心智模型（`USE_MOCK=1` = 全部自足）。若改看 `REDIS_HOST`，`.env.example` 內建的 `REDIS_HOST=localhost` 會讓 `USE_MOCK=1` 的新人被迫先開 Redis，破壞零依賴保證。
+
+### 7.2 單例掛在 `globalThis`（**dev 必需**）
+
 ```ts
 // src/lib/session/store/index.ts
 import 'server-only'
+import { env } from '@/lib/config'
 import type { SessionStore } from './types'
+import { InMemorySessionStore } from './in-memory'
 import { RedisSessionStore } from './redis'
 
-let instance: SessionStore | undefined
+const g = globalThis as unknown as { __sessionStore?: SessionStore }
 
-/** Production / dev 預設用 Redis。Testing 走 `vi.mock` 整模組替換，不需 setter。 */
 export function getSessionStore(): SessionStore {
-  if (!instance) instance = new RedisSessionStore()
-  return instance
+  if (!g.__sessionStore) {
+    g.__sessionStore =
+      env.USE_MOCK === '1' || !env.REDIS_HOST
+        ? new InMemorySessionStore()
+        : new RedisSessionStore()
+  }
+  return g.__sessionStore
 }
 ```
+
+**為何 `globalThis` 而非 module-level `let`**：`next dev`（Turbopack）把 **Route Handler 與 RSC 編成不同 module graph**。module 級單例會讓每個 graph 各持一份**空的** in-memory `Map`——登入路由（Route Handler）寫入的 session，`/cms` 的 RSC gate（`requireAdminSession`）讀不到 → CMS 被導回登入頁（同一 cookie「打 API 正常、進頁面被踢」為徵狀）。Route Handler 與 RSC 共用同一 process（同一 `globalThis`），故把單例掛 `globalThis` 即可跨 graph 共享（2026-07-18 dev 實測 login → `/cms/admins` 回 200，純 in-memory 無 Redis）。副帶好處：HMR reload 不會重複建立 Redis client。
 
 測試用法（廣域替換）：
 
