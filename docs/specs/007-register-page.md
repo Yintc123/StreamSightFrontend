@@ -1,6 +1,15 @@
 # Spec 007：建立帳號頁（`/register`）
 
-- **狀態**：Draft（v0.4 — FE BFF 明確 stamp `role: 0` (ADMIN) 給 BE：對應 BE 008 改為 caller-supplied role 為主；防止 form / 攻擊者繞過）
+> ⚠️ **已被 spec 012 取代（2026-07-18）—— 本 spec 描述的公開自助註冊流程整條作廢，且 role 值已翻正。**
+> 1. **公開註冊移除**：[spec 012b §1](./012b-backend-auth-ui.md) 最終定案「移除首頁公開自助註冊；新增 admin 一律由
+>    已登入 SUPER_ADMIN 在 CMS 內建立」。`RegisterCard`/`/register`/`register/route.ts` 均**淘汰**（見 012b §1.1）。
+>    Admin 建立改由 [spec 013b](./013b-admin-management-ui.md) 的 `AdminFormSheet`。
+> 2. **role 值翻正**：本 spec 全篇的 **`role: 0 = ADMIN` 已作廢**；後端實際為 **`USER=0`、`ADMIN=1`**
+>    （[spec 012a §1/§2.2](./012a-backend-auth-logic.md)，前端常數翻正見 [012a §4.6](./012a-backend-auth-logic.md)）。**切勿**照本檔 stamp `role: 0`。
+>
+> 本檔僅供 historical reference（表單結構/密碼規則等視覺契約可參考）；**權威規格見 [012a](./012a-backend-auth-logic.md) / [012b](./012b-backend-auth-ui.md) / [013](./013-admin-management-page.md)**。
+
+- **狀態**：~~Draft（v0.4 — FE BFF 明確 stamp `role: 0` (ADMIN) 給 BE：對應 BE 008 改為 caller-supplied role 為主；防止 form / 攻擊者繞過）~~ → **Superseded by spec 012（2026-07-18）**
 - **建立日期**：2026-06-15（v0.1）/ 2026-06-16（v0.2）
 - **路徑（前端）**：
   - `src/app/register/page.tsx`（目前 placeholder；本 spec 描述要替換的版本）

@@ -260,6 +260,26 @@ adaptTokenResponse(raw, now):
 
 ---
 
+## 5b. 復用對照（既有資產，開發前先讀）
+
+> 2026-07-18 盤點。本 spec **不新建基礎層**，是在既有 auth bridge 上**修正**（role 翻正、錯誤契約、adapter）。
+
+| 既有檔 | 現況 | 本 spec 對它做什麼 |
+|---|---|---|
+| `src/lib/session/types.ts` | `Role = {ADMIN:0,USER:1}`；`StoredSession` 有 token 欄、**無 `adminRole`** | 翻正 Role 為 `{USER:0,ADMIN:1}`(§4.6)、加 `adminRole?`(§4.8) |
+| `src/lib/api/backend.ts` | 讀巢狀 `error.code`、只在 `AUTH_TOKEN_EXPIRED` refresh(`:96,:98`) | 改扁平碼 + `if(activeSession)` refresh(§4.10) |
+| `src/lib/api/constants.ts` | `REFRESH_LOCK_TTL_MS=10_000` | 改 `15_000`(§4.7) |
+| `src/app/api/auth/login/route.ts` | 打 `/auth/login`、`resolveRole` 解 JWT | 改打 `/admin/auth/login`+`/admin/me`、存 adminRole(§4.1/§4.4/§4.8) |
+| `src/lib/session/service.ts` `refresh()` | 直接 spread 未驗證回應 | snake body + Zod + adapter(§4.7) |
+| `src/lib/auth/decodeJwtPayload.ts` | 可用 | 取 `sub`/`role`/`grade`(§4.5) |
+| `src/lib/schemas/auth.ts`（snake→camel 慣例、`PASSWORD_*` 常數） | 可用 | `BackendTokenResponse`/`BackendAdminMeResponse` 沿用風格(§4.4) |
+| `src/lib/mock/auth-mock.ts` | 發 `role: Role.ADMIN`(=0)、舊路徑 | 對齊新契約(snake、`/admin/*`、role 翻正)(§6.6) |
+| `src/lib/errors/*`、`create-route.ts`、`responses.ts` | 完整 | **as-is 複用**，不動 |
+
+> 重點：**沒有全新模組要寫**；風險在「翻轉 Role 常數」的連動測試/mock（§4.6 已標）。
+
+---
+
 ## 6. 實作順序（邏輯步驟；TDD）
 
 > 全部不依賴後端新端點，可立即開工。UI 步驟（淘汰 register）見 [spec 012b §實作](./012b-backend-auth-ui.md)。
@@ -294,4 +314,4 @@ adaptTokenResponse(raw, now):
 
 ---
 
-最後更新：2026-07-18（v0.1，自 spec 012 v0.4 拆出業務邏輯半）
+最後更新：2026-07-18（v0.2，自 spec 012 v0.4 拆出業務邏輯半；+§5b 復用對照）

@@ -24,6 +24,45 @@ CSRF/session）、`backendFetch`、iron-session/Redis session、CSRF（spec 001b
 
 ---
 
+## 0. 復用對照（既有資產，開發前先讀）
+
+> 2026-07-18 盤點結果。**整個 BFF 基礎層已存在**；本頁的邏輯多為「照範本 + adapter」而非新建。
+
+### 0.1 直接複用（as-is）
+
+| 既有檔 | 用途 | 用在 |
+|---|---|---|
+| `src/lib/api/create-route.ts` | 路由工廠(requireAuth/params/query/body schema/CSRF/session touch) | `createAdminRoute` **薄封裝它**(§3.1) |
+| `src/lib/api/backend.ts` `backendFetch` | 帶 Bearer、`passClientErrors`、error 映射 | 所有 `/admin/admins*` 呼叫 |
+| `src/lib/api/responses.ts` `okResponse` + `src/lib/schemas/envelope.ts` | `{data}`/`{error}` 外層 | 對外回應 |
+| `src/lib/api/parsers.ts` | `parseBody/Query/PathParams` | createRoute 內部已用 |
+| `src/lib/session/service.ts` `getSessionService()` | create/update/destroy/refresh/touch | 改密碼後 destroy |
+| `src/lib/session/requireAdmin.ts` | `ensureAdminAccess`(401/403→destroy+redirect) | 降權即時性(§2) |
+| `src/lib/errors/*` | `ForbiddenError`/`BackendClientError`/`toErrorResponse` | 403 gate、409/422 透傳 |
+| `src/lib/auth/decodeJwtPayload.ts` | 讀 JWT sub/role/grade | — |
+| `src/lib/client/csrf.ts` `getCsrfToken()` | client 取 CSRF | mutation 前(已存在) |
+
+### 0.2 複用為模板 / 遵循既有慣例
+
+| 既有 | → 新 | 說明 |
+|---|---|---|
+| `src/lib/api/create-route.ts` | `create-admin-route.ts`(§3.1) | Omit `requireAuth`、恆 true + super_admin 斷言 |
+| `src/lib/schemas/auth.ts`（snake→camel + 常數 `PASSWORD_MIN/MAX` 等）、`pagination.ts` | `src/lib/schemas/admin.ts`(§4) | 沿用 adapter 風格；時間戳 `z.string()` |
+| `src/app/api/auth/login|register/route.ts`（two-leg backendFetch + adapter + `passClientErrors`） | `/api/cms/admins*` routes(§3.2) | route 樣板 |
+| `src/app/api/csrf/route.ts`（簡單 requireAuth GET） | `/api/cms/me` GET | 樣板 |
+| `src/lib/mock/auth-mock.ts` + `register.ts` | `admin-mock.ts`(§3.3) | 執行期 mock；**需先擴充 `dispatch.ts` 中段 param** |
+| `tests/mocks/handlers.ts` + `tests/helpers/backend-mock.ts` `mockBackend()` | admin MSW handlers(§3.3、§6) | 錯誤/守衛測試基座 |
+
+### 0.3 ⚠️ 盤點時發現、與既有 code 的差異（**非「已實作」**）
+
+- **`backendFetch` 錯誤契約尚未修**：現行讀**巢狀** `errBody.error.code`、只在 `AUTH_TOKEN_EXPIRED` 才 refresh
+  （`backend.ts:96,98`）。本頁每個呼叫都是已登入呼叫，**依賴 [012a §4.10](./012a-backend-auth-logic.md) 先修**成扁平碼 + `if(activeSession)` refresh。
+- **`create-admin-route.ts` 不存在**：現行 admin gate 只在 RSC(`requireAdminSession`)；BFF 層是手動 inline
+  `if(session.role!==Role.ADMIN)`。本頁 §3.1 正式建立薄封裝，且 gate 是 **`role===ADMIN && adminRole==='super_admin'`**（非只 ADMIN）。
+- **`auth-mock` 發 `role: Role.ADMIN`（現 =0）**：[012a §4.6](./012a-backend-auth-logic.md) role 翻正後需一起改。
+
+---
+
 ## 1. 後端契約（source of truth = [012a §2.8](./012a-backend-auth-logic.md) + 後端 admin-management-api.md）
 
 所有 `/admin/admins/...` 端點**限 SUPER_ADMIN**（`require_min_admin_role(SUPER_ADMIN)`）；
@@ -208,4 +247,4 @@ export function createAdminRoute<TBody, TQuery, TParams>(
 
 ---
 
-最後更新：2026-07-18（v0.1，自 spec 013 v0.3 拆出業務邏輯半）
+最後更新：2026-07-18（v0.2，自 spec 013 v0.3 拆出業務邏輯半；+§0 復用對照）

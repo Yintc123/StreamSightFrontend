@@ -1,6 +1,12 @@
 # Spec 005：首頁 + 後台入口
 
-- **狀態**：Draft（v0.2 — 補 §4 smart back navigation hook 設計）
+> ⚠️ **局部作廢（2026-07-18，spec 012 取代）**：本 spec 中所有與**公開自助註冊**相關的描述已作廢——
+> 首頁「建立帳號」按鈕、`router.push('/register')` 入口、`/register` placeholder 皆**移除**
+> （[spec 012b §1.1 淘汰清單](./012b-backend-auth-ui.md)）。LoginCard 只保留登入。新增 admin 改由
+> [spec 013b](./013b-admin-management-ui.md) 的 CMS 內建立。**首頁本體、LoginCard 登入、`proxy.ts`、
+> §4 smart-back 導覽等其餘內容仍有效。**
+
+- **狀態**：Draft（v0.3 — §register 入口局部作廢，見上方橫幅；其餘有效）
 - **建立日期**：2026-06-15
 - **路徑**：
   - `src/app/page.tsx`（首頁 RSC）

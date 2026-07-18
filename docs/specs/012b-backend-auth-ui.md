@@ -28,6 +28,10 @@
 | 首頁「建立帳號」入口連結 | （若有）指向 `/register` | 移除 |
 | register 相關 mock / 測試 | 存在 | 一併移除，避免殘留失敗 |
 
+> ♻️ **淘汰前先搬走可複用 pattern**：`RegisterCard.tsx` 的**多欄驗證骨架 + 409 衝突處理**（client+server
+> 錯誤分離）是 [spec 013b](./013b-admin-management-ui.md) `AdminFormSheet`（新增 admin，username 409）的好範本；
+> `src/app/auth/Field.tsx`（label+input+aria）可續用。**刪 RegisterCard 之前先把這兩者的 pattern 移過去**，別直接連同範本一起刪。
+
 ### 1.2 `/register` 的處置：刪除 vs redirect
 
 - **建議**：`page.tsx` 改為 `redirect('/login')`（保留 URL 不 404，對舊書籤友善），並刪 `RegisterCard`。
@@ -65,4 +69,4 @@
 
 ---
 
-最後更新：2026-07-18（v0.1，自 spec 012 v0.4 拆出 UI 半）
+最後更新：2026-07-18（v0.2，自 spec 012 v0.4 拆出 UI 半；+§1 RegisterCard pattern 搬移提醒）
