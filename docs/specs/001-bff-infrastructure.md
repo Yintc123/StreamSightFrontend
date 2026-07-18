@@ -12,7 +12,7 @@
   - `backend/docs/specs/001-environment-config.md` §3.4 JWT 參數
   - `backend/docs/specs/005-error-handling.md`（錯誤碼前綴與 `AUTH_TOKEN_EXPIRED` 信號）
 
-> 本檔為**索引總覽**。完整規格分散在 7 份子 spec（`001a` ~ `001g`）。實作前請依下表逐份閱讀；不要跨 spec 平行實作，**前置依賴未完成不可動下游**。
+> 本檔為**索引總覽**。完整規格分散在子 spec：原始拆分 7 份（`001a` ~ `001g`），後續新增 [`001h` tracing](./001h-tracing.md)（分散式追蹤，2026-07-18，**未實作**）。實作前請依下表逐份閱讀；不要跨 spec 平行實作，**前置依賴未完成不可動下游**。
 
 ---
 
@@ -93,6 +93,7 @@ Browser ──▶ createRoute
 | [001e backendFetch](./001e-backend-fetch.md) | BFF → backend HTTP wrapper、timeout、401 分流、mock 短路 | `src/lib/api/backend.ts` |
 | [001f createRoute](./001f-create-route.md) | Route Handler 高階 wrapper、parsers、okResponse、request-id | `src/lib/api/{create-route,parsers,responses,request-id}.ts` |
 | [001g routes-and-lifecycle](./001g-routes-and-lifecycle.md) | `/api/csrf`、`/api/health`、`/api/auth/login`、graceful shutdown | `src/app/api/{csrf,health,health/live,auth/login}/route.ts`、`src/lib/lifecycle.ts`、`src/instrumentation.ts` |
+| [001h tracing](./001h-tracing.md) | 分散式追蹤：traceId 模組、W3C `traceparent` 傳遞、log 關聯、Streamlit 換頁 handoff | `src/lib/observability/trace.ts`、`src/instrumentation.ts`、`src/lib/api/{backend,create-route}.ts`、`src/lib/log.ts`（**未實作**） |
 
 ### 3.1 推薦實作順序
 
