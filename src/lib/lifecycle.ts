@@ -1,5 +1,6 @@
 import 'server-only'
 import { getSessionStore } from '@/lib/session/store'
+import { shutdownOtel } from '@/lib/observability/otel-sdk'
 import { log } from '@/lib/log'
 import { SHUTDOWN_DEADLINE_MS } from '@/lib/api/constants'
 
@@ -18,6 +19,9 @@ function handleSignal(signal: NodeJS.Signals): void {
 
   ;(async () => {
     try {
+      // Spec 001h §7 — flush OTel spans before exit so Cloud Run scale-to-zero
+      // doesn't drop the tail (no-op if tracing was never started).
+      await shutdownOtel()
       const store = getSessionStore()
       await store.close()
       log.info({}, 'bff.shutdown.clean')

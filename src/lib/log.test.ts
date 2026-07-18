@@ -1,4 +1,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+
+const traceFields = vi.hoisted(() => ({
+  value: { traceId: null as string | null, spanId: null as string | null },
+}))
+vi.mock('@/lib/observability/trace', () => ({
+  traceFieldsForLog: () => traceFields.value,
+}))
+
 import { log, maskBearer, maskToken, maskSessionId, maskCsrfToken } from './log'
 
 describe('log emitters', () => {
@@ -7,6 +15,7 @@ describe('log emitters', () => {
   let errorSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
+    traceFields.value = { traceId: null, spanId: null }
     infoSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -29,6 +38,22 @@ describe('log emitters', () => {
     expect(parsed.requestId).toBe('req_1')
     expect(parsed.path).toBe('/x')
     expect(typeof parsed.time).toBe('string')
+  })
+
+  it('omits traceId/spanId when no active span', () => {
+    log.info({ requestId: 'req_1' }, 'bff.request.in')
+    const parsed = JSON.parse(infoSpy.mock.calls[0][0] as string)
+    expect('traceId' in parsed).toBe(false)
+    expect('spanId' in parsed).toBe(false)
+  })
+
+  it('auto-adds traceId/spanId when a span is active (spec 001h §8)', () => {
+    traceFields.value = { traceId: 'a'.repeat(32), spanId: 'b'.repeat(16) }
+    log.info({ requestId: 'req_1' }, 'bff.request.in')
+    const parsed = JSON.parse(infoSpy.mock.calls[0][0] as string)
+    expect(parsed.traceId).toBe('a'.repeat(32))
+    expect(parsed.spanId).toBe('b'.repeat(16))
+    expect(parsed.requestId).toBe('req_1') // caller fields still present
   })
 
   it('routes warn → console.warn and error → console.error', () => {

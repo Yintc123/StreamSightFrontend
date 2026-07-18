@@ -1,5 +1,6 @@
 allowBuilds:
   msw: false
+  protobufjs: false
   sharp: true
   unrs-resolver: false
 onlyBuiltDependencies:
@@ -7,3 +8,4 @@ onlyBuiltDependencies:
 ignoredBuiltDependencies:
   - msw
   - unrs-resolver
+  - protobufjs

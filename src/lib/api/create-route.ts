@@ -6,6 +6,7 @@ import { verifyCsrf } from '@/lib/security/verifyCsrf'
 import { UnauthenticatedError } from '@/lib/errors/UnauthenticatedError'
 import { toErrorResponse } from '@/lib/errors/toErrorResponse'
 import { log } from '@/lib/log'
+import { currentTraceId } from '@/lib/observability/trace'
 import { newRequestId } from './request-id'
 import { parseBody, parseQuery, parsePathParams } from './parsers'
 
@@ -103,9 +104,15 @@ export function createRoute<
         await getSessionService().touch()
       }
 
-      // step 11
+      // step 11 — spec 001h §5.2: tag the response log with enduser_id when a
+      // session is present (BFF already holds it; no baggage read-back needed).
       log.info(
-        { requestId, status: response.status, durationMs: Date.now() - start },
+        {
+          requestId,
+          status: response.status,
+          durationMs: Date.now() - start,
+          ...(session ? { enduser_id: session.userId } : {}),
+        },
         'bff.response.out',
       )
       return response
@@ -117,7 +124,8 @@ export function createRoute<
         { requestId, durationMs: Date.now() - start, err: errMessage(err) },
         'bff.internal.error',
       )
-      return toErrorResponse(err, requestId)
+      // Spec 001h §5.2 — attach the active trace id to the envelope.
+      return toErrorResponse(err, requestId, currentTraceId())
     }
   }
 }

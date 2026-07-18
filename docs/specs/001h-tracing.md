@@ -1,6 +1,10 @@
 # Spec 001h：BFF 基礎建設 — 分散式追蹤（traceId 模組）
 
-- **狀態**：Draft **v0.3**（2026-07-18）— **階段 A（server-side）達「可實作」；階段 B（Streamlit handoff）延後**
+- **狀態**：**階段 A 已實作（v0.4，2026-07-18）** — server-side tracing 落地並全綠；**階段 B（Streamlit handoff）延後**
+  > 已交付：`src/lib/observability/{trace,otel-sdk}.ts`、`src/instrumentation.node.ts`（NodeSDK gated on OTLP endpoint）、
+  > `lifecycle.ts` SIGTERM flush、`log.ts` 自動帶 traceId/spanId、`create-route.ts` enduser_id + 錯誤 envelope traceId、
+  > `backendFetch` 注入 traceparent+baggage。依賴：`@opentelemetry/{api,sdk-node,sdk-trace-node,exporter-trace-otlp-http,resources,semantic-conventions}`。
+  > 差異：`session.id` 改由 `userId:createdAt` 衍生（§4）；OTel **僅在設 `OTEL_EXPORTER_OTLP_ENDPOINT` 時啟動**（dev/test 無 collector 靜默）。
 - **建立日期**：2026-07-18
 - **影響範圍**：`src/lib/observability/trace.ts`（新）、`src/instrumentation.ts` + `src/instrumentation.node.ts`（新）、
   `src/lib/lifecycle.ts`（span flush）、`src/lib/api/backend.ts`、`src/lib/api/create-route.ts`、
@@ -97,19 +101,21 @@ export function traceFieldsForLog(): { traceId: string | null; spanId: string | 
 /** 出站 traceparent：從 active span context 以 W3C 格式組出；無 active span → {}。 */
 export function outboundTraceHeaders(): { traceparent?: string }
 
-/** sessionId 的不可逆衍生（如 sha256 → 16 hex）；同一 sessionId 穩定、無法反推。 */
-export function deriveSessionCorrelationId(sessionId: string): string
+/** 不可逆衍生（sha256 → 16 hex）；穩定、無法反推。餵不可變的 per-session 值。 */
+export function deriveSessionCorrelationId(input: string): string
 
-/** 出站 baggage：從 session 直組（非 OTel baggage-context）；無 session → {}。 */
+/** 出站 baggage：從 StoredSession 直組（非 OTel baggage-context）；無 session → {}。 */
 export function outboundBaggageHeaders(
-  session: { userId: string } | null,
-  sessionId: string | null,
+  session: { userId: string; createdAt: number } | null,
 ): { baggage?: string } // "session.id=<derived>,enduser.id=<userId>"
 ```
 
 - **為何 baggage 用「直組 header」而非 OTel baggage-context**（v0.3）：OTel Baggage 綁在 context 上，需
   `context.with(setBaggage(active(), …), fn)` 才傳得出去；`backendFetch` **已握有 `options.session`**，直接組
   `baggage` header 更簡單、確定、可測，且免動 request 的 async context 範圍。
+- **`session.id` 從 `StoredSession` 不可變欄位衍生（v0.3 實作定案）**：`deriveSessionCorrelationId(`${userId}:${createdAt}`)`。
+  原構想餵「sessionId」，但實作揭露 **sessionId 是 cookie 值 / store key，`StoredSession` 內沒有、且 `backendFetch` 取得
+  它需額外 cookie 讀取**。改餵 `userId:createdAt`（皆不可變、per-session 唯一、自足），更遠離 sessionId 且無 cookie 讀取。
 - **無 active span / 無 session 時**：對應函式回 `null` / `{}`，**不得 throw**。
 - **強制 TDD**：有/無 active span 的回傳；`outboundTraceHeaders` 產合法 `traceparent`；`deriveSessionCorrelationId`
   穩定且不等於原值；`outboundBaggageHeaders` 值正確且 null 安全。
@@ -122,7 +128,7 @@ export function outboundBaggageHeaders(
 
 - **入站**：`NodeSDK` 的 http instrumentation 自動從 request `traceparent` 續接（有則同 trace、無則開新 root）；
   Next 的 request span 成為 active span。
-- **出站**：`backendFetch` 在組 headers 時**併入** `outboundTraceHeaders()` + `outboundBaggageHeaders(session, sessionId)`
+- **出站**：`backendFetch` 在組 headers 時**併入** `outboundTraceHeaders()` + `outboundBaggageHeaders(session)`
   （來自 §4），**與既有 `x-request-id` 並存**。
   > 採手動注入（而非依賴 fetch auto-instrumentation 自動注入）→ 傳遞**確定**、可單元測試，不受 Next patch fetch 的行為變動影響。
 - 後端須「續接 `traceparent`+`baggage` 並回報同一 `traceId`/`session.id`」（§9）。
@@ -148,7 +154,7 @@ export function outboundBaggageHeaders(
 ### 5.4 Baggage：跨服務傳 `session.id` / `enduser.id`
 
 - 服務對服務（BFF→後端）以 **`baggage` header** 傳跨切 context，由 §4 `outboundBaggageHeaders()` 在 `backendFetch` 組出。
-- 鍵名對齊 OTel semantic conventions：**`session.id`**（= `deriveSessionCorrelationId(sessionId)`，衍生值）、
+- 鍵名對齊 OTel semantic conventions：**`session.id`**（= `deriveSessionCorrelationId(`${userId}:${createdAt}`)`，衍生值）、
   **`enduser.id`**（= `session.userId` = principal_id，已 opaque）。
 - **僅非機密**：不得含 email / 姓名 / raw sessionId / token（§10）。後端 / Streamlit 讀進各自 log。
 
@@ -242,22 +248,22 @@ export function outboundBaggageHeaders(
 
 ## 12. 驗收清單
 
-**階段 A**
-- [ ] `trace.ts`：`currentTraceId`/`currentSpanId` 有 active span 回 32-/16-hex、無則 `null`；`outboundTraceHeaders()` 產合法 `traceparent`；`deriveSessionCorrelationId` 穩定且 ≠ 原值；`outboundBaggageHeaders` 值正確；全數 null 安全。
-- [ ] `instrumentation.node.ts` 以 `NodeSDK`（`serviceName='streamsight-bff'`、`ParentBased(TraceIdRatioBased)` sampler）啟動；於 `instrumentation.ts` 的 `NEXT_RUNTIME==='nodejs'` 分支載入；dev/prod 皆生效。
-- [ ] 取樣比例由 env 覆寫（prod 0.1）；三服務一致。
-- [ ] **Cloud Run flush**：SIGTERM 時 `sdk.forceFlush()`+`shutdown()` 在 deadline 內完成，尾端 span 不遺失。
-- [ ] BFF 入站帶 `traceparent` → log `traceId` 與上游一致；無則開新 root。
-- [ ] `backendFetch` 出站帶 `traceparent`+`baggage`（`session.id` 衍生 + `enduser.id`）；後端 log 同一 `traceId`/`session.id`；`x-request-id` 仍在。
-- [ ] log 每筆含 `traceId`/`spanId`/`session_id`（遮罩）/`request_id`（有 session 時 `enduser_id`）。
-- [ ] 對外錯誤回應含 `traceId`（不含任何 PII / token）。
-- [ ] Baggage / query / tracestate **無** session 原值 / token。
-- [ ] 匯出：OTLP → Collector，trace 在 backend 可見且跨服務串接。
-- [ ] **登入成功導向 `/cms`**（admin 管理區；非 Streamlit）。
+**階段 A**（✅ = 已實作＋單元測試；☁️ = 需真 collector/後端的整合驗證，待部署環境）
+- [x] `trace.ts`：`currentTraceId`/`currentSpanId` 有/無 active span、`outboundTraceHeaders()` 合法 `traceparent`、`deriveSessionCorrelationId` 穩定且 ≠ 原值、`outboundBaggageHeaders` 值正確、全數 null 安全。（`trace.test.ts` 11 例）
+- [x] `instrumentation.node.ts` 以 `NodeSDK`（`serviceName`、`ParentBased(TraceIdRatioBased)`）啟動；於 `instrumentation.ts` `NEXT_RUNTIME==='nodejs'` 分支載入；**gated on `OTEL_EXPORTER_OTLP_ENDPOINT`**（dev/test 無 collector 靜默）。
+- [x] 取樣比例由 env（`OTEL_TRACES_SAMPLER_ARG`）覆寫，預設 prod 0.1 / dev 1.0。
+- [x] **Cloud Run flush**：SIGTERM 時 `shutdownOtel()`（`sdk.shutdown()` flush）接進 `lifecycle.ts`。（`otel-sdk.test.ts` + `lifecycle.test.ts`）
+- [x] `backendFetch` 出站帶 `traceparent`+`baggage`（`session.id` 衍生 + `enduser.id`）；`x-request-id` 仍在。（`backend.test.ts` 2 例）
+- [x] log 每筆自動含 `traceId`/`spanId`（有 span 時）；`create-route` 帶 `enduser_id`。（`log.test.ts` + `create-route.test.ts`）
+- [x] 對外錯誤回應含 `traceId`（有 span 時；不含 PII / token）。（`toErrorResponse.test.ts`）
+- [x] Baggage / query / tracestate **無** session 原值 / token（僅衍生 id + principal id）。（`trace.test.ts`）
+- [x] **登入成功導向 `/cms`**（admin 管理區；非 Streamlit）——現況 `LoginCard`，冒煙已驗。
+- [ ] ☁️ BFF 入站續接 `traceparent` → log `traceId` 與上游一致（需真 collector/上游）。
+- [ ] ☁️ 後端 log 出現**同一** `traceId`/`session.id`；OTLP → Collector，trace 在 backend 跨服務串接（需真 collector + 後端）。
 
 **階段 B（延後）**
 - [ ] Streamlit handoff：URL 依 §5.3 帶 `sessionId` 衍生值（+選用 `trace_id`）；Streamlit 能關聯回使用者（跨 repo）。
 
 ---
 
-最後更新：2026-07-18（v0.3，收掉實作阻礙：baggage 改 backendFetch 直組、改用手動 NodeSDK（拿得到 flush handle）、Streamlit handoff 延後且本期登入導向 `/cms`；階段 A 達可實作）
+最後更新：2026-07-18（v0.4，**階段 A 已實作並全綠**：trace/otel-sdk 模組、NodeSDK instrumentation（gated on OTLP endpoint）、SIGTERM flush、log/錯誤 envelope trace 欄位、backendFetch 注入；`session.id` 改由 `userId:createdAt` 衍生。跨服務整合驗證（☁️）待部署環境）

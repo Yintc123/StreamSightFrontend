@@ -10,6 +10,10 @@ import { NotFoundError } from '@/lib/errors/NotFoundError'
 import { BffError } from '@/lib/errors/BffError'
 import { getSessionService } from '@/lib/session/service'
 import type { StoredSession } from '@/lib/session/types'
+import {
+  outboundTraceHeaders,
+  outboundBaggageHeaders,
+} from '@/lib/observability/trace'
 import { DEFAULT_BACKEND_TIMEOUT_MS, PRE_REFRESH_MARGIN_MS } from './constants'
 import { newRequestId } from './request-id'
 
@@ -66,6 +70,12 @@ export async function backendFetch<T = unknown>(
     const headers: Record<string, string> = {
       'x-request-id': requestId,
       'content-type': 'application/json',
+      // Spec 001h §5.1 — manual W3C trace-context + baggage injection (kept
+      // deterministic + testable rather than relying on fetch auto-instrument).
+      // traceparent: from the active span (empty if none). baggage: non-PII
+      // session.id + enduser.id, built from the session we already hold.
+      ...outboundTraceHeaders(),
+      ...outboundBaggageHeaders(options.session ?? null),
       ...options.headers,
     }
 

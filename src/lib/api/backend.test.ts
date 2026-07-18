@@ -44,6 +44,17 @@ vi.mock('@/lib/session/service', () => ({
   }),
 }))
 
+// Spec 001h §5.1 — control what the trace module contributes so the test
+// asserts backendFetch forwards it (the module's own logic is unit-tested
+// separately). traceparent always present (from active span); baggage only
+// when a session is passed.
+vi.mock('@/lib/observability/trace', () => ({
+  outboundTraceHeaders: () => ({ traceparent: '00-' + 'a'.repeat(32) + '-' + 'b'.repeat(16) + '-01' }),
+  outboundBaggageHeaders: (s: unknown) =>
+    s ? { baggage: 'session.id=deadbeefdeadbeef,enduser.id=u1' } : {},
+  traceFieldsForLog: () => ({ traceId: null, spanId: null }), // used by log.ts
+}))
+
 import { backendFetch } from './backend'
 
 function makeSession(over: Partial<StoredSession> = {}): StoredSession {
@@ -117,6 +128,30 @@ describe('happy path', () => {
     const { requestId } = await backendFetch('/x', { requestId: myId })
     expect(received).toBe(myId)
     expect(requestId).toBe(myId)
+  })
+
+  it('injects traceparent + baggage (with session) alongside x-request-id', async () => {
+    const captured: Record<string, string | null> = {}
+    mockBackend('get', 'http://backend.test/items', (req) => {
+      captured.traceparent = req.headers.get('traceparent')
+      captured.baggage = req.headers.get('baggage')
+      captured.requestId = req.headers.get('x-request-id')
+      return HttpResponse.json({ data: 'ok' })
+    })
+    await backendFetch('/items', { session: makeSession() })
+    expect(captured.traceparent).toBe('00-' + 'a'.repeat(32) + '-' + 'b'.repeat(16) + '-01')
+    expect(captured.baggage).toBe('session.id=deadbeefdeadbeef,enduser.id=u1')
+    expect(captured.requestId).toMatch(/^req_/)
+  })
+
+  it('no session → traceparent present, no baggage', async () => {
+    let baggage: string | null = 'x'
+    mockBackend('get', 'http://backend.test/public', (req) => {
+      baggage = req.headers.get('baggage')
+      return HttpResponse.json({ data: 'ok' })
+    })
+    await backendFetch('/public')
+    expect(baggage).toBeNull()
   })
 
   it('builds URL with query params', async () => {

@@ -1,10 +1,21 @@
 import 'server-only'
+import { traceFieldsForLog } from '@/lib/observability/trace'
 
 type LogObj = Record<string, unknown>
 type Level = 'info' | 'warn' | 'error'
 
 function emit(level: Level, obj: LogObj, event: string): void {
-  const line = JSON.stringify({ level, event, time: new Date().toISOString(), ...obj })
+  // Spec 001h §8 — auto-correlate every line with the active trace so call
+  // sites don't thread it through. Only emitted when a span is active.
+  const { traceId, spanId } = traceFieldsForLog()
+  const line = JSON.stringify({
+    level,
+    event,
+    time: new Date().toISOString(),
+    ...(traceId ? { traceId } : {}),
+    ...(spanId ? { spanId } : {}),
+    ...obj,
+  })
   if (level === 'error') console.error(line)
   else if (level === 'warn') console.warn(line)
   else console.log(line)

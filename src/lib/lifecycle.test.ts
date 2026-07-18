@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 const closeMock = vi.fn().mockResolvedValue(undefined)
+const shutdownOtelMock = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/lib/session/store', () => ({
   getSessionStore: () => ({ close: closeMock }),
+}))
+
+vi.mock('@/lib/observability/otel-sdk', () => ({
+  shutdownOtel: () => shutdownOtelMock(),
 }))
 
 import { registerLifecycle, _resetLifecycleForTest } from './lifecycle'
@@ -13,6 +18,7 @@ const processOnSpy = vi.spyOn(process, 'on')
 
 beforeEach(() => {
   closeMock.mockClear().mockResolvedValue(undefined)
+  shutdownOtelMock.mockClear().mockResolvedValue(undefined)
   exitSpy.mockClear()
   processOnSpy.mockClear()
   _resetLifecycleForTest()
@@ -35,12 +41,13 @@ describe('registerLifecycle', () => {
     expect(sigint).toHaveLength(1)
   })
 
-  it('on SIGTERM: closes store and exits cleanly', async () => {
+  it('on SIGTERM: flushes OTel spans, closes store, exits cleanly', async () => {
     registerLifecycle()
     process.emit('SIGTERM')
     // Allow microtasks to drain
     await new Promise((r) => setImmediate(r))
     await new Promise((r) => setImmediate(r))
+    expect(shutdownOtelMock).toHaveBeenCalledTimes(1) // spec 001h §7
     expect(closeMock).toHaveBeenCalledTimes(1)
     expect(exitSpy).toHaveBeenCalledWith(0)
   })

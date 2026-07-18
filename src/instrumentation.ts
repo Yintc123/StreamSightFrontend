@@ -1,5 +1,10 @@
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // Spec 001h §5.1 — start OpenTelemetry FIRST so Next's built-in
+    // instrumentation emits spans against the registered TracerProvider.
+    // No-ops unless an OTLP endpoint is configured (see instrumentation.node).
+    await import('./instrumentation.node')
+
     const { registerLifecycle } = await import('./lib/lifecycle')
     registerLifecycle()
     // Spec 002 §4.5 — eager mock-handler registration. Side-effect of the

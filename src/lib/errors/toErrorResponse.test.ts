@@ -56,4 +56,16 @@ describe('toErrorResponse', () => {
     const body = await readEnvelope(res)
     expect(body.error.code).toBe('INTERNAL_ERROR')
   })
+
+  it('includes traceId in the envelope when provided (spec 001h §5.2)', async () => {
+    const res = toErrorResponse(new NotFoundError('nope'), REQ_ID, 'a'.repeat(32))
+    const body = (await res.json()) as { error: { traceId?: string } }
+    expect(body.error.traceId).toBe('a'.repeat(32))
+  })
+
+  it('omits traceId when null/undefined', async () => {
+    const res = toErrorResponse(new NotFoundError('nope'), REQ_ID, null)
+    const body = (await res.json()) as { error: Record<string, unknown> }
+    expect('traceId' in body.error).toBe(false)
+  })
 })
