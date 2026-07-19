@@ -11,11 +11,13 @@
 - [架構概覽](#架構概覽)
 - [系統需求](#系統需求)
 - [快速開始](#快速開始)
+- [測試帳號](#測試帳號)
 - [環境變數](#環境變數)
 - [開發指令](#開發指令)
 - [專案結構](#專案結構)
 - [技術選型](#技術選型)
 - [頁面與 BFF Route 總覽](#頁面與-bff-route-總覽)
+- [API 文件](#api-文件)
 - [骨架能力（可重用基建）](#骨架能力可重用基建)
 - [測試](#測試)
 - [部署](#部署)
@@ -105,6 +107,30 @@ pnpm dev
 ```
 
 > **Redis port 注意**：`.env.example` 預設 `REDIS_PORT=6379`，對應整合 repo（StreamSight 根目錄）compose 起的 Redis；若使用本 repo 的 `docker compose up -d redis`（對外 port 6380，避開 6379 衝突），`.env.local` 需改為 `REDIS_PORT=6380`。
+
+### 整套服務一鍵啟動
+
+若要同時啟動前端、後端、MariaDB、Redis、Streamlit，請改用整合 repo（StreamSight 根目錄）的 `docker compose up -d`，詳見根目錄 README 的快速啟動說明。
+
+---
+
+## 測試帳號
+
+### Mock 模式（`USE_MOCK=1`）
+
+Mock 的 login handler **不驗證帳密**——任意帳號密碼皆可登入，登入後身分固定為 root 管理員（`username: admin`、`name: Root Admin`、`admin_role: root`）。
+
+e2e 測試與文件範例慣例使用以下帳密（見 `tests/e2e/cms-admins.spec.ts`）：
+
+| 帳號 | 密碼 |
+|---|---|
+| `admin` | `admin-dev-password-change-me` |
+
+### 真後端模式（`USE_MOCK=0`）
+
+無內建測試帳號。初始管理員由整合 repo 的 `setup.sh` / `setup.ps1` 在初始化時互動建立（預設 username `admin`，密碼由你自行輸入）。
+
+> **注意**：上表帳密僅供 mock／e2e 測試使用。任何真實環境的帳號密碼都不應寫入 README 或版本控制。
 
 ---
 
@@ -371,6 +397,19 @@ StreamSightFrontend/
 | `POST` | `/api/cms/admins/[id]/restore` | 復原已刪除管理員 |
 | `GET` | `/api/cms/me` | 目前登入者資料 |
 | `POST` | `/api/cms/me/password` | 修改密碼 |
+
+---
+
+## API 文件
+
+| 文件 | 位址 | 說明 |
+|---|---|---|
+| BFF Route Handlers | 上方〈[頁面與 BFF Route 總覽](#頁面與-bff-route-總覽)〉 | 瀏覽器實際呼叫的 API（本 repo） |
+| 後端 Swagger UI | http://localhost:8000/docs | FastAPI 自動生成的互動式文件 |
+| 後端 ReDoc | http://localhost:8000/redoc | 同一份 OpenAPI 的閱讀版 |
+| 後端 OpenAPI schema | http://localhost:8000/openapi.json | 供工具匯入（Postman、codegen） |
+
+> 後端為內網 domain API：瀏覽器端一律走 BFF（`/api/*`），不要直接呼叫後端。後端文件位址以本機 `docker compose` 部署為準（port 8000），其他環境請替換 host。
 
 ---
 
