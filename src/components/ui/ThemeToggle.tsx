@@ -16,6 +16,8 @@ export function ThemeToggle() {
       onClick={toggle}
       className="flex items-center justify-center w-9 h-9 rounded-md text-ink-AA hover:text-ink-AAA hover:bg-line transition-colors"
     >
+      {/* 18×18 對齊 Streamlit TopBar 的 _SUN_SVG/_MOON_SVG（theme-toggle.md §3；
+          014b v0.7）；鈕 36×36、radius 6、色彩 token 兩端本已一致 */}
       <svg
         aria-hidden="true"
         viewBox="0 0 24 24"
@@ -24,7 +26,7 @@ export function ThemeToggle() {
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="w-5 h-5"
+        className="h-[18px] w-[18px]"
       >
         {isLight ? <SunPaths /> : <MoonPaths />}
       </svg>

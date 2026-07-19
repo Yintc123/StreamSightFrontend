@@ -205,7 +205,8 @@
 | 0.4 | 2026-07-18 | §5 補上 sidebar nav 互動 token `--color-nav-hover` / `--color-nav-active`（隨 [016 §4.2](./016-cms-sidebar-streamlit-nav.md) nav hover/尺寸對齊 Streamlit 實測值）；修正 §5 標題誤指的 016 §5 交叉引用（正確為 016 §4.1 背景 / §4.2 nav 互動）。 |
 | 0.5 | 2026-07-19 | ThemeToggle 放置點隨 [016 v0.4](./016-cms-sidebar-streamlit-nav.md) 兩層導覽由 `CmsNav` → `CmsTopBar`（頂部列右側 `ml-auto` 容器）；§3.6 / §0.2 / §4 檔案清單 / D6 同步更新。功能與排版不變。 |
 | 0.6 | 2026-07-19 | +D8 **功能開關**：`ThemeToggle` 在 `NEXT_PUBLIC_ENABLE_THEME_TOGGLE !== '1'` 時 `return null`；§3.5 補說明、§4 檔案清單更新。消費者（`page.tsx`、`CmsTopBar.tsx`）插入點不動，開關控一處即可。 |
+| 0.7 | 2026-07-19 | **icon 尺寸對齊 Streamlit ThemeToggle**：`w-5 h-5`（20px）→ `h-[18px] w-[18px]`（＝Streamlit `_SUN_SVG`/`_MOON_SVG` 的 `width/height=18`，theme-toggle.md §3）。其餘本已一致：SVG path 同源（sun 圓+8 線 / moon 單 path，stroke-2 round）、鈕 36×36（`w-9 h-9`=`.ss-topbar__theme-btn`）、radius 6（`rounded-md`）、色彩 `ink-AA`/hover `ink-AAA`+`bg-line` 同 token。純樣式。 |
 
 ---
 
-最後更新：2026-07-19（v0.6，+D8 功能開關 ThemeToggle return null）
+最後更新：2026-07-19（v0.7，ThemeToggle icon 18px 對齊 Streamlit）
