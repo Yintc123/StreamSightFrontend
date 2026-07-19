@@ -157,8 +157,8 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 | 邊框 | **無 border**（靠 `surface-card` vs `surface-page` 對比分隔） | 同（移除 `border-r`） |
 | resize handle | `div` 8px 寬、`height:100%`、`right:-6px`（跨邊）、`cursor:col-resize`、`user-select:none`，內含一條 hover 才上色的細條 | `role="separator"` 8px hit 區、`-right-1` 跨邊、內 `w-px` hover/focus 顯示 `bg-brand` |
 | 收合動畫 | `min/max-width→0` + `transform:translateX(-256px)`，`transition .3s` | **無動畫**（v0.5.2 依使用者偏好移除 transition，即時收合；此處刻意不對齊 Streamlit）；nav 轉 `aria-hidden`+`inert` |
-| 收合鈕圖示 | material `keyboard_double_arrow_left`（«） | 雙箭頭 SVG（左） |
-| 收合後控制 | 左上浮出 `stExpandSidebarButton`（`keyboard_double_arrow_right` »，28×28） | 左上 `absolute` 浮出展開鈕（雙箭頭右） |
+| 收合鈕圖示 | Material Symbols Rounded `keyboard_double_arrow_left`，`DynamicIcon size="xl"` = **24px**（bundle 實查） | **官方 Material Symbols Rounded 24px 向量內嵌**（同 glyph、`w-6 h-6` 同 24px；v0.5.3） |
+| 收合後控制 | 左上浮出 `stExpandSidebarButton`（`keyboard_double_arrow_right`，`size="xl"` 24px，鈕 28×28） | 左上 `absolute` 浮出展開鈕（同官方 24px 向量，鈕 `h-7 w-7` 28×28） |
 
 - **拖曳調寬**：右緣 8px 透明 `role="separator"`（`aria-orientation="vertical"`）hit 區，指標拖曳即時
   改寬（拖曳中 `transition:none`）；亦支援鍵盤 `←/→`（步進 16px，`aria-valuenow/min/max` 曝露現值）。
@@ -264,6 +264,8 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 | 0.5.1 | 2026-07-19 | **實測校準**：以 Playwright 量 Streamlit `stSidebar` computed style，校正 §4.3 尺寸/行為——寬 `256/200/600`（原 224/180/480）、**去 border**、resize handle 改 8px 透明跨邊條（hover 顯示 brand 細條）、收合改**寬度動畫**（非卸載）、雙箭頭圖示、收合後左上浮出展開鈕。僅視覺/尺寸校準，測試契約不變（574 綠）。 |
 | 0.5.2 | 2026-07-19 | **移除寬度動畫**（使用者偏好）：外層 `transition: width .3s` 拿掉，收合 / 展開與載入定位皆即時；連帶移除只為動畫存在的 `dragging` state。此處刻意不對齊 Streamlit（其收合仍有 .3s 動畫）。純樣式，測試契約不變。附帶效益：spec 019 後首繪 256 → cookie 寬的跳動不再帶滑動感（019 OQ-1 的體感問題減輕）。 |
 
+| 0.5.3 | 2026-07-19 | **收合 / 展開 icon 完全對齊 Streamlit**：bundle 實查其渲染為 Material Symbols Rounded `keyboard_double_arrow_left/right`、`DynamicIcon size="xl"`＝1.5rem＝24px；原自繪 stroke 雙箭頭（16px）改為 **google/material-design-icons 官方 materialsymbolsrounded 24px 向量內嵌**（`viewBox 0 -960 960 960`、`fill:currentColor`、`w-6 h-6`），glyph 與尺寸皆一致。純視覺，測試契約不變。 |
+
 ---
 
-最後更新：2026-07-19（v0.5.2，移除寬度動畫）
+最後更新：2026-07-19（v0.5.3，收合 icon 對齊 Streamlit 官方向量）

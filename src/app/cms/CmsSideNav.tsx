@@ -171,29 +171,22 @@ export function CmsSideNav({
   )
 }
 
-// 雙箭頭（對齊 Streamlit material keyboard_double_arrow_left / right）。
+// 雙箭頭：Material Symbols Rounded keyboard_double_arrow_left / right 的官方 24px
+// 向量內嵌（google/material-design-icons materialsymbolsrounded 24px，viewBox
+// 0 -960 960 960）。對齊 Streamlit 收合 / 展開鈕實際渲染：DynamicIcon size="xl"
+// = 1.5rem = 24px、同字型同 glyph（016 §4.3，bundle 實查 2026-07-19）。
 function DoubleChevron({ dir }: { dir: 'left' | 'right' }) {
   return (
     <svg
       aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="w-4 h-4"
+      viewBox="0 -960 960 960"
+      fill="currentColor"
+      className="w-6 h-6"
     >
       {dir === 'left' ? (
-        <>
-          <polyline points="17 17 12 12 17 7" />
-          <polyline points="11 17 6 12 11 7" />
-        </>
+        <path d="m313-480 155 156q11 11 11.5 27.5T468-268q-11 11-28 11t-28-11L228-452q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l184-184q11-11 27.5-11.5T468-692q11 11 11 28t-11 28L313-480Zm264 0 155 156q11 11 11.5 27.5T732-268q-11 11-28 11t-28-11L492-452q-6-6-8.5-13t-2.5-15q0-8 2.5-15t8.5-13l184-184q11-11 27.5-11.5T732-692q11 11 11 28t-11 28L577-480Z" />
       ) : (
-        <>
-          <polyline points="7 17 12 12 7 7" />
-          <polyline points="13 17 18 12 13 7" />
-        </>
+        <path d="M383-480 228-636q-11-11-11.5-27.5T228-692q11-11 28-11t28 11l184 184q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13L284-268q-11 11-27.5 11.5T228-268q-11-11-11-28t11-28l155-156Zm264 0L492-636q-11-11-11.5-27.5T492-692q11-11 28-11t28 11l184 184q6 6 8.5 13t2.5 15q0 8-2.5 15t-8.5 13L548-268q-11 11-27.5 11.5T492-268q-11-11-11-28t11-28l155-156Z" />
       )}
     </svg>
   )
