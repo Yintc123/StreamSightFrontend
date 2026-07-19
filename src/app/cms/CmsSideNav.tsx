@@ -10,7 +10,8 @@
 //  - 右緣 8px 透明 col-resize 拖曳條（hover 顯示 brand 細條），可拖曳調寬 + 鍵盤 ←→。
 //  - 收合＝寬度動畫收到 0（transition .3s），nav 轉 aria-hidden + inert；左上浮出展開鈕。
 //  - 雙箭頭圖示（« / »）、無 border（靠 surface-card vs surface-page 對比分隔）。
-// 寬度 / 收合態由 useSidebarPanel 持久化到 localStorage。
+// 持久化由 useSidebarPanel 承載（019）：寬度走 sidebar_width cookie（與 Streamlit
+// 共用）、收合態走 localStorage。
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -18,10 +19,10 @@ import { usePathname } from 'next/navigation'
 
 import type { AdminRole } from '@/lib/schemas/admin'
 import {
+  hasCollapsedPreference,
   useSidebarPanel,
   SIDEBAR_MIN_WIDTH,
   SIDEBAR_MAX_WIDTH,
-  SIDEBAR_STORAGE_KEY,
 } from './useSidebarPanel'
 
 const RESIZE_STEP = 16 // 鍵盤每次調整寬度的像素步進
@@ -32,11 +33,12 @@ export function CmsSideNav({ adminRole }: { adminRole?: AdminRole }) {
   const [dragging, setDragging] = useState(false)
   const dragStart = useRef<{ x: number; width: number } | null>(null)
 
-  // Auto-collapse on narrow viewports (mobile) when no preference is saved.
+  // Auto-collapse on narrow viewports (mobile) when no collapse preference is
+  // saved (019 §I-2: width-only legacy records don't count as a preference).
   // Keeps full-width content on first visit; user can expand manually and the
   // preference persists via localStorage thereafter.
   useEffect(() => {
-    if (!localStorage.getItem(SIDEBAR_STORAGE_KEY) && window.innerWidth < 768) {
+    if (!hasCollapsedPreference() && window.innerWidth < 768) {
       toggleCollapsed()
     }
   }, [toggleCollapsed])

@@ -7,10 +7,17 @@ vi.mock('next/navigation', () => ({
 
 import { CmsSideNav } from './CmsSideNav'
 import { SIDEBAR_DEFAULT_WIDTH, SIDEBAR_STORAGE_KEY } from './useSidebarPanel'
+import { SIDEBAR_COOKIE } from './sidebarCookie'
+
+/** 清掉 sidebar_width cookie（019 §I-5），避免寬度在測試間洩漏。 */
+function clearSidebarCookie() {
+  document.cookie = `${SIDEBAR_COOKIE}=; Max-Age=0; Path=/`
+}
 
 describe('CmsSideNav 左欄（當前系統功能）', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    clearSidebarCookie()
   })
 
   it('super_admin：顯示「管理員管理」→ /cms/admins、「設定」→ /cms/settings', () => {
@@ -39,6 +46,7 @@ describe('CmsSideNav 左欄（當前系統功能）', () => {
 describe('CmsSideNav 收合 / 展開（對齊 Streamlit）', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    clearSidebarCookie()
   })
 
   afterEach(() => {
@@ -69,6 +77,14 @@ describe('CmsSideNav 收合 / 展開（對齊 Streamlit）', () => {
     expect(screen.queryByRole('link', { name: '設定' })).not.toBeInTheDocument()
   })
 
+  it('窄螢幕且只有 legacy width 記錄（無 collapsed 欄位）→ 仍自動收合（019 §I-2）', () => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 375 })
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify({ width: 300 }))
+    render(<CmsSideNav adminRole="super_admin" />)
+    // 拖過寬度不代表表態過收合偏好，窄螢幕仍應自動收合
+    expect(screen.getByRole('button', { name: '展開側欄' })).toBeInTheDocument()
+  })
+
   it('窄螢幕但已有 localStorage → 不覆寫使用者偏好', () => {
     Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 375 })
     window.localStorage.setItem(
@@ -95,6 +111,7 @@ describe('CmsSideNav 收合 / 展開（對齊 Streamlit）', () => {
 describe('CmsSideNav 寬度調整把手（鍵盤可及）', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    clearSidebarCookie()
   })
 
   it('提供 vertical separator，預設 aria-valuenow = 預設寬', () => {
