@@ -102,17 +102,19 @@ export function CmsSideNav({
         inert={collapsed}
       >
         <nav
-          className="flex h-full flex-col gap-0.5 px-3 py-3"
+          className="flex h-full flex-col gap-0.5 px-3 pb-3"
           style={{ width }}
         >
-          <div className="mb-1 flex justify-end">
+          {/* header 對齊 Streamlit stSidebarHeader：高 60px（3.75rem）垂直置中、
+              marginBottom 16px；鈕右緣內縮 20px（px-3 12 + mr-2 8，同其水平 padding） */}
+          <div className="mb-4 flex h-[3.75rem] items-center justify-end">
             <button
               type="button"
               aria-label="收合側欄"
               title="收合側欄"
               onClick={toggleCollapsed}
               tabIndex={collapsed ? -1 : undefined}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-AA hover:bg-nav-hover"
+              className="mr-2 flex h-7 w-7 items-center justify-center rounded-lg text-ink-AA hover:bg-nav-hover"
             >
               <DoubleChevron dir="left" />
             </button>
@@ -155,14 +157,15 @@ export function CmsSideNav({
         </div>
       )}
 
-      {/* 收合後：左上浮出展開鈕（同 Streamlit stExpandSidebarButton，keyboard_double_arrow_right） */}
+      {/* 收合後：左上浮出展開鈕（同 Streamlit stExpandSidebarButton：主 header 左側
+          marginLeft 16px、60px 高度置中 → 約 (16, 16)） */}
       {collapsed && (
         <button
           type="button"
           aria-label="展開側欄"
           title="展開側欄"
           onClick={toggleCollapsed}
-          className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-surface-card text-ink-AA hover:bg-nav-hover"
+          className="absolute left-4 top-4 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-surface-card text-ink-AA hover:bg-nav-hover"
         >
           <DoubleChevron dir="right" />
         </button>
