@@ -28,6 +28,7 @@ const RawEnv = z
     REDIS_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
     REDIS_COMMAND_TIMEOUT_MS: z.coerce.number().int().positive().default(1000),
 
+    APP_ENV: z.string().default('local'),
     APP_VERSION: z.string().default('0.0.0'),
     APP_COMMIT: z.string().optional(),
     NEXT_PUBLIC_APP_NAME: z.string().default('StreamSight'),
@@ -56,7 +57,7 @@ const RawEnv = z
       }
     }
 
-    if (env.NODE_ENV === 'production') {
+    if (env.APP_ENV === 'production') {
       const list = (env.ALLOWED_ORIGINS ?? '')
         .split(',')
         .map((s) => s.trim())
