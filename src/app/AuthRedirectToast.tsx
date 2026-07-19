@@ -16,6 +16,8 @@ const REASON_PARAM = 'reason'
 
 const CMS_AUTH_REASON = 'cms-auth'
 const CMS_NOT_ADMIN_REASON = 'cms-not-admin'
+// Spec 018 §5.5 — idle timeout hard-redirect lands here.
+const IDLE_LOGOUT_REASON = 'idle-logout'
 
 export const CMS_AUTH_TOAST_ID = 'cms-auth-required'
 export const CMS_AUTH_TOAST_MESSAGE = '無使用 cms 權限'
@@ -23,6 +25,9 @@ export const CMS_AUTH_TOAST_DURATION_MS = 4000
 
 export const CMS_NOT_ADMIN_TOAST_ID = 'cms-not-admin'
 export const CMS_NOT_ADMIN_TOAST_MESSAGE = '需要管理員權限'
+
+export const IDLE_LOGOUT_TOAST_ID = 'idle-logout'
+export const IDLE_LOGOUT_TOAST_MESSAGE = '閒置過久,已自動登出'
 
 type ToastSpec = { id: string; message: string }
 
@@ -34,6 +39,10 @@ const REASONS: Record<string, ToastSpec> = {
   [CMS_NOT_ADMIN_REASON]: {
     id: CMS_NOT_ADMIN_TOAST_ID,
     message: CMS_NOT_ADMIN_TOAST_MESSAGE,
+  },
+  [IDLE_LOGOUT_REASON]: {
+    id: IDLE_LOGOUT_TOAST_ID,
+    message: IDLE_LOGOUT_TOAST_MESSAGE,
   },
 }
 

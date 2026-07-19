@@ -9,12 +9,15 @@ import { env } from '@/lib/config'
 import { requireAdminSession } from '@/lib/session/requireAdmin'
 import { CmsTopBar } from './CmsTopBar'
 import { CmsSideNav } from './CmsSideNav'
+import { IdleLogout } from './IdleLogout'
 
 // Spec 016 §6 — 兩層導覽：頂部列切換系統（管理後台 / 資料平台），左欄顯示當前系統功能。
 export default async function CmsLayout({ children }: { children: ReactNode }) {
   const session = await requireAdminSession()
   return (
     <div className="min-h-dvh bg-surface-page flex flex-col">
+      {/* Spec 018 — 閒置 15 分鐘自動登出（僅登入後區域）。 */}
+      <IdleLogout />
       <CmsTopBar
         name={session.user.name}
         streamlitBaseUrl={env.STREAMLIT_BASE_URL ?? ''}

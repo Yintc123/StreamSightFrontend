@@ -27,6 +27,8 @@ import {
   CMS_AUTH_TOAST_MESSAGE,
   CMS_NOT_ADMIN_TOAST_ID,
   CMS_NOT_ADMIN_TOAST_MESSAGE,
+  IDLE_LOGOUT_TOAST_ID,
+  IDLE_LOGOUT_TOAST_MESSAGE,
 } from './AuthRedirectToast'
 
 beforeEach(() => {
@@ -79,6 +81,18 @@ describe('<AuthRedirectToast />', () => {
     expect(toastErrorMock).toHaveBeenCalledWith(
       CMS_NOT_ADMIN_TOAST_MESSAGE,
       expect.objectContaining({ id: CMS_NOT_ADMIN_TOAST_ID }),
+    )
+    expect(replaceMock).toHaveBeenCalledWith('/')
+  })
+
+  it('(spec 018) fires toast.error 「閒置過久」 when reason=idle-logout', () => {
+    searchParamsMock.get.mockImplementation((k) =>
+      k === 'reason' ? 'idle-logout' : null,
+    )
+    render(<AuthRedirectToast />)
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      IDLE_LOGOUT_TOAST_MESSAGE,
+      expect.objectContaining({ id: IDLE_LOGOUT_TOAST_ID }),
     )
     expect(replaceMock).toHaveBeenCalledWith('/')
   })
