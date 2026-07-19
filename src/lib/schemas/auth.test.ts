@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import {
   AdminRole,
+  AdminRoleWire,
+  ADMIN_ROLE_RANK,
+  toAdminRoleRank,
   BackendTokenResponse,
   BackendAdminMeResponse,
   adaptTokenResponse,
   REFRESH_TTL_FALLBACK_MS,
 } from './auth'
 
-describe('AdminRole', () => {
+describe('AdminRole (internal string enum)', () => {
   it('accepts the three backend admin roles', () => {
     expect(AdminRole.parse('super_admin')).toBe('super_admin')
     expect(AdminRole.parse('editor')).toBe('editor')
@@ -17,6 +20,30 @@ describe('AdminRole', () => {
   it('rejects unknown roles', () => {
     expect(AdminRole.safeParse('root').success).toBe(false)
     expect(AdminRole.safeParse('SUPER_ADMIN').success).toBe(false)
+  })
+})
+
+// enum-int.md — the backend wire is now an IntEnum rank; the BFF translates
+// only at the boundary and keeps the human-readable string internally.
+describe('AdminRoleWire (int rank ↔ internal string)', () => {
+  it('parses the int rank into the internal string label', () => {
+    expect(AdminRoleWire.parse(0)).toBe('viewer')
+    expect(AdminRoleWire.parse(50)).toBe('editor')
+    expect(AdminRoleWire.parse(100)).toBe('super_admin')
+  })
+
+  it('rejects the old string wire and off-ladder ints', () => {
+    expect(AdminRoleWire.safeParse('super_admin').success).toBe(false)
+    expect(AdminRoleWire.safeParse(3).success).toBe(false)
+    // ROOT=999 is backend Phase 2 bootstrap; Phase 1 wire is {0,50,100}.
+    expect(AdminRoleWire.safeParse(999).success).toBe(false)
+  })
+
+  it('toAdminRoleRank maps internal string → wire int (inverse)', () => {
+    expect(toAdminRoleRank('viewer')).toBe(0)
+    expect(toAdminRoleRank('editor')).toBe(50)
+    expect(toAdminRoleRank('super_admin')).toBe(100)
+    expect(ADMIN_ROLE_RANK).toEqual({ viewer: 0, editor: 50, super_admin: 100 })
   })
 })
 
@@ -94,10 +121,16 @@ describe('adaptTokenResponse', () => {
 })
 
 describe('BackendAdminMeResponse', () => {
-  const valid = { id: 1, username: 'root', name: 'Root Admin', admin_role: 'super_admin' }
+  // wire admin_role is the int rank (enum-int.md); it transforms to the string.
+  const valid = { id: 1, username: 'root', name: 'Root Admin', admin_role: 100 }
 
-  it('parses the /admin/me payload with int id', () => {
-    expect(BackendAdminMeResponse.parse(valid)).toEqual(valid)
+  it('parses the /admin/me payload with int id + transforms admin_role rank→string', () => {
+    expect(BackendAdminMeResponse.parse(valid)).toEqual({
+      id: 1,
+      username: 'root',
+      name: 'Root Admin',
+      admin_role: 'super_admin',
+    })
   })
 
   it('rejects a string id (BE returns int child PK)', () => {
@@ -108,7 +141,8 @@ describe('BackendAdminMeResponse', () => {
     expect(BackendAdminMeResponse.safeParse(valid).success).toBe(true)
   })
 
-  it('rejects an unknown admin_role', () => {
-    expect(BackendAdminMeResponse.safeParse({ ...valid, admin_role: 'root' }).success).toBe(false)
+  it('rejects an unknown admin_role rank (old string / off-ladder int)', () => {
+    expect(BackendAdminMeResponse.safeParse({ ...valid, admin_role: 'super_admin' }).success).toBe(false)
+    expect(BackendAdminMeResponse.safeParse({ ...valid, admin_role: 999 }).success).toBe(false)
   })
 })

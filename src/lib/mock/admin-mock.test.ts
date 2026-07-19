@@ -57,12 +57,12 @@ describe('adminCollectionHandler — status filter (spec 013b §2.1)', () => {
     expect(list().items).toEqual(list('active').items)
   })
 
-  it('POST still returns a created AdminResponse (unaffected by filter)', () => {
+  it('POST still returns a created AdminResponse (int rank wire, unaffected by filter)', () => {
     const created = adminCollectionHandler({
       method: 'POST',
-      body: { username: 'x', name: 'X', admin_role: 'editor' },
-    }) as { username: string; admin_role: string }
+      body: { username: 'x', name: 'X', admin_role: 50 },
+    }) as { username: string; admin_role: number }
     expect(created.username).toBe('x')
-    expect(created.admin_role).toBe('editor')
+    expect(created.admin_role).toBe(50)
   })
 })

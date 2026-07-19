@@ -9,13 +9,15 @@ import 'server-only'
 
 import type { MockHandler } from './dispatch'
 
-type AdminRole = 'super_admin' | 'editor' | 'viewer'
+// enum-int.md — the backend wire speaks int admin_role ranks; the mock mirrors
+// it so responses pass the BFF's int-rank Zod validators.
+const RANK = { viewer: 0, editor: 50, super_admin: 100 } as const
 
 function summary(over: {
   id: number
   username: string
   name: string
-  admin_role?: AdminRole
+  admin_role?: number
   is_protected?: boolean
   is_active?: boolean
   archived_at?: string | null
@@ -25,7 +27,7 @@ function summary(over: {
     id: over.id,
     username: over.username,
     name: over.name,
-    admin_role: over.admin_role ?? 'viewer',
+    admin_role: over.admin_role ?? RANK.viewer,
     is_protected: over.is_protected ?? false,
     is_active: over.is_active ?? true,
     archived_at: over.archived_at ?? null,
@@ -40,9 +42,9 @@ function summary(over: {
 }
 
 const SEED = [
-  summary({ id: 1, username: 'root', name: 'Root Admin', admin_role: 'super_admin', is_protected: true }),
-  summary({ id: 2, username: 'editor1', name: 'Editor One', admin_role: 'editor' }),
-  summary({ id: 3, username: 'viewer1', name: 'Viewer One', admin_role: 'viewer' }),
+  summary({ id: 1, username: 'root', name: 'Root Admin', admin_role: RANK.super_admin, is_protected: true }),
+  summary({ id: 2, username: 'editor1', name: 'Editor One', admin_role: RANK.editor }),
+  summary({ id: 3, username: 'viewer1', name: 'Viewer One', admin_role: RANK.viewer }),
   // Archived + deleted rows so the status filter returns distinct sets
   // (已封存 tab shows the archived row; deleted rows only surface via an
   // explicit status=deleted request — the list no longer has a 已刪除 tab).
@@ -50,7 +52,7 @@ const SEED = [
     id: 4,
     username: 'archived1',
     name: 'Archived One',
-    admin_role: 'viewer',
+    admin_role: RANK.viewer,
     is_active: false,
     archived_at: '2026-07-11T00:00:00Z',
   }),
@@ -58,7 +60,7 @@ const SEED = [
     id: 5,
     username: 'deleted1',
     name: 'Deleted One',
-    admin_role: 'viewer',
+    admin_role: RANK.viewer,
     is_active: false,
     deleted_at: '2026-07-12T00:00:00Z',
   }),
@@ -82,13 +84,13 @@ export const adminCollectionHandler: MockHandler = (opts) => {
     const body = (opts.body ?? {}) as {
       username?: string
       name?: string
-      admin_role?: AdminRole
+      admin_role?: number
     }
     return {
       id: 100,
       username: body.username ?? 'new-admin',
       name: body.name ?? 'New Admin',
-      admin_role: body.admin_role ?? 'viewer',
+      admin_role: body.admin_role ?? RANK.viewer,
     }
   }
   // Spec 013b §2.1 — honour the `status` tab filter (all/active/archived/
@@ -122,9 +124,9 @@ export const adminItemHandler: MockHandler = (opts) => {
 
 export const adminRoleHandler: MockHandler = (opts) => {
   const id = Number(captured(opts, 'id') ?? 2)
-  const body = (opts.body ?? {}) as { admin_role?: AdminRole }
+  const body = (opts.body ?? {}) as { admin_role?: number }
   const base = SEED.find((s) => s.id === id) ?? SEED[1]!
-  return { id, username: base.username, name: base.name, admin_role: body.admin_role ?? 'viewer' }
+  return { id, username: base.username, name: base.name, admin_role: body.admin_role ?? RANK.viewer }
 }
 
 function lifecycleHandler(kind: 'archive' | 'unarchive' | 'restore'): MockHandler {

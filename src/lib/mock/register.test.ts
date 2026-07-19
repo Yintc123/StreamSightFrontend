@@ -33,7 +33,8 @@ describe('mock/register — admin auth bridge registered', () => {
     expect(tokens.refresh_token).toBeTypeOf('string')
     const claims = decodeJwtPayload(tokens.access_token)
     expect(claims?.role).toBe(Role.ADMIN)
-    expect(claims?.grade).toBe('super_admin')
+    // enum-int.md — grade is the int rank (super_admin=100).
+    expect(claims?.grade).toBe(100)
   })
 
   it('/admin/me emits AdminResponse { id:int, username, name, admin_role }', () => {
@@ -42,7 +43,7 @@ describe('mock/register — admin auth bridge registered', () => {
     expect(me.id).toBeTypeOf('number')
     expect(me.username).toBe('admin')
     expect(me.name).toBeTypeOf('string')
-    expect(me.admin_role).toBe('super_admin')
+    expect(me.admin_role).toBe(100)
     expect('email' in me).toBe(false)
     expect('role' in me).toBe(false)
   })

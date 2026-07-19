@@ -6,7 +6,7 @@
 // the spec 011 BackendUserResponse convention.
 
 import { z } from 'zod'
-import { AdminRole } from './auth'
+import { AdminRole, AdminRoleWire, toAdminRoleRank } from './auth'
 
 export { AdminRole }
 
@@ -52,7 +52,7 @@ export const BackendAdminResponse = z.object({
   id: z.number().int(),
   username: z.string(),
   name: z.string(),
-  admin_role: AdminRole,
+  admin_role: AdminRoleWire, // int rank on the wire → internal string
 })
 export type BackendAdminResponse = z.infer<typeof BackendAdminResponse>
 
@@ -153,12 +153,12 @@ export function toBackendAdminCreate(input: AdminCreateInput) {
     username: input.username,
     name: input.name,
     password: input.password,
-    admin_role: input.adminRole,
+    admin_role: toAdminRoleRank(input.adminRole), // string → wire int rank
   }
 }
 
 export function toBackendRoleUpdate(input: AdminRoleInput) {
-  return { admin_role: input.adminRole }
+  return { admin_role: toAdminRoleRank(input.adminRole) }
 }
 
 export function toBackendPasswordChange(input: ChangePasswordInput) {

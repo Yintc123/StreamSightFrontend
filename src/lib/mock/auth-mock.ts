@@ -18,7 +18,8 @@ import type { MockHandler } from './dispatch'
 // child PK (a different int) — spec 012a §2.7.
 const MOCK_PRINCIPAL_ID = '1'
 const MOCK_ADMIN_CHILD_ID = 1
-const MOCK_ADMIN_ROLE = 'super_admin'
+// enum-int.md — admin_role / JWT grade are int ranks on the wire (super_admin=100).
+const MOCK_ADMIN_ROLE = 100
 
 function base64Url(value: unknown): string {
   return Buffer.from(JSON.stringify(value))

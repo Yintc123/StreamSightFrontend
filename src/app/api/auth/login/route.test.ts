@@ -82,10 +82,11 @@ function jwt(payload: Record<string, unknown>): string {
 
 let loginRequestBody: Record<string, unknown> | null = null
 
+// enum-int.md — grade / admin_role are int ranks on the wire (super_admin=100).
 function stubBeAuth(
-  opts: { roleInJwt?: 0 | 1; grade?: string; adminRole?: string } = {},
+  opts: { roleInJwt?: 0 | 1; grade?: number; adminRoleRank?: number } = {},
 ) {
-  const { roleInJwt = 1, grade = 'super_admin', adminRole = 'super_admin' } = opts
+  const { roleInJwt = 1, grade = 100, adminRoleRank = 100 } = opts
   loginRequestBody = null
   mockBackend('post', 'http://backend.test/admin/auth/login', async (req) => {
     loginRequestBody = (await req.json()) as Record<string, unknown>
@@ -101,7 +102,7 @@ function stubBeAuth(
   })
   mockBackend('get', 'http://backend.test/admin/me', () =>
     HttpResponse.json(
-      { id: ADMIN_CHILD_ID, username: 'admin', name: 'Root Admin', admin_role: adminRole },
+      { id: ADMIN_CHILD_ID, username: 'admin', name: 'Root Admin', admin_role: adminRoleRank },
       { status: 200 },
     ),
   )
@@ -139,8 +140,8 @@ describe('POST /api/auth/login', () => {
     expect(loginRequestBody).toEqual({ username: 'root', password: 'pw' })
   })
 
-  it('stores adminRole from /admin/me.admin_role', async () => {
-    stubBeAuth({ adminRole: 'editor' })
+  it('stores adminRole from /admin/me.admin_role (int rank → internal string)', async () => {
+    stubBeAuth({ adminRoleRank: 50 })
     await POST(postReq(), noParams)
     const [args] = createMock.mock.calls[0]
     expect((args as { adminRole?: string }).adminRole).toBe('editor')

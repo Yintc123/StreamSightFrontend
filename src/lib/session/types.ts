@@ -16,6 +16,10 @@ export type RoleValue = (typeof Role)[keyof typeof Role]
  * admin_role ladder inside the admin principal (spec 012a §4.8). Present
  * only on admin sessions; drives the spec 013 SUPER_ADMIN gate. NOT an
  * authorization boundary on its own — the backend 403/422 is authoritative.
+ *
+ * The backend wire is now an int rank (`enum-int.md`); the BFF translates at
+ * the boundary and stores this human-readable string, so gate comparisons
+ * (`=== 'super_admin'`) stay unchanged.
  */
 export type AdminRole = 'super_admin' | 'editor' | 'viewer'
 

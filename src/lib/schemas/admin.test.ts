@@ -12,17 +12,21 @@ import {
   adaptAdminSummary,
   adaptAdminList,
   toBackendAdminCreate,
+  toBackendRoleUpdate,
   type BackendAdminResponse as TBackendAdminResponse,
   type BackendAdminSummary as TBackendAdminSummary,
 } from './admin'
 
-const snakeResponse: TBackendAdminResponse = { id: 5, username: 'jane', name: 'Jane', admin_role: 'editor' }
+// enum-int.md — the backend wire carries admin_role as the int rank; Zod
+// transforms it to the internal string label. So the raw input fed to
+// `.parse()` uses ints, while adapters (which run post-parse) receive strings.
+const wireResponse = { id: 5, username: 'jane', name: 'Jane', admin_role: 50 }
 
-const snakeSummary: TBackendAdminSummary = {
+const wireSummary = {
   id: 5,
   username: 'jane',
   name: 'Jane',
-  admin_role: 'editor',
+  admin_role: 50,
   is_protected: false,
   is_active: true,
   archived_at: null,
@@ -34,6 +38,10 @@ const snakeSummary: TBackendAdminSummary = {
   created_at: '2026-07-01T00:00:00Z',
   updated_at: '2026-07-02T00:00:00Z',
 }
+
+// Post-parse shape (string admin_role) — what adapters consume.
+const parsedResponse: TBackendAdminResponse = { ...wireResponse, admin_role: 'editor' }
+const parsedSummary: TBackendAdminSummary = { ...wireSummary, admin_role: 'editor' }
 
 describe('AdminListQuery', () => {
   it('defaults status=active, limit=50, offset=0', () => {
@@ -106,19 +114,24 @@ describe('AdminUpdateInput / AdminRoleInput / ChangePasswordInput', () => {
 })
 
 describe('backend response validators', () => {
-  it('BackendAdminResponse parses snake shape', () => {
-    expect(BackendAdminResponse.parse(snakeResponse)).toEqual(snakeResponse)
+  it('BackendAdminResponse parses snake shape + transforms admin_role rank→string', () => {
+    expect(BackendAdminResponse.parse(wireResponse)).toEqual(parsedResponse)
+  })
+
+  it('rejects the old string admin_role wire', () => {
+    expect(BackendAdminResponse.safeParse({ ...wireResponse, admin_role: 'editor' }).success).toBe(false)
   })
 
   it('BackendAdminSummary keeps timestamps as ISO strings', () => {
-    const parsed = BackendAdminSummary.parse(snakeSummary)
+    const parsed = BackendAdminSummary.parse(wireSummary)
     expect(parsed.created_at).toBe('2026-07-01T00:00:00Z')
     expect(typeof parsed.created_at).toBe('string')
+    expect(parsed.admin_role).toBe('editor')
   })
 
   it('BackendAdminListResponse validates items + pagination', () => {
     const parsed = BackendAdminListResponse.parse({
-      items: [snakeSummary],
+      items: [wireSummary],
       total: 1,
       limit: 50,
       offset: 0,
@@ -130,7 +143,7 @@ describe('backend response validators', () => {
 
 describe('adapters snake → camel', () => {
   it('adaptAdminResponse renames admin_role → adminRole', () => {
-    expect(adaptAdminResponse(snakeResponse)).toEqual({
+    expect(adaptAdminResponse(parsedResponse)).toEqual({
       id: 5,
       username: 'jane',
       name: 'Jane',
@@ -139,7 +152,7 @@ describe('adapters snake → camel', () => {
   })
 
   it('adaptAdminSummary maps every snake field to camel, timestamps stay ISO', () => {
-    const c = adaptAdminSummary(snakeSummary)
+    const c = adaptAdminSummary(parsedSummary)
     expect(c).toEqual({
       id: 5,
       username: 'jane',
@@ -159,16 +172,21 @@ describe('adapters snake → camel', () => {
   })
 
   it('adaptAdminList maps items + passes pagination through', () => {
-    const c = adaptAdminList({ items: [snakeSummary], total: 3, limit: 50, offset: 0 })
+    const c = adaptAdminList({ items: [parsedSummary], total: 3, limit: 50, offset: 0 })
     expect(c.items[0].adminRole).toBe('editor')
     expect(c).toMatchObject({ total: 3, limit: 50, offset: 0 })
   })
 })
 
-describe('outbound camel → snake', () => {
-  it('toBackendAdminCreate renames adminRole → admin_role', () => {
+describe('outbound camel → snake (admin_role → int rank)', () => {
+  it('toBackendAdminCreate renames adminRole → admin_role rank', () => {
     expect(
       toBackendAdminCreate({ username: 'j', name: 'J', password: 'secret12', adminRole: 'editor' }),
-    ).toEqual({ username: 'j', name: 'J', password: 'secret12', admin_role: 'editor' })
+    ).toEqual({ username: 'j', name: 'J', password: 'secret12', admin_role: 50 })
+  })
+
+  it('toBackendRoleUpdate sends the int rank', () => {
+    expect(toBackendRoleUpdate({ adminRole: 'super_admin' })).toEqual({ admin_role: 100 })
+    expect(toBackendRoleUpdate({ adminRole: 'viewer' })).toEqual({ admin_role: 0 })
   })
 })

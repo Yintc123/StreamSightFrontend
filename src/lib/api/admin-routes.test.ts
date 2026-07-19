@@ -92,11 +92,12 @@ function ctx(id?: string): { params: Promise<Record<string, string>> } {
   return { params: Promise.resolve(params) }
 }
 
+// Backend wire fixture — admin_role is the int rank (enum-int.md).
 const SUMMARY = {
   id: 2,
   username: 'editor1',
   name: 'Editor One',
-  admin_role: 'editor',
+  admin_role: 50,
   is_protected: false,
   is_active: true,
   archived_at: null,
@@ -160,7 +161,7 @@ describe('POST /api/cms/admins (create)', () => {
     mockBackend('post', 'http://backend.test/admin/admins', async (r) => {
       sentBody = await r.json()
       return HttpResponse.json(
-        { id: 100, username: 'jane', name: 'Jane', admin_role: 'viewer' },
+        { id: 100, username: 'jane', name: 'Jane', admin_role: 0 },
         { status: 201 },
       )
     })
@@ -169,7 +170,7 @@ describe('POST /api/cms/admins (create)', () => {
       ctx(),
     )
     expect(res.status).toBe(201)
-    expect(sentBody).toEqual({ username: 'jane', name: 'Jane', password: 'secret12', admin_role: 'viewer' })
+    expect(sentBody).toEqual({ username: 'jane', name: 'Jane', password: 'secret12', admin_role: 0 })
     const body = await res.json()
     expect(body.data).toEqual({ id: 100, username: 'jane', name: 'Jane', adminRole: 'viewer' })
   })
@@ -212,7 +213,7 @@ describe('GET/PATCH/DELETE /api/cms/admins/[id]', () => {
     let sent: unknown
     mockBackend('patch', 'http://backend.test/admin/admins/2', async (r) => {
       sent = await r.json()
-      return HttpResponse.json({ id: 2, username: 'editor1', name: 'Renamed', admin_role: 'editor' })
+      return HttpResponse.json({ id: 2, username: 'editor1', name: 'Renamed', admin_role: 50 })
     })
     const res = await adminRenameRoute(req('PATCH', { name: 'Renamed' }), ctx('2'))
     expect(res.status).toBe(200)
@@ -242,11 +243,11 @@ describe('PUT /api/cms/admins/[id]/role', () => {
     let sent: unknown
     mockBackend('put', 'http://backend.test/admin/admins/2/role', async (r) => {
       sent = await r.json()
-      return HttpResponse.json({ id: 2, username: 'editor1', name: 'Editor One', admin_role: 'super_admin' })
+      return HttpResponse.json({ id: 2, username: 'editor1', name: 'Editor One', admin_role: 100 })
     })
     const res = await adminRoleRoute(req('PUT', { adminRole: 'super_admin' }), ctx('2'))
     expect(res.status).toBe(200)
-    expect(sent).toEqual({ admin_role: 'super_admin' })
+    expect(sent).toEqual({ admin_role: 100 })
     expect((await res.json()).data.adminRole).toBe('super_admin')
   })
 
@@ -280,7 +281,7 @@ describe('/api/cms/me (self-service)', () => {
   it('GET returns own id — open to a viewer admin (not super)', async () => {
     overrides.session = makeSession({ adminRole: 'viewer' })
     mockBackend('get', 'http://backend.test/admin/me', () =>
-      HttpResponse.json({ id: 9, username: 'viewer1', name: 'Viewer', admin_role: 'viewer' }),
+      HttpResponse.json({ id: 9, username: 'viewer1', name: 'Viewer', admin_role: 0 }),
     )
     const res = await cmsMeRoute(req('GET'), ctx())
     expect(res.status).toBe(200)

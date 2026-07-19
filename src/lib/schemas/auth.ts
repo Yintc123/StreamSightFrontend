@@ -36,9 +36,42 @@ export const Password = z
 // absorbs the gap in a single adapter (`adaptTokenResponse`) rather than
 // scattering field renames across routes.
 
-/** admin_role ladder within the admin principal (spec 012a §1). */
+/**
+ * admin_role ladder within the admin principal (spec 012a §1).
+ *
+ * The backend wire is now an IntEnum rank (`enum-int.md`, 方案 A): VIEWER=0,
+ * EDITOR=50, SUPER_ADMIN=100, ROOT=999. The BFF translates at the boundary
+ * (`AdminRoleWire` / `toAdminRoleRank`) and keeps this human-readable string
+ * internally, so session/UI/`=== 'super_admin'` comparisons stay unchanged.
+ */
 export const AdminRole = z.enum(['super_admin', 'editor', 'viewer'])
 export type AdminRole = z.infer<typeof AdminRole>
+
+/** Internal string → backend wire int rank (enum-int.md). */
+export const ADMIN_ROLE_RANK: Record<AdminRole, number> = {
+  viewer: 0,
+  editor: 50,
+  super_admin: 100,
+}
+
+const RANK_TO_ADMIN_ROLE: Record<number, AdminRole> = {
+  0: 'viewer',
+  50: 'editor',
+  100: 'super_admin',
+}
+
+/**
+ * Wire schema: the backend sends the int rank; parse → internal string label.
+ * Phase 1 wire is `{0,50,100}` and deliberately rejects ROOT=999 (backend
+ * Phase 2 bootstrap). Adding ROOT later is a one-line map extension.
+ */
+export const AdminRoleWire = z
+  .union([z.literal(0), z.literal(50), z.literal(100)])
+  .transform((rank) => RANK_TO_ADMIN_ROLE[rank])
+
+export function toAdminRoleRank(role: AdminRole): number {
+  return ADMIN_ROLE_RANK[role]
+}
 
 /**
  * `TokenResponse` (spec 012a §2.4): snake_case, `token_type` lowercase
@@ -62,7 +95,7 @@ export const BackendAdminMeResponse = z.object({
   id: z.number().int(),
   username: z.string(),
   name: z.string(),
-  admin_role: AdminRole,
+  admin_role: AdminRoleWire, // int rank on the wire → internal string
 })
 export type BackendAdminMeResponse = z.infer<typeof BackendAdminMeResponse>
 
