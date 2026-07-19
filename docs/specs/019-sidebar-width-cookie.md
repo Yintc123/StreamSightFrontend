@@ -63,11 +63,12 @@ CMS 左欄寬度目前存 `localStorage['cms.sidebar']`（016 §4.3），Streaml
 
 ### 3.3 讀取架構：維持 `useSyncExternalStore`，快照改複合 primitive
 
-- 快照字串改為 `` `${extractSidebarWidthRaw(document.cookie) ?? ''}|${localStorage 原始值}` ``
+- 快照字串改為 `` `${parseSidebarWidthCookie(document.cookie) ?? ''}|${localStorage 原始值}` ``
   （primitive 值比較，沿用 016 v0.5 避免無限重繪 / hydration mismatch 的架構；server snapshot
   仍回 `''` → 首繪預設值）。
-- **只放抽出的 `sidebar_width` 原始值，不放整串 `document.cookie`**：否則任何無關 cookie
-  變動（如 ThemeToggle 寫 `theme`）都會產生新快照觸發重繪。抽取用與解析同一條 regex（§I-3）。
+- **只放 `sidebar_width` 的合法值，不放整串 `document.cookie`**：否則任何無關 cookie
+  變動（如 ThemeToggle 寫 `theme`）都會產生新快照觸發重繪；非法 / 越界值收斂為 `''`
+  （與缺省同），連非法值變動的重繪也免了。抽值與解析共用同一條 regex（§I-3）。
 - cookie **沒有變更事件**：同分頁寫入後靠既有 `emit()` 通知；**跨分頁 / 跨 app** 改於
   `window` `focus` 時 `emit()` 重讀（subscribe 加掛 `focus` listener）——涵蓋主要情境
   「在 Streamlit 分頁拖完 → 切回 CMS 分頁」。`storage` listener 保留（服務 `collapsed`）。
@@ -93,8 +94,8 @@ width  = parseSidebarWidthCookie(document.cookie)   // ① cookie（新常態）
 
 | 檔案 | 動作 | 職責 |
 |---|---|---|
-| `src/app/cms/sidebarCookie.ts` | 新增 | 純函式層：`SIDEBAR_COOKIE`（`'sidebar_width'`）、`SIDEBAR_COOKIE_MAX_AGE`、`extractSidebarWidthRaw(cookieHeader): string \| null`（§I-3 regex 抽原始值，供快照）、`parseSidebarWidthCookie(cookieHeader): number \| null`（抽值 → 整數 → 值域外 / 非法 → `null`）、`buildSidebarWidthCookieString(width, isProd)`（對齊 `buildThemeCookieString` 形狀）。皆為純函式、以 `document.cookie` 字串為參數。**不可 `import 'server-only'`**（client hook 要用，同 014a §I-2） |
-| `src/app/cms/useSidebarPanel.ts` | 改 | 儲存層照 §3.2–3.4 改寫；對外介面 `SidebarPanel`、`clampWidth`、`SIDEBAR_*_WIDTH` 常數**均不變**；**新增 export** `hasCollapsedPreference(): boolean`（讀 `cms.sidebar`，JSON 內含 boolean `collapsed` 欄位 → `true`；缺 key / 毀損 / 無該欄位 → `false`，供 §I-2） |
+| `src/app/cms/sidebarCookie.ts` | 新增 | 純函式層：`SIDEBAR_COOKIE`（`'sidebar_width'`）、`SIDEBAR_COOKIE_MAX_AGE`、`SIDEBAR_MIN/MAX_WIDTH`（值域常數定義於此以免與 hook 循環 import）、`extractSidebarWidthRaw(cookieHeader): string \| null`（§I-3 regex 抽原始值）、`parseSidebarWidthCookie(cookieHeader): number \| null`（抽值 → 整數 → 值域外 / 非法 → `null`；供快照 §3.3）、`buildSidebarWidthCookieString(width, isProd)`（對齊 `buildThemeCookieString` 形狀）。皆為純函式、以 `document.cookie` 字串為參數。**不可 `import 'server-only'`**（client hook 要用，同 014a §I-2） |
+| `src/app/cms/useSidebarPanel.ts` | 改 | 儲存層照 §3.2–3.4 改寫；對外介面 `SidebarPanel`、`clampWidth`、`SIDEBAR_*_WIDTH` 常數**均不變**（`MIN/MAX` 改為自 `sidebarCookie` 再匯出）；**新增 export** `hasCollapsedPreference(): boolean`（讀 `cms.sidebar`，JSON 內含 boolean `collapsed` 欄位 → `true`；缺 key / 毀損 / 無該欄位 → `false`，供 §I-2） |
 | `src/app/cms/CmsSideNav.tsx` | 改（一處） | auto-collapse 判斷由「`localStorage.getItem(SIDEBAR_STORAGE_KEY)` 存在與否」改為 `!hasCollapsedPreference() && window.innerWidth < 768`（§I-2）；其餘不動 |
 
 > 不新增 Route Handler、不動 `cms/layout.tsx`。
