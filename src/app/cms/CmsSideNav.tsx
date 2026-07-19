@@ -55,12 +55,14 @@ export function CmsSideNav({
     { href: '/cms/settings', label: '設定' },
   ]
 
-  // 尺寸/hover 沿用 spec 016 §4.2：hover 填色（文字色不變）、active 加深填色 + 粗體。
+  // 尺寸/hover 沿用 spec 016 §4.2（v0.5.7 Playwright 實測校準）：hover 填色（文字色
+  // 不變）、active 加深填色 + 粗體；可見文字 14px（Streamlit 為項內 span 的 0.875rem）、
+  // inactive 文字 rgba(15,23,42,.8)（--color-nav-ink，非 a 的 .66）。
   const itemClass = (active: boolean) =>
-    'rounded-lg px-2 h-7 flex items-center gap-2 text-base ' +
+    'rounded-lg px-2 h-7 flex items-center gap-2 text-sm ' +
     (active
       ? 'bg-nav-active text-ink-AAA font-semibold'
-      : 'text-ink-AA font-normal hover:bg-nav-hover')
+      : 'text-nav-ink font-normal hover:bg-nav-hover')
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault()
@@ -102,13 +104,13 @@ export function CmsSideNav({
         inert={collapsed}
       >
         <nav
-          className="flex h-full flex-col gap-0.5 px-3 pb-3"
+          className="flex h-full flex-col px-3 pb-3"
           style={{ width }}
         >
           {/* header 對齊 Streamlit stSidebarHeader（Playwright 實測 2026-07-19）：
               高 60px 垂直置中（鈕頂距側欄頂 16px）、鈕右緣內縮 13px（px-3 12 + mr-px 1）、
-              首個 nav 項起點 92px（60 + mb-[30px] + 父層 gap-0.5 2） */}
-          <div className="mb-[30px] flex h-[3.75rem] items-center justify-end">
+              首個 nav 項起點 92px（60 + mb-8 32） */}
+          <div className="mb-8 flex h-[3.75rem] items-center justify-end">
             <button
               type="button"
               aria-label="收合側欄"
@@ -121,20 +123,24 @@ export function CmsSideNav({
             </button>
           </div>
 
-          {links.map((link) => {
-            const active =
-              pathname === link.href || pathname.startsWith(`${link.href}/`)
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                aria-current={active ? 'page' : undefined}
-                className={itemClass(active)}
-              >
-                {link.label}
-              </Link>
-            )
-          })}
+          {/* 連結容器（v0.5.7 實測）：項左右內縮 23px（px-3 12 + px-[11px] 11）、
+              項間距 6px（gap-1.5）；label span truncate = Streamlit 的 ellipsis */}
+          <div className="flex flex-col gap-1.5 px-[11px]">
+            {links.map((link) => {
+              const active =
+                pathname === link.href || pathname.startsWith(`${link.href}/`)
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={active ? 'page' : undefined}
+                  className={itemClass(active)}
+                >
+                  <span className="truncate">{link.label}</span>
+                </Link>
+              )
+            })}
+          </div>
         </nav>
       </div>
 

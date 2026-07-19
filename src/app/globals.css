@@ -37,6 +37,9 @@
    * light 於 [data-theme="light"] 覆寫為 Streamlit 精確值 rgba(141,173,206,·)。 */
   --color-nav-hover:  rgba(230, 237, 246, 0.08);
   --color-nav-active: rgba(230, 237, 246, 0.14);
+  /* nav 項 inactive 文字（016 §4.2 v0.5.7）：Streamlit 可見文字為項內 span 的
+   * rgba(15,23,42,.8)（非 a 的 .66）；dark 無對照，沿用 ink-AA 值。 */
+  --color-nav-ink:    rgba(230, 237, 246, 0.72);
 
   /* Borders — 淺色低透明 */
   --color-line: rgba(230, 237, 246, 0.12);   /* 卡片 border / divider */
@@ -124,6 +127,7 @@ html[data-theme="light"] {
   /* Streamlit sidebar nav hover / active 精確填色（rgba(141,173,206,·)） */
   --color-nav-hover:  rgba(141, 173, 206, 0.15);
   --color-nav-active: rgba(141, 173, 206, 0.25);
+  --color-nav-ink:    rgba(15, 23, 42, 0.8); /* nav 項 inactive 文字（Playwright 實測 span） */
 
   --color-line:      rgba(15, 23, 42, 0.12);
   --color-line-soft: rgba(15, 23, 42, 0.07);

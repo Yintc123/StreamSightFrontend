@@ -123,10 +123,14 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 
 | 屬性 | Streamlit 值 | 對應 Tailwind |
 |---|---|---|
-| padding / height / radius / gap / font | `0 8px` / `28px` / `8px` / `8px` / `16px` | `px-2 h-7 rounded-lg gap-2 text-base` |
+| padding / height / radius / gap | `0 8px` / `28px` / `8px` / `8px` | `px-2 h-7 rounded-lg gap-2` |
+| 可見文字大小 | **14px**（`a` 為 16px，但 label 為項內 `span` 0.875rem —— v0.5.7 實測校正，v0.3 誤採 `a` 的 16px） | `text-sm` |
+| 項左右內縮 / 項間距 | **23px**（ul x=23、w=210 @256）/ **6px**（v0.5.7 實測） | 容器 `px-3`(12) + 連結容器 `px-[11px]`(11)＝23；`gap-1.5` |
 | font-weight（inactive / active）| `400` / `600` | `font-normal` / `font-semibold` |
 | **hover 背景（inactive）** | **`rgba(141,173,206,.15)`**（文字色不變） | `hover:bg-nav-hover` |
 | active 背景 / 文字 | `rgba(141,173,206,.25)` / `#0f172a` | `bg-nav-active` / `text-ink-AAA` |
+| inactive 文字 | **`rgba(15,23,42,.8)`**（可見的 `span` 色；`a` 為 .66 —— v0.5.7 實測校正，原誤採 `a` 值＝`ink-AA`） | `text-nav-ink`（新 token） |
+| 文字溢出 | `span` overflow hidden / ellipsis / nowrap | label 包 `span.truncate` |
 
 **關鍵行為**：Streamlit hover ＝**加背景填色、文字不變**（前端原為文字變色、無背景，已改齊）。
 
@@ -136,6 +140,7 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 |---|---|---|
 | `--color-nav-hover` | `rgba(230,237,246,.08)` | `rgba(141,173,206,.15)` |
 | `--color-nav-active` | `rgba(230,237,246,.14)` | `rgba(141,173,206,.25)` |
+| `--color-nav-ink`（v0.5.7） | `rgba(230,237,246,.72)`（＝ink-AA，dark 無對照不變） | `rgba(15,23,42,.8)`（實測 span） |
 
 - `@theme` 定 dark base、`[data-theme="light"]` 覆寫（同 D4 架構）；產生 `bg-nav-hover`/`hover:bg-nav-hover`/`bg-nav-active`（Tailwind v4 編譯驗證）。
 - **上表尺寸（`px-2 h-7 text-base`）僅適用 `CmsSideNav` 左欄項目**（量自 Streamlit sidebar）。
@@ -158,7 +163,7 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 | resize handle | `div` 8px 寬、`height:100%`、`right:-6px`（跨邊）、`cursor:col-resize`、`user-select:none`，內含一條 hover 才上色的細條 | `role="separator"` 8px hit 區、`-right-1` 跨邊、內 `w-px` hover/focus 顯示 `bg-brand` |
 | 收合動畫 | `min/max-width→0` + `transform:translateX(-256px)`，`transition .3s` | **無動畫**（v0.5.2 依使用者偏好移除 transition，即時收合；此處刻意不對齊 Streamlit）；nav 轉 `aria-hidden`+`inert` |
 | 收合鈕圖示 | Material Symbols Rounded `keyboard_double_arrow_left`，`DynamicIcon size="xl"` = **24px**（bundle 實查） | **官方 Material Symbols Rounded 24px 向量內嵌**（同 glyph、`w-6 h-6` 同 24px；v0.5.3） |
-| 收合鈕位置 | **Playwright 實測（v0.5.5）**：鈕頂距側欄頂（＝其 48px 頂列下緣）**16px**、右緣內縮 **13px**（`max(gutter, 1.25rem−gutter)` 受 scrollbar gutter 抵扣，實測非 bundle 推算的 20px）；首個 nav 項起點 **92px** | header 列 `h-[3.75rem] items-center`（鈕頂 16px）+ 右內縮 `px-3`(12) + `mr-px`(1) = **13px**；header `mb-[30px]` + nav 容器 `gap-0.5`(2) → nav 起點 60+30+2 = **92px**（v0.5.6 校正：v0.5.5 的 `mb-8` 漏算 gap，實為 94） |
+| 收合鈕位置 | **Playwright 實測（v0.5.5）**：鈕頂距側欄頂（＝其 48px 頂列下緣）**16px**、右緣內縮 **13px**（`max(gutter, 1.25rem−gutter)` 受 scrollbar gutter 抵扣，實測非 bundle 推算的 20px）；首個 nav 項起點 **92px** | header 列 `h-[3.75rem] items-center`（鈕頂 16px）+ 右內縮 `px-3`(12) + `mr-px`(1) = **13px**；header `mb-8` → nav 起點 60+32 = **92px**（v0.5.7 起連結另有獨立容器、nav 父層無 gap；v0.5.6 曾為 `mb-[30px]`+gap 補償） |
 | 收合後控制 | 左上浮出 `stExpandSidebarButton`（`keyboard_double_arrow_right`，`size="xl"` 24px，鈕 28×28）：**Playwright 實測 (10, 8)**（相對頂列下緣） | 左上 `absolute left-2.5 top-2`＝**(10, 8)** 浮出展開鈕（同官方 24px 向量，鈕 `h-7 w-7` 28×28；v0.5.5） |
 
 - **拖曳調寬**：右緣 8px 透明 `role="separator"`（`aria-orientation="vertical"`）hit 區，指標拖曳即時
@@ -273,6 +278,8 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 
 | 0.5.6 | 2026-07-19 | 規格 / 實作核對修正：v0.5.5 的 nav 起點公式（`mb-8`＝60+32=92）**漏算 nav 容器 `gap-0.5`**（作用於 header 與首個連結之間），實際 rendered 為 94px。改 `mb-[30px]`（60+30+gap 2 = 92），與 Streamlit 實測一致。 |
 
+| 0.5.7 | 2026-07-19 | **nav 項 CSS 以 Playwright 實測完全對齊**（mock :8503 量 computed style 與幾何）：①可見文字 **14px**（label 為項內 `span` 0.875rem；v0.3 誤採 `a` 的 16px）→ `text-sm`＋`span.truncate`（ellipsis 對齊）；②項左右內縮 12px → **23px**（新增連結容器 `px-[11px]`）；③項間距 2px → **6px**（`gap-1.5`；nav 父層 gap 移除，header 回 `mb-8`，起點仍 92）；④inactive 文字 `ink-AA`(.66) → 新 token **`--color-nav-ink`**（light `rgba(15,23,42,.8)`＝實測 span 色；dark 沿用 .72 不變）。已知未對齊項（nav 水平內縮）就此結案。 |
+
 ---
 
-最後更新：2026-07-19（v0.5.6，nav 起點 gap 校正）
+最後更新：2026-07-19（v0.5.7，nav 項 CSS 實測對齊）
