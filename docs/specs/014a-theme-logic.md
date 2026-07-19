@@ -81,6 +81,8 @@
   硬導覽 / 重新整理時**伺服器已輸出正確屬性**，first paint 即正確，無需 inline script。
 - 代價：root layout 讀 cookie → 該層轉**動態渲染**。本站頁面本就多為動態，可接受（見 OQ-3）。
 - `<html>` 既有 `suppressHydrationWarning` 覆蓋殘餘屬性差異。
+- **功能開關（D8）**：`NEXT_PUBLIC_ENABLE_THEME_TOGGLE !== '1'` 時，root layout **跳過** `readThemeCookie()`，
+  直接以 `'light'` 作為 `initialTheme`，layout **回靜態渲染**（見 §I-8）。
 
 ### 3.4 即時切換：client 直改 DOM + 寫 cookie（無 round-trip / 無 Route Handler）
 
@@ -109,7 +111,7 @@
 | `src/lib/theme/schema.ts` | 新增 | `themeSchema = z.enum(['light','dark'])`、`type Theme`、`parseTheme(raw): Theme`（未知→`dark`）、`THEME_COOKIE`、`THEME_COOKIE_MAX_AGE` 常數。**⚠ 不可加 `import 'server-only'`**——client 的 `ThemeProvider` 也要 import 這些常數（見 §I-2） |
 | `src/lib/theme/readThemeCookie.ts` | 新增 | **server-only**；以 `await cookies()` 讀 `THEME_COOKIE`，經 `parseTheme` 回 `Theme`（缺省 `dark`） |
 | `src/lib/theme/ThemeProvider.tsx` | 新增 | **`'use client'`** context + `useTheme()`；`{ theme, toggle, setTheme }`；執行 §3.4 的 DOM + cookie 寫入；§3.5 mount 後掛 `data-theme-ready`。**⚠ prod 判斷用 `process.env.NODE_ENV`，不可 import `@/lib/config`（server-only）**（見 §I-1） |
-| `src/app/layout.tsx` | 改 | **改為 `async`**；`await readThemeCookie()` → `<html data-theme={theme}>`；傳 `initialTheme` 給 `Providers` |
+| `src/app/layout.tsx` | 改 | **改為 `async`**；`NEXT_PUBLIC_ENABLE_THEME_TOGGLE === '1'` 時 `await readThemeCookie()`，否則直接 `'light'`（靜態渲染）→ `<html data-theme={theme}>`；傳 `initialTheme` 給 `Providers` |
 | `src/app/providers.tsx` | 改（**與 014b 共用**） | 收 `initialTheme` prop；包 `<ThemeProvider initialTheme={initialTheme}>`。**Toaster 改讀 `useTheme` 屬 014b**（見 §I-3） |
 
 > 切換**不新增** Route Handler（§3.4），不涉及 BFF TDD。
@@ -127,6 +129,9 @@
 - **§I-3 — providers.tsx 是共用檔**：本規格負責「包 `ThemeProvider` + 收 `initialTheme`」；
   Toaster 改讀 `useTheme()` 的接線在 [`014b §I-3`](./014b-theme-ui.md)。`ThemeProvider` 需包在 `<Toaster>` **外層**。
 - **§I-7 — RootLayout 動態化**：`await readThemeCookie()` 使 root layout 轉動態渲染（見 §3.3／OQ-3），屬預期行為。
+- **§I-8 — 功能開關環境變數**：`NEXT_PUBLIC_ENABLE_THEME_TOGGLE`（`.env.*`）。值為 `'1'` 才啟用切換；
+  預設 `'0'`（關閉）。`NEXT_PUBLIC_` 前綴使此值在 server（`process.env`）與 client bundle 皆可讀，
+  不需另立 server-only 判斷。測試環境於 `vitest.config.ts` 固定設為 `'1'`，現有 `ThemeToggle` 測試不受影響。
 
 ---
 
@@ -174,7 +179,7 @@
 
 - **OQ-1（三態）**：未來加「跟隨系統」時，`theme` cookie 值域擴為 `light|dark|system`，
   並在 `readThemeCookie` / provider 解析 system → media query。**本期不做**。
-- **OQ-3（root layout 動態化）**：讀 cookie 使 root layout 動態；若日後需靜態化，改以 middleware 於邊緣設 `data-theme`。**本期接受動態**。
+- **OQ-3（root layout 動態化）**：讀 cookie 使 root layout 動態；若日後需靜態化，改以 middleware 於邊緣設 `data-theme`。**功能開關關閉（D8）時 layout 已回靜態，此問題僅在開關開啟時存在**。
 
 ---
 
@@ -184,7 +189,8 @@
 |---|---|---|
 | 0.1 | 2026-07-18 | 自 `014-theme-mode.md` v0.2 拆出「業務邏輯」部分：狀態模型、cookie 持久化、SSR 直出、即時切換資料流、token 間接引用機制、server-only 邊界、邏輯類 TDD。色值 / 元件 / 排版移至 `014b`。 |
 | 0.2 | 2026-07-18 | 狀態更新為「已實作」：`schema.ts`、`readThemeCookie.ts`、`ThemeProvider.tsx`、root layout 接線、providers 接線全部落地，含完整 Vitest 測試。 |
+| 0.3 | 2026-07-19 | +D8 **功能開關**：`NEXT_PUBLIC_ENABLE_THEME_TOGGLE` env var（預設 `0`）；§3.3 補開關邏輯（跳過 cookie / 固定 `light` / layout 回靜態）；+§I-8；OQ-3 補充說明；`layout.tsx` 檔案清單更新。Vitest 設 `'1'` 保既有測試。 |
 
 ---
 
-最後更新：2026-07-18（v0.2，已實作）
+最後更新：2026-07-19（v0.3，+D8 功能開關）

@@ -8,14 +8,17 @@ export const metadata: Metadata = {
   description: "捐款項目列表 — 公益團體 / 捐款專案 / 義賣商品",
 };
 
-// spec 014a §3.3 / §I-7 — async: readThemeCookie() 使此 layout 轉動態渲染，屬預期行為
+// spec 014a §3.3 / §I-7 — 啟用主題切換時 readThemeCookie() 使 layout 轉動態渲染；
+// NEXT_PUBLIC_ENABLE_THEME_TOGGLE !== '1' 時跳過，layout 保持靜態渲染。
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // SSR 直出正確 data-theme，首屏無閃爍，不需 inline script（spec 014a §3.3）
-  const theme = await readThemeCookie();
+  const theme =
+    process.env.NEXT_PUBLIC_ENABLE_THEME_TOGGLE === '1'
+      ? await readThemeCookie()
+      : 'light';
 
   return (
     // suppressHydrationWarning: 瀏覽器擴充功能 / Chrome 自動翻譯常會在 React

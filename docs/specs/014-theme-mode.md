@@ -51,6 +51,7 @@ SSR 首屏直接畫對顏色（無閃爍），且**不受登入 / 登出影響**
 | D5 切換機制 | client 直改 `dataset.theme` + 寫 cookie，無 round-trip、無 Route Handler | 014a |
 | D6 放置點 | 首頁 `header` + `CmsTopBar`（016 v0.4 前為 `CmsNav`）；排版 014b §3.6 | 014b |
 | D7 淺色調色盤 | **對齊 Streamlit 前端**：背景/文字/主色（`#ffffff`/`#f1f5f9`/`#0f172a`/`#2563eb`）+ sidebar nav hover/active 互動填色（`rgba(141,173,206,·)`，實測）；深色 base 不變 | 背景 [016 §4.1](./016-cms-sidebar-streamlit-nav.md)／nav [016 §4.2](./016-cms-sidebar-streamlit-nav.md)／色值 014b §5 |
+| D8 功能開關 | `NEXT_PUBLIC_ENABLE_THEME_TOGGLE=1` 才啟用；預設 `0`（關閉）→ 按鈕不渲染、全站固定 `light`、root layout 回靜態渲染 | 014a §3.3、014b §3.5 |
 
 ### Open Questions（不阻塞開工）
 
@@ -72,7 +73,8 @@ SSR 首屏直接畫對顏色（無閃爍），且**不受登入 / 登出影響**
 | 0.5 | 2026-07-18 | +D7 **淺色調色盤對齊 Streamlit**（隨 [spec 016](./016-cms-sidebar-streamlit-nav.md)）：accent 改藍 `#2563eb`、`surface-page`→`#ffffff`、`surface-card`→`#f1f5f9`（修正側欄/內容明暗對調）、`ink-AAA`→`#0f172a`；深色 base 不變。OQ-2 收斂、+OQ-4 深色一致性。細節見 [014b §5 v0.3](./014b-theme-ui.md)。 |
 | 0.6 | 2026-07-18 | D7 擴充涵蓋 sidebar nav 互動 token `--color-nav-hover` / `--color-nav-active`（Streamlit 實測 `rgba(141,173,206,·)`，[016 §4.2](./016-cms-sidebar-streamlit-nav.md)）；D7 出處補 016 §4.2。 |
 | 0.7 | 2026-07-19 | D6 放置點隨 [016 v0.4](./016-cms-sidebar-streamlit-nav.md) 兩層導覽由 `CmsNav` → `CmsTopBar`（頂部列）；細節見 [014b §3.6 v0.5](./014b-theme-ui.md)。 |
+| 0.8 | 2026-07-19 | +D8 **功能開關**：`NEXT_PUBLIC_ENABLE_THEME_TOGGLE` 環境變數，預設 `0`（關閉）；開關關閉時按鈕不渲染、全站固定 `light`、root layout 回靜態渲染。邏輯細節見 [014a §3.3 / §I-8](./014a-theme-logic.md)、元件細節見 [014b §3.5](./014b-theme-ui.md)。 |
 
 ---
 
-最後更新：2026-07-19（v0.7，標記已實作；放置點隨 016 v0.4 由 CmsNav → CmsTopBar）
+最後更新：2026-07-19（v0.8，+D8 功能開關）

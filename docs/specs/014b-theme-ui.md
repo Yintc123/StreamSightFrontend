@@ -83,6 +83,8 @@
 ### 3.5 `ThemeToggle` 元件設計
 
 - **`'use client'`**；`const { theme, toggle } = useTheme()`（來自 014a）。
+- **功能開關（D8）**：`NEXT_PUBLIC_ENABLE_THEME_TOGGLE !== '1'` 時**提早 `return null`**，按鈕不渲染，
+  消費者（`page.tsx`、`CmsTopBar.tsx`）無需條件渲染——插入點保留，開關打開後即自動出現。
 - 手寫 inline SVG：`dark` 顯示月亮、`light` 顯示太陽（或反之，表「按了會切到的目標」皆可，於實作定案並反映在 `aria-label`）。
 - a11y：
   - `aria-pressed={theme === 'light'}`（反映當前狀態）。
@@ -105,7 +107,7 @@
 
 | 檔案 | 動作 | 職責 |
 |---|---|---|
-| `src/components/ui/ThemeToggle.tsx` | 新增 | §3.5：一鍵按鈕、手寫 inline SVG、`aria-label`/`aria-pressed`、鍵盤 Enter/Space；消費 014a `useTheme` |
+| `src/components/ui/ThemeToggle.tsx` | 新增 | §3.5：一鍵按鈕、手寫 inline SVG、`aria-label`/`aria-pressed`、鍵盤 Enter/Space；消費 014a `useTheme`；`NEXT_PUBLIC_ENABLE_THEME_TOGGLE !== '1'` 時 `return null` |
 | `src/app/globals.css` | 改 | §3.1 加 `html[data-theme="light"]` 覆寫區塊（§5 色值）；§3.2 `color-scheme` 覆寫；§3.4 transition + `[data-theme-ready]` guard + `prefers-reduced-motion` |
 | `src/app/cms/CmsTopBar.tsx` | 改 | §3.6：頂部列右側 `ml-auto` 容器內含 `<ThemeToggle>`（016 v0.4 前為 `CmsNav.tsx`） |
 | `src/app/page.tsx` | 改 | §3.6：header 改 `relative`，右側 `absolute` 疊放 `<ThemeToggle>` |
@@ -202,7 +204,8 @@
 | 0.3 | 2026-07-18 | **淺色調色盤對齊 Streamlit**（[spec 016](./016-cms-sidebar-streamlit-nav.md)）：accent `#0891b2`→`#2563eb`（藍）、`surface-page` `#f6f8fb`→`#ffffff`、`surface-card` `#ffffff`→`#f1f5f9`（同時修正側欄/內容明暗與 Streamlit 相反）、`ink-AAA`→`#0f172a`、`ink-on-brand`→`#ffffff`、`ink-link`→`#2563eb`。深色 base 不變。OQ-2 收斂。 |
 | 0.4 | 2026-07-18 | §5 補上 sidebar nav 互動 token `--color-nav-hover` / `--color-nav-active`（隨 [016 §4.2](./016-cms-sidebar-streamlit-nav.md) nav hover/尺寸對齊 Streamlit 實測值）；修正 §5 標題誤指的 016 §5 交叉引用（正確為 016 §4.1 背景 / §4.2 nav 互動）。 |
 | 0.5 | 2026-07-19 | ThemeToggle 放置點隨 [016 v0.4](./016-cms-sidebar-streamlit-nav.md) 兩層導覽由 `CmsNav` → `CmsTopBar`（頂部列右側 `ml-auto` 容器）；§3.6 / §0.2 / §4 檔案清單 / D6 同步更新。功能與排版不變。 |
+| 0.6 | 2026-07-19 | +D8 **功能開關**：`ThemeToggle` 在 `NEXT_PUBLIC_ENABLE_THEME_TOGGLE !== '1'` 時 `return null`；§3.5 補說明、§4 檔案清單更新。消費者（`page.tsx`、`CmsTopBar.tsx`）插入點不動，開關控一處即可。 |
 
 ---
 
-最後更新：2026-07-19（v0.5，已實作；ThemeToggle 放置點隨 016 v0.4 由 CmsNav → CmsTopBar）
+最後更新：2026-07-19（v0.6，+D8 功能開關 ThemeToggle return null）

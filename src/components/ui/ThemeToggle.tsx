@@ -3,6 +3,8 @@
 import { useTheme } from '@/lib/theme/ThemeProvider'
 
 export function ThemeToggle() {
+  if (process.env.NEXT_PUBLIC_ENABLE_THEME_TOGGLE !== '1') return null
+
   const { theme, toggle } = useTheme()
   const isLight = theme === 'light'
 

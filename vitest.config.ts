@@ -34,6 +34,7 @@ export default defineConfig({
       REDIS_KEY_PREFIX: process.env.REDIS_KEY_PREFIX ?? 'streamsight-bff-test',
       APP_VERSION: '0.0.0-test',
       NEXT_PUBLIC_APP_NAME: 'StreamSight',
+      NEXT_PUBLIC_ENABLE_THEME_TOGGLE: '1',
     },
     coverage: {
       provider: 'v8',
