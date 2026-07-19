@@ -38,6 +38,12 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production
 
+# NEXT_PUBLIC_* are inlined by Next.js at build time — must be ARG/ENV here.
+ARG NEXT_PUBLIC_APP_NAME=StreamSight
+ARG NEXT_PUBLIC_ENABLE_THEME_TOGGLE=0
+ENV NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME \
+    NEXT_PUBLIC_ENABLE_THEME_TOGGLE=$NEXT_PUBLIC_ENABLE_THEME_TOGGLE
+
 # Build-time env: config.ts runs at build time and fails fast in production
 # if these aren't set. Real runtime values come from ECS task definition
 # env / secrets — these placeholders only satisfy build-time validation.
