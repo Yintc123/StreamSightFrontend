@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
 vi.mock('next/navigation', () => ({
@@ -41,6 +41,11 @@ describe('CmsSideNav 收合 / 展開（對齊 Streamlit）', () => {
     window.localStorage.clear()
   })
 
+  afterEach(() => {
+    // 確保 innerWidth 不洩漏到其他 case
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 })
+  })
+
   it('點「收合側欄」→ 連結隱藏、改顯「展開側欄」鈕', () => {
     render(<CmsSideNav adminRole="super_admin" />)
     fireEvent.click(screen.getByRole('button', { name: '收合側欄' }))
@@ -55,6 +60,24 @@ describe('CmsSideNav 收合 / 展開（對齊 Streamlit）', () => {
     fireEvent.click(screen.getByRole('button', { name: '展開側欄' }))
 
     expect(screen.getByRole('link', { name: '設定' })).toBeInTheDocument()
+  })
+
+  it('窄螢幕（< 768px）且無 localStorage → 掛載後自動收合', () => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 375 })
+    render(<CmsSideNav adminRole="super_admin" />)
+    expect(screen.getByRole('button', { name: '展開側欄' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '設定' })).not.toBeInTheDocument()
+  })
+
+  it('窄螢幕但已有 localStorage → 不覆寫使用者偏好', () => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 375 })
+    window.localStorage.setItem(
+      SIDEBAR_STORAGE_KEY,
+      JSON.stringify({ width: SIDEBAR_DEFAULT_WIDTH, collapsed: false }),
+    )
+    render(<CmsSideNav adminRole="super_admin" />)
+    // 使用者明確設定展開，respect it
+    expect(screen.getByRole('button', { name: '收合側欄' })).toBeInTheDocument()
   })
 
   it('持久化：localStorage 標記 collapsed → 掛載即為收合態', () => {

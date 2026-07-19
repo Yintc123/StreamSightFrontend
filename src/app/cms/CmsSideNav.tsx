@@ -12,7 +12,7 @@
 //  - 雙箭頭圖示（« / »）、無 border（靠 surface-card vs surface-page 對比分隔）。
 // 寬度 / 收合態由 useSidebarPanel 持久化到 localStorage。
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -21,6 +21,7 @@ import {
   useSidebarPanel,
   SIDEBAR_MIN_WIDTH,
   SIDEBAR_MAX_WIDTH,
+  SIDEBAR_STORAGE_KEY,
 } from './useSidebarPanel'
 
 const RESIZE_STEP = 16 // 鍵盤每次調整寬度的像素步進
@@ -30,6 +31,15 @@ export function CmsSideNav({ adminRole }: { adminRole?: AdminRole }) {
   const { collapsed, width, toggleCollapsed, setWidth } = useSidebarPanel()
   const [dragging, setDragging] = useState(false)
   const dragStart = useRef<{ x: number; width: number } | null>(null)
+
+  // Auto-collapse on narrow viewports (mobile) when no preference is saved.
+  // Keeps full-width content on first visit; user can expand manually and the
+  // preference persists via localStorage thereafter.
+  useEffect(() => {
+    if (!localStorage.getItem(SIDEBAR_STORAGE_KEY) && window.innerWidth < 768) {
+      toggleCollapsed()
+    }
+  }, [toggleCollapsed])
 
   const isSuperAdmin = adminRole === 'super_admin'
   const links: { href: string; label: string }[] = [
