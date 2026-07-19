@@ -68,25 +68,6 @@ export function AdminsTable() {
 
   return (
     <>
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface-card px-4 h-14">
-        <div className="flex items-baseline gap-2 min-w-0">
-          <h1 className="text-[17px] font-bold leading-[22px] text-ink-AAA truncate">
-            管理員管理
-          </h1>
-          <span className="text-sm text-ink-A shrink-0">{items.length}</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setSheet({ mode: 'create' })}
-          className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-brand px-3 h-9 text-sm font-semibold text-ink-on-brand
-                     hover:bg-brand-400 active:opacity-90
-                     focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        >
-          <span aria-hidden className="text-base leading-none">＋</span>
-          新增管理員
-        </button>
-      </header>
-
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-4 flex flex-col gap-4">
         <div className="flex flex-col gap-3">
           <label className="block">
@@ -128,6 +109,25 @@ export function AdminsTable() {
           </div>
         </div>
 
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <h1 className="text-[17px] font-bold leading-[22px] text-ink-AAA truncate">
+              管理員管理
+            </h1>
+            <span className="text-sm text-ink-A shrink-0">{items.length}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSheet({ mode: 'create' })}
+            className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-brand px-3 h-9 text-sm font-semibold text-ink-on-brand
+                       hover:bg-brand-400 active:opacity-90
+                       focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            <span aria-hidden className="text-base leading-none">＋</span>
+            新增管理員
+          </button>
+        </div>
+
         {adminsQuery.isPending ? (
           <div className="flex justify-center py-16 text-ink-A">
             <Spinner size="lg" />
@@ -138,7 +138,7 @@ export function AdminsTable() {
           <EmptyState
             illustration="/figma/empty-no-data.png"
             title={query.trim() ? '找不到符合的管理員' : '尚無管理員'}
-            subtitle={query.trim() ? '試試其他關鍵字' : '按右上角「新增管理員」建立第一個帳號'}
+            subtitle={query.trim() ? '試試其他關鍵字' : '按上方「新增管理員」建立第一個帳號'}
           />
         ) : (
           <ul className="flex flex-col gap-2">
