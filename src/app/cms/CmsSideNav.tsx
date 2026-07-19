@@ -105,16 +105,17 @@ export function CmsSideNav({
           className="flex h-full flex-col gap-0.5 px-3 pb-3"
           style={{ width }}
         >
-          {/* header 對齊 Streamlit stSidebarHeader：高 60px（3.75rem）垂直置中、
-              marginBottom 16px；鈕右緣內縮 20px（px-3 12 + mr-2 8，同其水平 padding） */}
-          <div className="mb-4 flex h-[3.75rem] items-center justify-end">
+          {/* header 對齊 Streamlit stSidebarHeader（Playwright 實測 2026-07-19）：
+              高 60px 垂直置中（鈕頂距側欄頂 16px）、鈕右緣內縮 13px（px-3 12 + mr-px 1）、
+              首個 nav 項起點 92px（60 + mb-8 32） */}
+          <div className="mb-8 flex h-[3.75rem] items-center justify-end">
             <button
               type="button"
               aria-label="收合側欄"
               title="收合側欄"
               onClick={toggleCollapsed}
               tabIndex={collapsed ? -1 : undefined}
-              className="mr-2 flex h-7 w-7 items-center justify-center rounded-lg text-ink-AA hover:bg-nav-hover"
+              className="mr-px flex h-7 w-7 items-center justify-center rounded-lg text-ink-AA hover:bg-nav-hover"
             >
               <DoubleChevron dir="left" />
             </button>
@@ -157,15 +158,15 @@ export function CmsSideNav({
         </div>
       )}
 
-      {/* 收合後：左上浮出展開鈕（同 Streamlit stExpandSidebarButton：主 header 左側
-          marginLeft 16px、60px 高度置中 → 約 (16, 16)） */}
+      {/* 收合後：左上浮出展開鈕（同 Streamlit stExpandSidebarButton，Playwright 實測
+          (10, 8)，相對頂列下緣） */}
       {collapsed && (
         <button
           type="button"
           aria-label="展開側欄"
           title="展開側欄"
           onClick={toggleCollapsed}
-          className="absolute left-4 top-4 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-surface-card text-ink-AA hover:bg-nav-hover"
+          className="absolute left-2.5 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-surface-card text-ink-AA hover:bg-nav-hover"
         >
           <DoubleChevron dir="right" />
         </button>
