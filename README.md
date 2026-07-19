@@ -104,6 +104,8 @@ docker compose up -d redis
 pnpm dev
 ```
 
+> **Redis port 注意**：`.env.example` 預設 `REDIS_PORT=6379`，對應整合 repo（StreamSight 根目錄）compose 起的 Redis；若使用本 repo 的 `docker compose up -d redis`（對外 port 6380，避開 6379 衝突），`.env.local` 需改為 `REDIS_PORT=6380`。
+
 ---
 
 ## 環境變數
@@ -122,7 +124,7 @@ pnpm dev
 | 變數 | 條件 | 說明 |
 |---|---|---|
 | `BACKEND_API_URL` | `USE_MOCK=0` | BFF → 真後端 base URL（預設 `http://localhost:8000`） |
-| `REDIS_HOST` / `REDIS_PORT` | `USE_MOCK=0` | BFF session store。本機用 `docker compose up -d redis`（對外 port 6380） |
+| `REDIS_HOST` / `REDIS_PORT` | `USE_MOCK=0` | BFF session store。`.env.example` 預設 port `6379`（整合 repo 的 Redis）；用本 repo 的 `docker compose up -d redis` 時為 `6380` |
 
 ### 選填
 
@@ -172,18 +174,22 @@ pnpm dev
 
 ## 專案結構
 
+> 單元／整合測試與被測檔案 colocate（`<檔名>.test.ts(x)`），樹中省略不列。
+> BFF Route Handlers 的完整清單見〈[頁面與 BFF Route 總覽](#頁面與-bff-route-總覽)〉。
+
 ```
 StreamSightFrontend/
 ├── docs/
 │   ├── architecture.md              # BFF 架構、資料流、資料夾結構
-│   ├── specs/                       # 基建實作規格（001x / 005–017）
+│   ├── specs/                       # 基建實作規格（001a–001h、005–017）
 │   └── decisions/                   # ADR（架構決策紀錄）
 ├── infra/
 │   └── terraform/                   # Infrastructure as Code
 ├── public/                          # 靜態資產
 ├── src/
 │   ├── proxy.ts                     # Next.js 16 Proxy：/cms* auth-gate（optimistic）
-│   ├── instrumentation.ts           # Node runtime lifecycle + mock 初始化
+│   ├── instrumentation.ts           # Runtime 進入點（委派至 instrumentation.node.ts）
+│   ├── instrumentation.node.ts      # Node runtime 初始化：OTel、mock、lifecycle
 │   ├── app/
 │   │   ├── layout.tsx               # Root layout
 │   │   ├── providers.tsx            # TanStack Query Provider + Toast
@@ -198,29 +204,20 @@ StreamSightFrontend/
 │   │   │   ├── layout.tsx           # CMS 版型（側欄 + 頂欄）
 │   │   │   ├── CmsSideNav.tsx       # 側欄導航（含 Streamlit 連結）
 │   │   │   ├── CmsTopBar.tsx        # 頂欄（用戶資訊、登出）
+│   │   │   ├── CmsHomeToast.tsx     # /cms 首頁提示 toast
+│   │   │   ├── useSidebarPanel.ts   # 側欄面板開合狀態 hook
 │   │   │   ├── page.tsx             # /cms 首頁（ADMIN gate）
-│   │   │   ├── admins/page.tsx      # 管理員管理（SUPER_ADMIN gate）
-│   │   │   ├── admins/              # AdminsTable、AdminFormSheet、AdminRoleControl、AdminLifecycleMenu
-│   │   │   ├── settings/page.tsx    # 個人設定（改密碼）
+│   │   │   ├── admins/              # 管理員管理（SUPER_ADMIN gate）
+│   │   │   │   ├── page.tsx
+│   │   │   │   ├── api.ts           # Client API（TanStack Query）
+│   │   │   │   └── …               # AdminsTable、AdminFormSheet、AdminRoleControl、AdminLifecycleMenu
+│   │   │   ├── settings/            # 個人設定（改密碼）：page.tsx、ProfileForm.tsx
 │   │   │   └── users/page.tsx       # 重導向 → /cms/admins
 │   │   └── api/                     # BFF Route Handlers
-│   │       ├── auth/
-│   │       │   ├── login/route.ts   # POST：Admin 登入（→ 真後端 token 換取）
-│   │       │   ├── logout/route.ts  # POST：登出（清 BFF session + 撤銷 refresh token）
-│   │       │   └── session/route.ts # GET：session introspection（供 Streamlit 使用）
-│   │       ├── cms/
-│   │       │   ├── admins/route.ts           # GET 列表 / POST 新增
-│   │       │   ├── admins/[id]/route.ts      # GET / PATCH / DELETE
-│   │       │   ├── admins/[id]/role/route.ts # PUT：升降權
-│   │       │   ├── admins/[id]/archive/      # POST：封存
-│   │       │   ├── admins/[id]/unarchive/    # POST：解封存
-│   │       │   ├── admins/[id]/restore/      # POST：復原刪除
-│   │       │   ├── me/route.ts               # GET：目前登入者資料
-│   │       │   └── me/password/route.ts      # POST：改密碼
+│   │       ├── auth/                # login、logout、session
+│   │       ├── cms/                 # admins CRUD／role／archive／unarchive／restore、me、me/password
 │   │       ├── csrf/route.ts        # GET：取 CSRF token
-│   │       └── health/
-│   │           ├── route.ts         # GET /api/health（版本、commit、Redis 狀態）
-│   │           └── live/route.ts    # GET /api/health/live（liveness probe）
+│   │       └── health/              # /api/health、/api/health/live
 │   ├── components/
 │   │   └── ui/                      # UI primitives
 │   │       ├── BottomSheet.tsx
@@ -229,15 +226,22 @@ StreamSightFrontend/
 │   │       ├── FormField.tsx
 │   │       ├── InlineError.tsx
 │   │       ├── Spinner.tsx
-│   │       └── ThemeToggle.tsx
+│   │       ├── StatusBadge.tsx
+│   │       ├── ThemeToggle.tsx
+│   │       └── useImageWithFallback.ts
 │   └── lib/
 │       ├── api/                     # BFF 基礎框架
-│       │   ├── createRoute.ts       # Route Handler 工廠（Zod parse + 統一錯誤）
-│       │   ├── backendFetch.ts      # → 真後端（含 timeout、request-id 轉發）
+│       │   ├── create-route.ts      # createRoute：Route Handler 工廠（Zod parse + auth + 統一錯誤）
+│       │   ├── create-admin-route.ts# createAdminRoute：SUPER_ADMIN gate 的薄包裝
+│       │   ├── backend.ts           # backendFetch：→ 真後端（timeout、request-id、trace 轉發）
+│       │   ├── admin-routes.ts      # /api/cms/* handler 實作（route.ts re-export）
+│       │   ├── admin-fetch.ts       # 後端 admin payload 驗證 + snake→camel 轉接
 │       │   ├── responses.ts         # okResponse、errorResponse
 │       │   ├── parsers.ts           # 通用 request parser
+│       │   ├── constants.ts         # timeout、refresh lock TTL、body 上限等常數
 │       │   ├── request-id.ts
-│       │   └── http-status.ts
+│       │   ├── http-status.ts
+│       │   └── index.ts
 │       ├── session/                 # iron-session cookie + store
 │       │   ├── config.ts
 │       │   ├── cookie.ts
@@ -250,9 +254,15 @@ StreamSightFrontend/
 │       │   └── origin.ts            # Origin 白名單檢查
 │       ├── auth/
 │       │   └── decodeJwtPayload.ts  # JWT payload decode（不驗章）
-│       ├── errors/                  # 錯誤型別階層
-│       │   ├── types.ts             # AppError、ContractViolationError 等
-│       │   ├── toErrorResponse.ts
+│       ├── cms/
+│       │   └── adminActions.ts      # 管理員列表 row-level 動作規則（純函式）
+│       ├── errors/                  # 錯誤型別階層（一類一檔，經 index.ts 匯出）
+│       │   ├── BffError.ts          # 基底錯誤（含 error code）
+│       │   ├── …                   # ValidationError、UnauthenticatedError、ForbiddenError、
+│       │   │                        # CsrfError、NotFoundError、PayloadTooLargeError、
+│       │   │                        # ContractViolationError、BackendTimeoutError、
+│       │   │                        # BackendUpstreamError、BackendClientError
+│       │   ├── toErrorResponse.ts   # 錯誤 → 統一 JSON 回應
 │       │   └── globalQueryError.ts  # TanStack Query 全域錯誤攔截
 │       ├── schemas/                 # 共用 Zod schema
 │       │   ├── auth.ts              # LoginRequest、SessionUser、AdminRoleWire…
@@ -273,21 +283,25 @@ StreamSightFrontend/
 │       ├── observability/
 │       │   ├── otel-sdk.ts          # OpenTelemetry SDK 初始化
 │       │   └── trace.ts             # Span helper
-│       ├── mock/                    # USE_MOCK=1 mock dispatch 框架
-│       │   └── dispatch.ts
+│       ├── mock/                    # USE_MOCK=1 mock 框架
+│       │   ├── dispatch.ts          # mock 路由分派
+│       │   ├── register.ts          # mock handler 註冊
+│       │   ├── auth-mock.ts
+│       │   └── admin-mock.ts
 │       ├── client/
 │       │   └── csrf.ts              # 瀏覽器端取 CSRF token
 │       ├── config.ts                # 環境變數統一讀取與驗證
 │       ├── log.ts                   # 結構化 logger
 │       ├── lifecycle.ts             # Node runtime 生命週期 hooks
+│       ├── date.ts                  # 共用日期格式化
 │       └── cn.ts                    # clsx + tailwind-merge
 ├── tests/
 │   ├── e2e/                         # Playwright spec（整體 user flow）
 │   ├── mocks/
 │   │   ├── handlers.ts              # MSW handlers（unit + BFF 測試共用）
 │   │   └── server.ts                # MSW node server（Vitest 用）
-│   ├── helpers/
-│   └── contracts/
+│   ├── helpers/                     # backend mock、cookie store、csrf 輔助
+│   └── contracts/                   # session store 契約測試
 ├── .env.example                     # 環境變數範本（含完整說明）
 ├── Dockerfile                       # 多階段 build（deps / builder / runtime）
 ├── docker-compose.yml               # 本機 Redis（host port 6380）
@@ -364,8 +378,10 @@ StreamSightFrontend/
 
 ### `src/lib/api/` — BFF Route Handler 框架
 
-- **`createRoute`**：Route Handler 工廠，統一處理 Zod parse（query / body / params）、auth guard、錯誤回應格式化
-- **`backendFetch`**：向真後端發送請求，含 timeout、request-id 轉發、`USE_MOCK` 旁路
+- **`createRoute`**（`create-route.ts`）：Route Handler 工廠，統一處理 Zod parse（query / body / params）、auth guard、CSRF、錯誤回應格式化
+- **`createAdminRoute`**（`create-admin-route.ts`）：`createRoute` 的薄包裝，強制登入並要求 SUPER_ADMIN 以上權限（`/api/cms/admins*` 用）
+- **`backendFetch`**（`backend.ts`）：向真後端發送請求，含 timeout、request-id 轉發、`USE_MOCK` 旁路
+- **`admin-fetch.ts` / `admin-routes.ts`**：後端 admin payload 驗證與 snake→camel 轉接、`/api/cms/*` handler 實作
 - **`okResponse` / `errorResponse`**：標準化 JSON envelope `{ data }` / `{ error: { code, message } }`
 
 ### `src/lib/session/` — Session 管理
@@ -388,7 +404,9 @@ StreamSightFrontend/
 
 ### `src/lib/errors/` — 錯誤標準化
 
-錯誤型別階層：`AppError` → `UnauthorizedError`、`ForbiddenError`、`NotFoundError`、`ContractViolationError`、`BackendError`…
+錯誤型別階層（一類一檔，經 `errors/index.ts` 匯出）：
+
+`BffError`（基底，含 error code）→ `ValidationError`、`UnauthenticatedError`、`ForbiddenError`、`CsrfError`、`NotFoundError`、`PayloadTooLargeError`、`ContractViolationError`、`BackendTimeoutError`、`BackendUpstreamError`、`BackendClientError`
 
 所有 Route Handler 錯誤經 `toErrorResponse` 轉換為統一 JSON 格式；Client 端由 TanStack Query `handleGlobalQueryError` 顯示 Toast。
 
@@ -434,7 +452,7 @@ tests/
 |---|---|
 | `src/lib/`（utils、schemas、api wrapper） | ≥ 90% lines |
 | `src/app/api/`（Route Handlers） | ≥ 85% lines |
-| `src/components/features/`（功能元件邏輯） | ≥ 80% lines |
+| 功能元件邏輯（目前 colocate 於 `src/app/` 下；未來抽出至 `src/components/features/`） | ≥ 80% lines |
 | `src/components/ui/`（純展示） | 無下限（e2e 補關鍵路徑） |
 
 ### TDD 強制範圍
@@ -534,7 +552,8 @@ src/app/<feature>/page.tsx
 src/app/<feature>/api.ts
 
 # 5. 元件
-src/components/features/<feature>/
+src/components/features/<feature>/   # 目錄尚未建立；跨頁共用元件抽到此處，
+                                     # 頁面專屬元件則與 page.tsx colocate（現行慣例，如 cms/admins/）
 ```
 
 遵循 TDD 流程：先建測試（紅）→ 最小實作（綠）→ 重構。
