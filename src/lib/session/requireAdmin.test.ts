@@ -89,6 +89,13 @@ describe('requireSuperAdminSession', () => {
     await expect(requireSuperAdminSession()).resolves.toBe(s)
     expect(redirectMock).not.toHaveBeenCalled()
   })
+
+  it('root → return session, no redirect (root ≥ super_admin)', async () => {
+    const s = { ...adminSession(), adminRole: 'root' as const }
+    getMock.mockResolvedValue(s)
+    await expect(requireSuperAdminSession()).resolves.toBe(s)
+    expect(redirectMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('ensureAdminAccess', () => {

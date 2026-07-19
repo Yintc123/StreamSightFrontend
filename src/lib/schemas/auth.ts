@@ -44,7 +44,7 @@ export const Password = z
  * (`AdminRoleWire` / `toAdminRoleRank`) and keeps this human-readable string
  * internally, so session/UI/`=== 'super_admin'` comparisons stay unchanged.
  */
-export const AdminRole = z.enum(['super_admin', 'editor', 'viewer'])
+export const AdminRole = z.enum(['super_admin', 'editor', 'viewer', 'root'])
 export type AdminRole = z.infer<typeof AdminRole>
 
 /** Internal string → backend wire int rank (enum-int.md). */
@@ -52,21 +52,19 @@ export const ADMIN_ROLE_RANK: Record<AdminRole, number> = {
   viewer: 0,
   editor: 50,
   super_admin: 100,
+  root: 999,
 }
 
 const RANK_TO_ADMIN_ROLE: Record<number, AdminRole> = {
   0: 'viewer',
   50: 'editor',
   100: 'super_admin',
+  999: 'root',
 }
 
-/**
- * Wire schema: the backend sends the int rank; parse → internal string label.
- * Phase 1 wire is `{0,50,100}` and deliberately rejects ROOT=999 (backend
- * Phase 2 bootstrap). Adding ROOT later is a one-line map extension.
- */
+/** Wire schema: the backend sends the int rank; parse → internal string label. */
 export const AdminRoleWire = z
-  .union([z.literal(0), z.literal(50), z.literal(100)])
+  .union([z.literal(0), z.literal(50), z.literal(100), z.literal(999)])
   .transform((rank) => RANK_TO_ADMIN_ROLE[rank])
 
 export function toAdminRoleRank(role: AdminRole): number {

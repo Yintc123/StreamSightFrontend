@@ -6,14 +6,14 @@ import { ForbiddenError } from '@/lib/errors/ForbiddenError'
 import { createRoute } from './create-route'
 
 /**
- * Spec 013a §3.1 — SUPER_ADMIN-only route wrapper for `/api/cms/admins*`.
+ * Spec 013a §3.1 — SUPER_ADMIN-or-above route wrapper for `/api/cms/admins*`.
  *
  * Best practice: do NOT re-build the pipeline. This is a thin wrapper over
  * `createRoute` that only adds two things on top of the shared factory
  * (params/query/body schemas, CSRF, single session read, touch):
  *
  *   1. Forces `requireAuth: true` — the handler's `session` is non-null.
- *   2. Asserts `role === ADMIN && adminRole === 'super_admin'` before the
+ *   2. Asserts `role === ADMIN && adminRole ∈ {super_admin, root}` before the
  *      handler runs; otherwise throws ForbiddenError (403).
  *
  * The gate is a fast-fail affordance: the backend `require_min_admin_role`
@@ -50,7 +50,8 @@ export function createAdminRoute<
     csrfExempt: opts.csrfExempt,
     handler: (args) => {
       const { session } = args // non-null: requireAuth true
-      if (session.role !== Role.ADMIN || session.adminRole !== 'super_admin') {
+      const canManage = session.adminRole === 'super_admin' || session.adminRole === 'root'
+      if (session.role !== Role.ADMIN || !canManage) {
         throw new ForbiddenError('super admin required')
       }
       return opts.handler(args)

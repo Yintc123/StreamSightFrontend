@@ -1,6 +1,6 @@
 # Spec 013a — Admin 管理：業務邏輯（契約 / 授權 / BFF / mutation）
 
-狀態：**已實作（2026-07-18）**（v0.3；原 Draft v0.1，自 spec 013 v0.3 拆出）
+狀態：**已實作（2026-07-19）**（v0.4；原 Draft v0.1，自 spec 013 v0.3 拆出）
 關係：本檔為 [spec 013（索引）](./013-admin-management-page.md) 的**業務邏輯半**。
 頁面 / 元件 / 視覺 / 遷移 / e2e 見 [spec 013b](./013b-admin-management-ui.md)。
 後端契約權威 = [spec 012a](./012a-backend-auth-logic.md)。
@@ -52,7 +52,7 @@ CSRF/session）、`backendFetch`、iron-session/Redis session、CSRF（spec 001b
 
 | 既有 | → 新 | 說明 |
 |---|---|---|
-| `src/lib/api/create-route.ts` | `create-admin-route.ts`(§3.1) | Omit `requireAuth`、恆 true + super_admin 斷言 |
+| `src/lib/api/create-route.ts` | `create-admin-route.ts`(§3.1) | Omit `requireAuth`、恆 true + super_admin/root 斷言 |
 | `src/lib/schemas/auth.ts`（snake→camel + 常數 `PASSWORD_MIN/MAX` 等）、`pagination.ts` | `src/lib/schemas/admin.ts`(§4) | 沿用 adapter 風格；時間戳 `z.string()` |
 | `src/app/api/auth/login|register/route.ts`（two-leg backendFetch + adapter + `passClientErrors`） | `/api/cms/admins*` routes(§3.2) | route 樣板 |
 | `src/app/api/csrf/route.ts`（簡單 requireAuth GET） | `/api/cms/me` GET | 樣板 |
@@ -64,7 +64,7 @@ CSRF/session）、`backendFetch`、iron-session/Redis session、CSRF（spec 001b
 - **`backendFetch` 錯誤契約尚未修**：現行讀**巢狀** `errBody.error.code`、只在 `AUTH_TOKEN_EXPIRED` 才 refresh
   （`backend.ts:96,98`）。本頁每個呼叫都是已登入呼叫，**依賴 [012a §4.10](./012a-backend-auth-logic.md) 先修**成扁平碼 + `if(activeSession)` refresh。
 - **`create-admin-route.ts` 不存在**：現行 admin gate 只在 RSC(`requireAdminSession`)；BFF 層是手動 inline
-  `if(session.role!==Role.ADMIN)`。本頁 §3.1 正式建立薄封裝，且 gate 是 **`role===ADMIN && adminRole==='super_admin'`**（非只 ADMIN）。
+  `if(session.role!==Role.ADMIN)`。本頁 §3.1 正式建立薄封裝，且 gate 是 **`role===ADMIN && adminRole ∈ {super_admin, root}`**（非只 ADMIN）。
 - **`auth-mock` 發 `role: Role.ADMIN`（現 =0）**：[012a §4.6](./012a-backend-auth-logic.md) role 翻正後需一起改。
 
 ---
@@ -91,7 +91,7 @@ CSRF/session）、`backendFetch`、iron-session/Redis session、CSRF（spec 001b
 ### 1.1 DTO（後端 snake_case）
 
 ```
-AdminResponse  = { id:int, username:str, name:str, admin_role:"super_admin"|"editor"|"viewer" }
+AdminResponse  = { id:int, username:str, name:str, admin_role:int }  # wire: VIEWER=0/EDITOR=50/SUPER_ADMIN=100/ROOT=999
 AdminSummary   = AdminResponse + {
   is_protected:bool, is_active:bool,
   archived_at:datetime|null, archived_by:int|null, archived_by_username:str|null,
@@ -126,13 +126,13 @@ ChangeOwnPasswordRequest = { current_password, new_password }
 
 ## 2. 授權模型（頁面 + BFF 雙層 gate）
 
-`/admin/admins/...` 限 SUPER_ADMIN，所以**整個 admin 管理頁面限 SUPER_ADMIN**。
+`/admin/admins/...` 限 **SUPER_ADMIN 以上**（後端 `require_min_admin_role(SUPER_ADMIN)`，ROOT=999 也通過），所以整個 admin 管理頁面限 `super_admin` 或 `root`。
 
-- **頁面 gate（RSC）**：新增 `requireSuperAdminSession()`（`requireAdmin.ts` 旁），session 需 `role===ADMIN`
-  **且** `adminRole===SUPER_ADMIN`（來自 [012a §4.8](./012a-backend-auth-logic.md) 存入 session 的 `adminRole`）。
-  非 super_admin（editor/viewer）→ `redirect('/cms?reason=not-super-admin')`。
-- **BFF gate**：`createAdminRoute` 再加一層 super_admin 檢查（§3.1）；即使頁面被繞過，BFF 仍擋。最終權威仍是後端 403/422。
-- **導覽可見性**（UI，見 013b）：CMS 導覽只在 `adminRole===SUPER_ADMIN` 顯示入口——**純 UX、非安全邊界**。
+- **頁面 gate（RSC）**：`requireSuperAdminSession()`（`requireAdmin.ts`），session 需 `role===ADMIN`
+  **且** `adminRole ∈ {super_admin, root}`（來自 [012a §4.8](./012a-backend-auth-logic.md) 存入 session 的 `adminRole`）。
+  editor/viewer → `redirect('/cms?reason=not-super-admin')`。
+- **BFF gate**：`createAdminRoute` 同樣檢查 `adminRole ∈ {super_admin, root}`（§3.1）；即使頁面被繞過，BFF 仍擋。最終權威仍是後端 403/422。
+- **導覽可見性**（UI，見 013b）：CMS 導覽在 `adminRole === 'super_admin' || adminRole === 'root'` 顯示入口——**純 UX、非安全邊界**。
 - ⚠️ **降權即時性**（後端 rbac）：`grade`/`adminRole` 在 token 內最多陳舊一個 access TTL。若「被降權的是自己」，
   前端收到後端 403/422 時應 `destroy session`→重登（沿用既有 `ensureAdminAccess` 的 403 處理）。
 
@@ -149,8 +149,8 @@ ChangeOwnPasswordRequest = { current_password, new_password }
 `querySchema`/`bodySchema` 解析、CSRF、session 單次讀取與 `touch`。`createAdminRoute` **只補三件事**：
 
 1. **強制 `requireAuth: true`**（handler 拿到的 `session` 型別即非 null）。
-2. **SUPER_ADMIN 斷言**：進 backend 呼叫前檢查 `session.role === Role.ADMIN && session.adminRole === 'super_admin'`，
-   否則丟 `ForbiddenError`（403）。`role !== ADMIN`（一般 user）→ 403；`adminRole !== super_admin`（editor/viewer）→ 403。
+2. **SUPER_ADMIN-or-above 斷言**：進 backend 呼叫前檢查 `session.role === Role.ADMIN && adminRole ∈ {super_admin, root}`，
+   否則丟 `ForbiddenError`（403）。`role !== ADMIN`（一般 user）→ 403；`adminRole ∈ {editor, viewer}` → 403。
 3. **簽名對齊**：泛型/選項與 `createRoute` 一致，只是省去 `requireAuth` 參數（恆 true）。
 
 ```ts
@@ -162,7 +162,8 @@ export function createAdminRoute<TBody, TQuery, TParams>(
     requireAuth: true,
     handler: (args) => {
       const { session } = args // StoredSession（requireAuth:true）
-      if (session.role !== Role.ADMIN || session.adminRole !== 'super_admin') {
+      const canManage = session.adminRole === 'super_admin' || session.adminRole === 'root'
+      if (session.role !== Role.ADMIN || !canManage) {
         throw new ForbiddenError('super admin required')
       }
       return opts.handler(args)
@@ -173,7 +174,7 @@ export function createAdminRoute<TBody, TQuery, TParams>(
 - handler 內對 `backendFetch(path, { session, passClientErrors })` 帶 `session` → 自動附 Bearer + 走
   [012a §4.10](./012a-backend-auth-logic.md) 修正後的 401→refresh→重試 / destroy 流程。
 - 依賴 `session.adminRole`（[012a §4.8](./012a-backend-auth-logic.md)）與 `ForbiddenError`（已存在）。
-- **TDD**：無 session→401；`role=USER`→403；admin 但 `adminRole=viewer/editor`→403；`super_admin`→通過；非安全方法缺 CSRF→阻擋。
+- **TDD**：無 session→401；`role=USER`→403；admin 但 `adminRole=viewer/editor`→403；`super_admin`→通過；`root`→通過；非安全方法缺 CSRF→阻擋。
 
 ### 3.2 路由表（前端 BFF）
 
@@ -227,7 +228,7 @@ export function createAdminRoute<TBody, TQuery, TParams>(
 
 ## 4. Zod 契約（`src/lib/schemas/admin.ts`，強制 TDD）
 
-- `AdminRole = z.enum(['super_admin','editor','viewer'])`。
+- `AdminRole = z.enum(['super_admin','editor','viewer','root'])`（`AdminRoleInput` 排除 `'root'`，不得由 UI 指派）。
 - `BackendAdminResponse`（snake）、`BackendAdminSummary`（snake，時間戳 `z.string()`）、`BackendAdminListResponse` — 驗後端回應。
 - `AdminCreateInput`（client + BFF inbound，camel）：`username`（1–100）、`name`（1–100）、`password`（8–128）、
   `adminRole`（enum，預設 viewer）。
@@ -250,7 +251,7 @@ export function createAdminRoute<TBody, TQuery, TParams>(
 ## 6. TDD 測試計畫（邏輯/資料類，強制）
 
 - `schemas/admin.ts`：各 Zod happy + edge（enum 未知值、長度邊界、snake→camel adapter、時間戳保留字串）。
-- `createAdminRoute`：無 session→401；role=USER→403；admin 但非 super_admin→403；super_admin→通過；CSRF 缺失→阻擋。
+- `createAdminRoute`：無 session→401；role=USER→403；admin 但 adminRole∈{editor,viewer}→403；super_admin→通過；root→通過；CSRF 缺失→阻擋。
 - BFF routes（Vitest + MSW）：list 透傳 status/分頁；create 409/400/422 透傳；lifecycle 200 回 summary；
   role 422（受保護/自我提權）透傳；me/password 204→session destroy 流程；`/api/cms/me` GET 回自身 id。
 - **錯誤/守衛測試一律走 MSW**（§3.3）：409/422/404/403 在 HTTP 層模擬，不靠執行期 mock。
@@ -258,4 +259,4 @@ export function createAdminRoute<TBody, TQuery, TParams>(
 
 ---
 
-最後更新：2026-07-18（v0.2，自 spec 013 v0.3 拆出業務邏輯半；+§0 復用對照）
+最後更新：2026-07-19（v0.4，ROOT=999 gate 支援：`requireSuperAdminSession` + `createAdminRoute` 改為 adminRole∈{super_admin,root}；`AdminRole` 加 `'root'`；AdminRoleInput 排除 root；DTO wire 改為 int rank）

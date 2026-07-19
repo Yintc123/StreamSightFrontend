@@ -24,13 +24,14 @@ export async function requireAdminSession(): Promise<StoredSession> {
 }
 
 /**
- * Spec 013a §2 — SUPER_ADMIN-only page gate (e.g. /cms/admins).
+ * Spec 013a §2 — SUPER_ADMIN-or-above page gate (e.g. /cms/admins).
  *
  * A missing / non-admin session redirects to the homepage like
- * `requireAdminSession`. An admin who is NOT super_admin is authenticated
- * for the CMS but lacks admin-management rights, so they bounce back to
- * `/cms?reason=not-super-admin` (not the homepage). Nav visibility is a
- * separate UX affordance; this is the real gate. Backend 403/422 remain
+ * `requireAdminSession`. An admin who is NOT super_admin or root is
+ * authenticated for the CMS but lacks admin-management rights, so they
+ * bounce back to `/cms?reason=not-super-admin` (not the homepage). Root
+ * (rank 999) is above super_admin and is always allowed. Nav visibility is
+ * a separate UX affordance; this is the real gate. Backend 403/422 remain
  * authoritative.
  */
 export async function requireSuperAdminSession(): Promise<StoredSession> {
@@ -38,7 +39,8 @@ export async function requireSuperAdminSession(): Promise<StoredSession> {
   if (!session || session.role !== Role.ADMIN) {
     redirect('/?reason=cms-not-admin')
   }
-  if (session.adminRole !== 'super_admin') {
+  const canManage = session.adminRole === 'super_admin' || session.adminRole === 'root'
+  if (!canManage) {
     redirect('/cms?reason=not-super-admin')
   }
   return session

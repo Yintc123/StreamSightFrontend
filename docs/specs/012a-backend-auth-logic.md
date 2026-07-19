@@ -1,6 +1,6 @@
 # Spec 012a — Backend Auth：業務邏輯（契約 / BFF / adapter）
 
-狀態：**已實作（2026-07-18）**（v0.3；原 Draft v0.1，自 spec 012 v0.4 拆出）
+狀態：**已實作（2026-07-19）**（v0.4；原 Draft v0.1，自 spec 012 v0.4 拆出）
 關係：本檔為 [spec 012（索引）](./012-backend-auth-integration.md) 的**業務邏輯半**。
 UI 面向（移除公開註冊、LoginCard 行為）見 [spec 012b](./012b-backend-auth-ui.md)。
 **後端契約 source of truth = 本檔 §2**（2026-07-18 讀 `/StreamSightBackend` 原始碼驗證）。
@@ -26,7 +26,7 @@ UI 面向（移除公開註冊、LoginCard 行為）見 [spec 012b](./012b-backe
 |---|---|
 | principal | 後端帳號主體，`principals.id`（int）。JWT 的 `sub`。user / admin 各以 `principal_id` 一對一掛上。 |
 | role | **principal 型別判別子**，JWT 整數 `role` claim。`Role`：**`USER=0`、`ADMIN=1`**（`app/core/enums.py`）。 |
-| admin_role | **admin 型別內的權限階梯**（有序），存 `admins.admin_role`。`SUPER_ADMIN > EDITOR > VIEWER`。 |
+| admin_role | **admin 型別內的權限階梯**（有序），存 `admins.admin_role`。`ROOT(999) > SUPER_ADMIN(100) > EDITOR(50) > VIEWER(0)`。**wire 格式為整數 rank**（見 [ADR 002](../decisions/002-admin-role-int-enum.md)）；BFF 邊界轉為內部字串。 |
 | grade | JWT 字串 claim，該身分的等級：admin→`admin_role`、user→`user_tier`。**僅 UX 提示、非授權邊界**。 |
 | access token | JWT，HS256，30 分鐘，帶 `role` + `grade` claim。 |
 | refresh token | opaque 隨機字串，14 天，單次使用、rotation、family + reuse detection。 |
@@ -99,11 +99,12 @@ UI 面向（移除公開註冊、LoginCard 行為）見 [spec 012b](./012b-backe
 
 `app/api/routers/admin/schemas.py:21-33`：
 ```json
-{ "id": 1, "username": "root", "name": "Root Admin", "admin_role": "super_admin" }
+{ "id": 2, "username": "admin_yin", "name": "yin", "admin_role": 999 }
 ```
 - **無 `email`、無 `is_active`、無 `role`**。
 - `id` 為 **int**，是 **admin.id（child PK）**，**不是** JWT 的 `sub`(principal_id)。
-- `admin_role` 為字串 enum（`super_admin`/`editor`/`viewer`）；為 rbac 等級的權威來源。
+- `admin_role` 為**整數 rank**（`VIEWER=0`/`EDITOR=50`/`SUPER_ADMIN=100`/`ROOT=999`）；為 rbac 等級的權威來源。BFF 在 `AdminRoleWire` schema 邊界轉為內部字串（見 [ADR 002](../decisions/002-admin-role-int-enum.md)）。
+- ⚠️ 注意：JWT `grade` claim 仍為**字串**（`"super_admin"` 等），與此欄位格式不同；不可混用。
 
 ### 2.6 錯誤回應
 
@@ -199,7 +200,7 @@ adaptTokenResponse(raw, now):
 - Zod 改驗 **snake_case**（新 `BackendTokenResponse`），移除 `z.literal('Bearer')`、移除必填 `refreshExpiresIn`。
 - `BackendTokenResponse.refresh_token` 宣告為 `.nullable()`；`AdaptedTokens.refreshToken: string | null`。
 - `StoredSession.refreshToken` / `TokenPair.refreshToken` 改為 `string | null`（對齊 adapter 輸出）。
-- `/admin/me` adapter：`BackendAdminMeResponse = { id:number, username, name, admin_role:enum }` → 顯示名用 `name`；`id`（child PK）**不進 session userId**（見 4.5）。
+- `/admin/me` adapter：`BackendAdminMeResponse = { id:number, username, name, admin_role:int_rank }` → `AdminRoleWire` 將 int rank 轉為內部字串；顯示名用 `name`；`id`（child PK）**不進 session userId**（見 4.5）。
 
 ### 4.5 使用者識別：改用 JWT `sub`
 
@@ -244,9 +245,10 @@ BFF `POST /api/auth/logout` 的登出流程（`src/app/api/auth/logout/route.ts`
 ### 4.8 admin_role 存入 session（**本期必做**——spec 013 gate 前置）
 
 - login route 讀 `/admin/me.admin_role`（child 現值、最新，優先）存進 session；`grade` claim 為輔（可能陳舊 ≤ 一個 TTL）。
-- **型別**：`StoredSession` 加 `adminRole?: 'super_admin' | 'editor' | 'viewer'`（user session 無此欄）。
+- **型別**：`StoredSession` 加 `adminRole?: 'super_admin' | 'editor' | 'viewer' | 'root'`（user session 無此欄）。`'root'`（rank=999）對應後端 seed 初始帳號；`AdminRoleWire` 邊界轉譯後進 session（見 [ADR 002](../decisions/002-admin-role-int-enum.md)）。
 - refresh 時 `grade` 重簽刷新；若要 UI 即時反映降權，refresh 後可一併更新 `session.adminRole`（非必要，授權以後端 403/422 為準）。
 - ⚠️ **非授權邊界**：前端據 `adminRole` 顯示/隱藏按鈕只是 UX；真授權以後端 403/422 為準（`ensureAdminAccess` 已處理 403 → destroy + redirect）。
+- `CmsSideNav` 的「管理員管理」可見性 gate：`adminRole === 'super_admin' || adminRole === 'root'`（root 等於或高於 super_admin）。
 
 ### 4.9 對外 BFF 契約（不變）
 
@@ -338,7 +340,7 @@ BFF `POST /api/auth/logout` 的登出流程（`src/app/api/auth/logout/route.ts`
 - [x] refresh 失敗（401）→ session destroy + 清 cookie。（`service.test.ts`「backend rejects…destroys local session」）
 - [x] 併發 refresh：僅一次打後端（鎖），其餘讀 cache。（`service.test.ts`「5 parallel…once」）
 - [x] Role 常數翻轉後：既有 admin gate 測試/mock 斷言仍正確（無靜默倒置）。（全套綠燈；斷言改用 `Role.ADMIN` 常數）
-- [x] session 帶 `adminRole`（super_admin/editor/viewer），供 spec 013 gate。（login test「stores adminRole…」）
+- [x] session 帶 `adminRole`（super_admin/editor/viewer/root），供 spec 013 gate。`admin_role` wire 為 int rank；`AdminRoleWire` 邊界轉譯，ROOT=999 → `'root'`。（login test「stores adminRole…」；`schemas/auth.test.ts`「parses 999…」）
 - [x] **backendFetch 扁平錯誤碼**：`passClientErrors` 對 `{error:'conflict',…}` 取得 `beCode='conflict'`。（`backend.test.ts`）
 - [x] **backendFetch 401 refresh**：扁平 `{error:'unauthorized'}` 401 → 一次 refresh + 重試；重試仍 401 → destroy；`session:null` 不遞迴。（`backend.test.ts`）
 - [x] **backendFetch no-op refresh 偵測**：session 無 refresh token → 401 → refresh 回傳同 token → **跳過重試**，直接 destroy + UnauthenticatedError（省一次 backend round-trip）。（`backend.test.ts`「session without refresh token」）
@@ -347,4 +349,4 @@ BFF `POST /api/auth/logout` 的登出流程（`src/app/api/auth/logout/route.ts`
 
 ---
 
-最後更新：2026-07-18（v0.3，實作對齊：檔頭已實作標記、§7 驗收全數勾選並註明對應測試）
+最後更新：2026-07-19（v0.4，ROOT=999 支援：ADR 002 enum-int 邊界轉譯、`AdminRole` 加 `'root'`、`AdminRoleInput` 排除 root、`CmsSideNav` isSuperAdmin gate 含 root、§2.5/§4.8/§7 對齊）

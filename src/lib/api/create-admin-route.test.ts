@@ -119,6 +119,13 @@ describe('createAdminRoute — SUPER_ADMIN gate', () => {
     expect(sessionSeen).not.toBeNull()
   })
 
+  it('root → handler runs (root ≥ super_admin)', async () => {
+    overrides.session = makeSession({ adminRole: 'root' })
+    const handler = createAdminRoute({ handler: () => okResponse({ ok: 1 }) })
+    const res = await handler(get(), noParams)
+    expect(res.status).toBe(200)
+  })
+
   it('non-safe method without CSRF token → CSRF_INVALID 403 (before gate body runs)', async () => {
     overrides.session = makeSession()
     const handler = createAdminRoute({ handler: () => okResponse({ ok: 1 }) })

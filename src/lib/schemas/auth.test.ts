@@ -11,15 +11,16 @@ import {
 } from './auth'
 
 describe('AdminRole (internal string enum)', () => {
-  it('accepts the three backend admin roles', () => {
+  it('accepts all four backend admin roles including root', () => {
     expect(AdminRole.parse('super_admin')).toBe('super_admin')
     expect(AdminRole.parse('editor')).toBe('editor')
     expect(AdminRole.parse('viewer')).toBe('viewer')
+    expect(AdminRole.parse('root')).toBe('root')
   })
 
   it('rejects unknown roles', () => {
-    expect(AdminRole.safeParse('root').success).toBe(false)
     expect(AdminRole.safeParse('SUPER_ADMIN').success).toBe(false)
+    expect(AdminRole.safeParse('admin').success).toBe(false)
   })
 })
 
@@ -30,20 +31,20 @@ describe('AdminRoleWire (int rank ↔ internal string)', () => {
     expect(AdminRoleWire.parse(0)).toBe('viewer')
     expect(AdminRoleWire.parse(50)).toBe('editor')
     expect(AdminRoleWire.parse(100)).toBe('super_admin')
+    expect(AdminRoleWire.parse(999)).toBe('root')
   })
 
   it('rejects the old string wire and off-ladder ints', () => {
     expect(AdminRoleWire.safeParse('super_admin').success).toBe(false)
     expect(AdminRoleWire.safeParse(3).success).toBe(false)
-    // ROOT=999 is backend Phase 2 bootstrap; Phase 1 wire is {0,50,100}.
-    expect(AdminRoleWire.safeParse(999).success).toBe(false)
   })
 
   it('toAdminRoleRank maps internal string → wire int (inverse)', () => {
     expect(toAdminRoleRank('viewer')).toBe(0)
     expect(toAdminRoleRank('editor')).toBe(50)
     expect(toAdminRoleRank('super_admin')).toBe(100)
-    expect(ADMIN_ROLE_RANK).toEqual({ viewer: 0, editor: 50, super_admin: 100 })
+    expect(toAdminRoleRank('root')).toBe(999)
+    expect(ADMIN_ROLE_RANK).toEqual({ viewer: 0, editor: 50, super_admin: 100, root: 999 })
   })
 })
 
@@ -141,8 +142,14 @@ describe('BackendAdminMeResponse', () => {
     expect(BackendAdminMeResponse.safeParse(valid).success).toBe(true)
   })
 
+  it('parses admin_role=999 (ROOT) into the internal string', () => {
+    expect(BackendAdminMeResponse.parse({ ...valid, admin_role: 999 })).toMatchObject({
+      admin_role: 'root',
+    })
+  })
+
   it('rejects an unknown admin_role rank (old string / off-ladder int)', () => {
     expect(BackendAdminMeResponse.safeParse({ ...valid, admin_role: 'super_admin' }).success).toBe(false)
-    expect(BackendAdminMeResponse.safeParse({ ...valid, admin_role: 999 }).success).toBe(false)
+    expect(BackendAdminMeResponse.safeParse({ ...valid, admin_role: 3 }).success).toBe(false)
   })
 })

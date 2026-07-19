@@ -41,7 +41,7 @@ export function CmsSideNav({ adminRole }: { adminRole?: AdminRole }) {
     }
   }, [toggleCollapsed])
 
-  const isSuperAdmin = adminRole === 'super_admin'
+  const isSuperAdmin = adminRole === 'super_admin' || adminRole === 'root'
   const links: { href: string; label: string }[] = [
     ...(isSuperAdmin ? [{ href: '/cms/admins', label: '管理員管理' }] : []),
     { href: '/cms/settings', label: '設定' },

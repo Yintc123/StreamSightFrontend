@@ -37,7 +37,7 @@ export type AdminCreateInput = z.infer<typeof AdminCreateInput>
 export const AdminUpdateInput = z.object({ name: AdminName })
 export type AdminUpdateInput = z.infer<typeof AdminUpdateInput>
 
-export const AdminRoleInput = z.object({ adminRole: AdminRole })
+export const AdminRoleInput = z.object({ adminRole: z.enum(['super_admin', 'editor', 'viewer']) })
 export type AdminRoleInput = z.infer<typeof AdminRoleInput>
 
 export const ChangePasswordInput = z.object({

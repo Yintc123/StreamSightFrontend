@@ -79,7 +79,7 @@ export const POST = createRoute({
     const meParsed = BackendAdminMeResponse.safeParse(rawMe)
     if (!meParsed.success) {
       throw new ContractViolationError(
-        `BE /admin/me response shape mismatch: ${meParsed.error.message}`,
+        `BE /admin/me response shape mismatch: ${meParsed.error.message} (raw: ${JSON.stringify(rawMe)})`,
       )
     }
     const me = meParsed.data

@@ -21,7 +21,7 @@ export type RoleValue = (typeof Role)[keyof typeof Role]
  * the boundary and stores this human-readable string, so gate comparisons
  * (`=== 'super_admin'`) stay unchanged.
  */
-export type AdminRole = 'super_admin' | 'editor' | 'viewer'
+export type AdminRole = 'super_admin' | 'editor' | 'viewer' | 'root'
 
 export type StoredSession = {
   userId: string
