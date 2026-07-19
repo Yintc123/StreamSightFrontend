@@ -8,12 +8,12 @@
 //
 // 016 §4.3（對齊 Streamlit 側欄，實測 stSidebar 2026-07-19）：
 //  - 右緣 8px 透明 col-resize 拖曳條（hover 顯示 brand 細條），可拖曳調寬 + 鍵盤 ←→。
-//  - 收合＝寬度動畫收到 0（transition .3s），nav 轉 aria-hidden + inert；左上浮出展開鈕。
+//  - 收合＝寬度即時收到 0（無動畫，016 v0.5.2），nav 轉 aria-hidden + inert；左上浮出展開鈕。
 //  - 雙箭頭圖示（« / »）、無 border（靠 surface-card vs surface-page 對比分隔）。
 // 持久化由 useSidebarPanel 承載（019）：寬度走 sidebar_width cookie（與 Streamlit
 // 共用）、收合態走 localStorage。
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -30,7 +30,6 @@ const RESIZE_STEP = 16 // 鍵盤每次調整寬度的像素步進
 export function CmsSideNav({ adminRole }: { adminRole?: AdminRole }) {
   const pathname = usePathname()
   const { collapsed, width, toggleCollapsed, setWidth } = useSidebarPanel()
-  const [dragging, setDragging] = useState(false)
   const dragStart = useRef<{ x: number; width: number } | null>(null)
 
   // Auto-collapse on narrow viewports (mobile) when no collapse preference is
@@ -59,7 +58,6 @@ export function CmsSideNav({ adminRole }: { adminRole?: AdminRole }) {
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault()
     dragStart.current = { x: e.clientX, width }
-    setDragging(true)
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }
 
@@ -71,7 +69,6 @@ export function CmsSideNav({ adminRole }: { adminRole?: AdminRole }) {
 
   function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
     dragStart.current = null
-    setDragging(false)
     e.currentTarget.releasePointerCapture?.(e.pointerId)
   }
 
@@ -86,13 +83,10 @@ export function CmsSideNav({ adminRole }: { adminRole?: AdminRole }) {
   }
 
   return (
-    // 外層：寬度動畫收合（拖曳中關掉 transition 求即時），無 border（同 Streamlit）。
+    // 外層：寬度即時收合（無 transition，016 v0.5.2），無 border（同 Streamlit）。
     <div
       className="relative shrink-0 bg-surface-card"
-      style={{
-        width: collapsed ? 0 : width,
-        transition: dragging ? 'none' : 'width 0.3s ease',
-      }}
+      style={{ width: collapsed ? 0 : width }}
     >
       {/* nav 內容：收合時整段 aria-hidden + inert（移出 a11y 樹、不可 focus），寬度固定避免動畫中折行 */}
       <div

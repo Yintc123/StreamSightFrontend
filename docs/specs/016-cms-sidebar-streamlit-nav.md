@@ -156,14 +156,15 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 | 預設 / 最小 / 最大寬 | `256px` / `200px` / `600px` | 同（`SIDEBAR_DEFAULT/MIN/MAX_WIDTH`） |
 | 邊框 | **無 border**（靠 `surface-card` vs `surface-page` 對比分隔） | 同（移除 `border-r`） |
 | resize handle | `div` 8px 寬、`height:100%`、`right:-6px`（跨邊）、`cursor:col-resize`、`user-select:none`，內含一條 hover 才上色的細條 | `role="separator"` 8px hit 區、`-right-1` 跨邊、內 `w-px` hover/focus 顯示 `bg-brand` |
-| 收合動畫 | `min/max-width→0` + `transform:translateX(-256px)`，`transition .3s` | 外層寬度動畫 `width 0.3s`（拖曳中關掉求即時）；nav 轉 `aria-hidden`+`inert` |
+| 收合動畫 | `min/max-width→0` + `transform:translateX(-256px)`，`transition .3s` | **無動畫**（v0.5.2 依使用者偏好移除 transition，即時收合；此處刻意不對齊 Streamlit）；nav 轉 `aria-hidden`+`inert` |
 | 收合鈕圖示 | material `keyboard_double_arrow_left`（«） | 雙箭頭 SVG（左） |
 | 收合後控制 | 左上浮出 `stExpandSidebarButton`（`keyboard_double_arrow_right` »，28×28） | 左上 `absolute` 浮出展開鈕（雙箭頭右） |
 
 - **拖曳調寬**：右緣 8px 透明 `role="separator"`（`aria-orientation="vertical"`）hit 區，指標拖曳即時
   改寬（拖曳中 `transition:none`）；亦支援鍵盤 `←/→`（步進 16px，`aria-valuenow/min/max` 曝露現值）。
-- **收合 / 展開**：側欄**常駐掛載**，收合＝寬度動畫收到 0 並將 nav `aria-hidden`+`inert`（移出 a11y 樹、
-  不可 focus）；左上浮出展開鈕。對齊 Streamlit「完全隱藏 + 重開」（非收成 icon 軌）。
+- **收合 / 展開**：側欄**常駐掛載**，收合＝寬度**即時**收到 0（無 transition，v0.5.2）並將 nav
+  `aria-hidden`+`inert`（移出 a11y 樹、不可 focus）；左上浮出展開鈕。對齊 Streamlit「完全隱藏 +
+  重開」（非收成 icon 軌）。
 - **寬度界限**：`[200, 600]`，預設 `256`；`clampWidth` 夾住並取整、防 NaN。
 - **持久化**：寬度 + 收合態存 `localStorage['cms.sidebar']`（`{ width, collapsed }`），跨重新整理 /
   跨分頁保留。以 `useSyncExternalStore`（非 `useEffect`+`setState`）讀取 → SSR 首繪用預設、
@@ -261,7 +262,8 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 | 0.4.1 | 2026-07-19 | 文件對齊修訂（實作/規格核對後）：§3.1 補**品牌連結列**與**頂部列項目尺寸**（`px-3 h-8 text-sm font-medium`）；§4.2 釐清「互動語言」僅指 **hover 填色行為**，上表尺寸（`px-2 h-7 text-base`）僅適用 `CmsSideNav` 左欄、頂部列尺寸另屬 §3.1。無程式碼變更。 |
 | 0.5 | 2026-07-19 | **左欄可調寬 + 收合**（對齊 Streamlit）：右緣 8px 透明 `separator` 拖曳 / 鍵盤 `←→` 調寬；收合＝寬度動畫收 0 + nav `aria-hidden`/`inert`、左上浮出展開鈕；寬度/收合態存 `localStorage['cms.sidebar']`，以 `useSyncExternalStore` 讀取（SSR 安全）。新增 `useSidebarPanel.ts`（clampWidth + hook，+9 測試）、`CmsSideNav` +5 測試；`vitest.setup.ts` 補 localStorage polyfill（Node 20 實驗性 Web Storage 遮蔽 happy-dom）。全套件 574 綠。+§4.3、更新 OQ-2。`layout.tsx` 不變。 |
 | 0.5.1 | 2026-07-19 | **實測校準**：以 Playwright 量 Streamlit `stSidebar` computed style，校正 §4.3 尺寸/行為——寬 `256/200/600`（原 224/180/480）、**去 border**、resize handle 改 8px 透明跨邊條（hover 顯示 brand 細條）、收合改**寬度動畫**（非卸載）、雙箭頭圖示、收合後左上浮出展開鈕。僅視覺/尺寸校準，測試契約不變（574 綠）。 |
+| 0.5.2 | 2026-07-19 | **移除寬度動畫**（使用者偏好）：外層 `transition: width .3s` 拿掉，收合 / 展開與載入定位皆即時；連帶移除只為動畫存在的 `dragging` state。此處刻意不對齊 Streamlit（其收合仍有 .3s 動畫）。純樣式，測試契約不變。附帶效益：spec 019 後首繪 256 → cookie 寬的跳動不再帶滑動感（019 OQ-1 的體感問題減輕）。 |
 
 ---
 
-最後更新：2026-07-19（v0.5.1，左欄可調寬 + 收合，尺寸/行為以 Streamlit 實測校準）
+最後更新：2026-07-19（v0.5.2，移除寬度動畫）
