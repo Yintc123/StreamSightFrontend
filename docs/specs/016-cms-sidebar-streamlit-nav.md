@@ -158,7 +158,7 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 | resize handle | `div` 8px 寬、`height:100%`、`right:-6px`（跨邊）、`cursor:col-resize`、`user-select:none`，內含一條 hover 才上色的細條 | `role="separator"` 8px hit 區、`-right-1` 跨邊、內 `w-px` hover/focus 顯示 `bg-brand` |
 | 收合動畫 | `min/max-width→0` + `transform:translateX(-256px)`，`transition .3s` | **無動畫**（v0.5.2 依使用者偏好移除 transition，即時收合；此處刻意不對齊 Streamlit）；nav 轉 `aria-hidden`+`inert` |
 | 收合鈕圖示 | Material Symbols Rounded `keyboard_double_arrow_left`，`DynamicIcon size="xl"` = **24px**（bundle 實查） | **官方 Material Symbols Rounded 24px 向量內嵌**（同 glyph、`w-6 h-6` 同 24px；v0.5.3） |
-| 收合鈕位置 | **Playwright 實測（v0.5.5）**：鈕頂距側欄頂（＝其 48px 頂列下緣）**16px**、右緣內縮 **13px**（`max(gutter, 1.25rem−gutter)` 受 scrollbar gutter 抵扣，實測非 bundle 推算的 20px）；首個 nav 項起點 **92px** | header 列 `h-[3.75rem] items-center`（鈕頂 16px）+ 右內縮 `px-3`(12) + `mr-px`(1) = **13px**；header `mb-8` → nav 起點 60+32 = **92px** |
+| 收合鈕位置 | **Playwright 實測（v0.5.5）**：鈕頂距側欄頂（＝其 48px 頂列下緣）**16px**、右緣內縮 **13px**（`max(gutter, 1.25rem−gutter)` 受 scrollbar gutter 抵扣，實測非 bundle 推算的 20px）；首個 nav 項起點 **92px** | header 列 `h-[3.75rem] items-center`（鈕頂 16px）+ 右內縮 `px-3`(12) + `mr-px`(1) = **13px**；header `mb-[30px]` + nav 容器 `gap-0.5`(2) → nav 起點 60+30+2 = **92px**（v0.5.6 校正：v0.5.5 的 `mb-8` 漏算 gap，實為 94） |
 | 收合後控制 | 左上浮出 `stExpandSidebarButton`（`keyboard_double_arrow_right`，`size="xl"` 24px，鈕 28×28）：**Playwright 實測 (10, 8)**（相對頂列下緣） | 左上 `absolute left-2.5 top-2`＝**(10, 8)** 浮出展開鈕（同官方 24px 向量，鈕 `h-7 w-7` 28×28；v0.5.5） |
 
 - **拖曳調寬**：右緣 8px 透明 `role="separator"`（`aria-orientation="vertical"`）hit 區，指標拖曳即時
@@ -271,6 +271,8 @@ CMS 採**兩層導覽**：**頂部列**切換「系統」（管理後台 CMS ⇄
 
 | 0.5.5 | 2026-07-19 | **鈕位置改以 Playwright 實測校準**（mock 模式 :8503 量 rendered 幾何，修正 v0.5.4 的 bundle 推算誤差）：收合鈕右緣內縮 20px → **13px**（`mr-2`→`mr-px`；bundle 的 `max(gutter, 1.25rem−gutter)` 會被 scrollbar gutter 抵扣，實測 13）；展開鈕 (16,16) → **(10, 8)**（`left-2.5 top-2`）；首個 nav 項起點 76px → **92px**（`mb-4`→`mb-8`；v0.5.4 聲稱 76 同 Streamlit 有誤）。已知未對齊項：nav 項水平內縮 Streamlit 實測 23px、CMS 為 12px（`px-3`），另案評估。 |
 
+| 0.5.6 | 2026-07-19 | 規格 / 實作核對修正：v0.5.5 的 nav 起點公式（`mb-8`＝60+32=92）**漏算 nav 容器 `gap-0.5`**（作用於 header 與首個連結之間），實際 rendered 為 94px。改 `mb-[30px]`（60+30+gap 2 = 92），與 Streamlit 實測一致。 |
+
 ---
 
-最後更新：2026-07-19（v0.5.5，鈕位置以實測校準）
+最後更新：2026-07-19（v0.5.6，nav 起點 gap 校正）

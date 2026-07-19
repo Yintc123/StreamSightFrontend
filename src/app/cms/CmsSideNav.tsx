@@ -107,8 +107,8 @@ export function CmsSideNav({
         >
           {/* header 對齊 Streamlit stSidebarHeader（Playwright 實測 2026-07-19）：
               高 60px 垂直置中（鈕頂距側欄頂 16px）、鈕右緣內縮 13px（px-3 12 + mr-px 1）、
-              首個 nav 項起點 92px（60 + mb-8 32） */}
-          <div className="mb-8 flex h-[3.75rem] items-center justify-end">
+              首個 nav 項起點 92px（60 + mb-[30px] + 父層 gap-0.5 2） */}
+          <div className="mb-[30px] flex h-[3.75rem] items-center justify-end">
             <button
               type="button"
               aria-label="收合側欄"
