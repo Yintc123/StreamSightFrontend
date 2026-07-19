@@ -88,6 +88,19 @@ width  = parseSidebarWidthCookie(document.cookie)   // ① cookie（新常態）
   就被蓋掉、下次載入寬度跳回 256（§I-4）。持久化型別改 `{ width?: number; collapsed: boolean }`。
 - 不做主動遷移（首載即寫 cookie）：拖過一次自然轉正；沒拖過的人走 ②→③ 也正確。
 
+### 3.5 SSR 直出寬度（v0.4，OQ-1 落地）
+
+- **動機**：server snapshot 為預設 → 首繪 256、hydration 後才跳 cookie 寬。`useLayoutEffect`
+  **救不了**：跳動發生在 hydration 之前（伺服器 HTML 先 paint），任何 effect 都晚於該幀。
+- **做法**（同 014a theme 的 cookie SSR 直出思路）：
+  1. `cms/layout.tsx`（RSC，本就因 session 動態渲染）以 `(await cookies()).get(SIDEBAR_COOKIE)`
+     讀值，經 `parseSidebarWidthValue` 驗證後以 `initialWidth` prop 傳入 `CmsSideNav`。
+  2. `useSidebarPanel(initialWidth)` 的 server/hydration 快照改為 `` `${initialWidth ?? ''}|` ``：
+     SSR 輸出即 cookie 寬、hydration 一致無 mismatch；之後 client 快照接手（同值 → 無重繪）。
+- **界限**：`collapsed` 仍在 localStorage，伺服器不可知 → SSR 恆直出展開態，收合者 hydration
+  後才收合（可接受；如需消除須將 collapsed 也 cookie 化，本期不做）。cookie 缺省走 legacy
+  退路者（②）伺服器同樣不可知 → 該過渡族群仍有一次跳動，拖一次寬度即轉正。
+
 ---
 
 ## 4. 檔案與元件清單
@@ -96,7 +109,8 @@ width  = parseSidebarWidthCookie(document.cookie)   // ① cookie（新常態）
 |---|---|---|
 | `src/app/cms/sidebarCookie.ts` | 新增 | 純函式層：`SIDEBAR_COOKIE`（`'sidebar_width'`）、`SIDEBAR_COOKIE_MAX_AGE`、`SIDEBAR_MIN/MAX_WIDTH`（值域常數定義於此以免與 hook 循環 import）、`extractSidebarWidthRaw(cookieHeader): string \| null`（§I-3 regex 抽原始值）、`parseSidebarWidthCookie(cookieHeader): number \| null`（抽值 → 整數 → 值域外 / 非法 → `null`；供快照 §3.3）、`buildSidebarWidthCookieString(width, isProd)`（對齊 `buildThemeCookieString` 形狀）。皆為純函式、以 `document.cookie` 字串為參數。**不可 `import 'server-only'`**（client hook 要用，同 014a §I-2） |
 | `src/app/cms/useSidebarPanel.ts` | 改 | 儲存層照 §3.2–3.4 改寫；對外介面 `SidebarPanel`、`clampWidth`、`SIDEBAR_*_WIDTH` 常數**均不變**（`MIN/MAX` 改為自 `sidebarCookie` 再匯出）；**新增 export** `hasCollapsedPreference(): boolean`（讀 `cms.sidebar`，JSON 內含 boolean `collapsed` 欄位 → `true`；缺 key / 毀損 / 無該欄位 → `false`，供 §I-2） |
-| `src/app/cms/CmsSideNav.tsx` | 改（一處） | auto-collapse 判斷由「`localStorage.getItem(SIDEBAR_STORAGE_KEY)` 存在與否」改為 `!hasCollapsedPreference() && window.innerWidth < 768`（§I-2）；其餘不動 |
+| `src/app/cms/CmsSideNav.tsx` | 改 | auto-collapse 判斷由「`localStorage.getItem(SIDEBAR_STORAGE_KEY)` 存在與否」改為 `!hasCollapsedPreference() && window.innerWidth < 768`（§I-2）；v0.4 增 `initialWidth?: number \| null` prop 透傳給 hook（§3.5） |
+| `src/app/cms/layout.tsx` | 改（v0.4） | RSC 讀 `sidebar_width` cookie（`cookies()` + `parseSidebarWidthValue`）→ `initialWidth` prop 直出（§3.5） |
 
 > 不新增 Route Handler、不動 `cms/layout.tsx`。
 
@@ -129,8 +143,8 @@ CMS 拖曳結束 / 鍵盤 ←→
 Streamlit 分頁拖曳結束（姊妹規格：storage event → 寫同一 cookie）
    └─ 使用者切回 CMS 分頁 → focus → emit() → 重讀 cookie → 側欄套用 320
 
-重新整理 / 硬導覽
-   └─ 首繪預設 256（server snapshot）→ hydration 後讀 cookie 套用（現狀相同，見 OQ-1）
+重新整理 / 硬導覽（v0.4 起）
+   └─ layout(RSC) 讀 cookie → initialWidth 直出 → first paint 即 cookie 寬（§3.5，無跳動）
 ```
 
 ---
@@ -160,8 +174,7 @@ Streamlit 分頁拖曳結束（姊妹規格：storage event → 寫同一 cookie
 
 ### Open Questions（不阻塞開工）
 
-- **OQ-1（SSR 直出寬度）**：`cms/layout.tsx`（RSC，本就動態）可讀 cookie 直出 `initialWidth`，
-  消除首繪 256 → 實寬的跳動（同 014a 防閃爍思路）。本期不做：跳動幅度小且既有行為相同。
+- ~~**OQ-1（SSR 直出寬度）**~~：✅ **v0.4 已落地**（§3.5）。
 - **OQ-2（雲端子網域）**：host-only cookie 在 `frontend.streamsight.local` / `streamlit.streamsight.local`
   下不共用（`theme` cookie 同此限制）。若要共用需 `Domain=.streamsight.local`，屬 `theme` + `sidebar_width`
   一起決定的跨域議題，另案處理。
@@ -178,6 +191,8 @@ Streamlit 分頁拖曳結束（姊妹規格：storage event → 寫同一 cookie
 | 0.2 | 2026-07-19 | 實作前完整性校對，補 3 個會卡實作的缺口：①§3.4/§I-4 `toggleCollapsed` 改**合併保留 legacy `width`**（原「只寫 `{collapsed}`」會蓋掉遷移退路，屬回歸）；②§3.3 快照明確為**抽出的 `sidebar_width` 原始值**（非整串 `document.cookie`，防無關 cookie 觸發重繪），新增 `extractSidebarWidthRaw`；③§I-2/§4 新增 `hasCollapsedPreference()` 契約供 auto-collapse 判斷。另：§I-3 統一抽值 regex（與 Streamlit 端同條）、§I-5 測試環境實查（happy-dom cookie 可用、清理 pattern）、§6 測試計畫對應擴充。 |
 | 0.3 | 2026-07-19 | **已實作**（TDD 紅→綠→重構×3 輪）：`sidebarCookie.ts`（+21 測試）、`useSidebarPanel` 儲存層改寫（hook 測試改寫為 14 案，含 §I-4 保留 legacy width、focus 重讀）、`CmsSideNav` auto-collapse 改 `hasCollapsedPreference()`（+1 測試、既有 10 案不變）。實作註記：快照的 cookie 部分實作為 `parseSidebarWidthCookie` 的合法值（非法值與缺省同視為 `''`，語義同 §3.3 且連非法值變動的重繪都免了）；`SIDEBAR_MIN/MAX_WIDTH` 常數移至 `sidebarCookie.ts` 定義、`useSidebarPanel` 再匯出（避免循環 import，公開介面不變）。檢查：`pnpm lint`、`pnpm typecheck` 過；cms 套件 83 綠；全套件 623 綠 + 2 紅為 main 既有 `config.test.ts` 失敗（stash 驗證與本變更無關）。 |
 
+| 0.4 | 2026-07-19 | **SSR 直出寬度（OQ-1 落地，+§3.5）**：`layout.tsx` 讀 cookie → `initialWidth` prop → `useSidebarPanel(initialWidth)` server 快照直出，first paint 即 cookie 寬（`useLayoutEffect` 無法解——跳動在 hydration 前）。`sidebarCookie.ts` 增 `parseSidebarWidthValue`（值層解析，`parseSidebarWidthCookie` 改組合之）。TDD +6 案（value 解析 3、hook SSR 2、CmsSideNav SSR 1；cms 套件 89 綠）。界限：`collapsed` 與 legacy 退路族群仍有 hydration 後過渡（§3.5）。 |
+
 ---
 
-最後更新：2026-07-19（v0.3，已實作）
+最後更新：2026-07-19（v0.4，已實作，SSR 直出寬度）

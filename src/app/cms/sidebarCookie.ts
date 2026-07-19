@@ -20,12 +20,19 @@ export function extractSidebarWidthRaw(cookieHeader: string): string | null {
   return SIDEBAR_COOKIE_RE.exec(cookieHeader)?.[1] ?? null
 }
 
-/** 解析為整數寬度；值域外（<200 / >600）→ null（不 clamp，交由讀取退路鏈）。 */
-export function parseSidebarWidthCookie(cookieHeader: string): number | null {
-  const raw = extractSidebarWidthRaw(cookieHeader)
-  if (raw === null) return null
+/** 單一 cookie 值 → 合法寬度（ASCII 整數且在值域內；其餘 → null，不 clamp）。
+ *  供 server 端 `cookies().get(...)?.value`（019 §3.5 SSR 直出）與 client 解析共用。 */
+export function parseSidebarWidthValue(
+  raw: string | null | undefined,
+): number | null {
+  if (!raw || !/^\d+$/.test(raw)) return null
   const width = Number.parseInt(raw, 10)
   return width >= SIDEBAR_MIN_WIDTH && width <= SIDEBAR_MAX_WIDTH ? width : null
+}
+
+/** 解析為整數寬度；值域外（<200 / >600）→ null（不 clamp，交由讀取退路鏈）。 */
+export function parseSidebarWidthCookie(cookieHeader: string): number | null {
+  return parseSidebarWidthValue(extractSidebarWidthRaw(cookieHeader))
 }
 
 /** 組裝 cookie 字串（對齊 buildThemeCookieString 形狀）。 */

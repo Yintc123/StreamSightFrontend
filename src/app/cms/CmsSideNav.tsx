@@ -27,9 +27,16 @@ import {
 
 const RESIZE_STEP = 16 // 鍵盤每次調整寬度的像素步進
 
-export function CmsSideNav({ adminRole }: { adminRole?: AdminRole }) {
+export function CmsSideNav({
+  adminRole,
+  initialWidth = null,
+}: {
+  adminRole?: AdminRole
+  // 019 §3.5 — layout（RSC）讀 sidebar_width cookie 直出的寬度；SSR first paint 用
+  initialWidth?: number | null
+}) {
   const pathname = usePathname()
-  const { collapsed, width, toggleCollapsed, setWidth } = useSidebarPanel()
+  const { collapsed, width, toggleCollapsed, setWidth } = useSidebarPanel(initialWidth)
   const dragStart = useRef<{ x: number; width: number } | null>(null)
 
   // Auto-collapse on narrow viewports (mobile) when no collapse preference is

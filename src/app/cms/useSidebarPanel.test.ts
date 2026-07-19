@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
+import { createElement } from 'react'
 
 import {
   clampWidth,
@@ -145,6 +147,22 @@ describe('useSidebarPanel（寬度走 sidebar_width cookie、收合走 localStor
     const { result } = renderHook(() => useSidebarPanel())
     expect(result.current.collapsed).toBe(false)
     expect(result.current.width).toBe(SIDEBAR_DEFAULT_WIDTH)
+  })
+
+  it('SSR：initialWidth 直出（019 §3.5，server 快照用 cookie 寬，first paint 即到位）', () => {
+    function Probe({ initialWidth }: { initialWidth: number | null }) {
+      const { width } = useSidebarPanel(initialWidth)
+      return createElement('span', null, String(width))
+    }
+    expect(renderToString(createElement(Probe, { initialWidth: 320 }))).toContain('320')
+  })
+
+  it('SSR：initialWidth 為 null（cookie 缺省）→ 直出預設 256', () => {
+    function Probe() {
+      const { width } = useSidebarPanel(null)
+      return createElement('span', null, String(width))
+    }
+    expect(renderToString(createElement(Probe))).toContain(String(SIDEBAR_DEFAULT_WIDTH))
   })
 
   it('focus 事件 → 重讀 cookie（模擬他分頁 / Streamlit 改寬後切回）', () => {

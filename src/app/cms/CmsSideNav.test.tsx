@@ -108,6 +108,14 @@ describe('CmsSideNav 收合 / 展開（對齊 Streamlit）', () => {
   })
 })
 
+describe('CmsSideNav SSR 直出寬度（019 §3.5）', () => {
+  it('initialWidth=320 → SSR 輸出 separator aria-valuenow=320（first paint 即到位）', async () => {
+    const { renderToString } = await import('react-dom/server')
+    const html = renderToString(<CmsSideNav adminRole="editor" initialWidth={320} />)
+    expect(html).toContain('aria-valuenow="320"')
+  })
+})
+
 describe('CmsSideNav 寬度調整把手（鍵盤可及）', () => {
   beforeEach(() => {
     window.localStorage.clear()

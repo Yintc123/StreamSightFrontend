@@ -3,10 +3,32 @@ import { describe, it, expect } from 'vitest'
 import {
   extractSidebarWidthRaw,
   parseSidebarWidthCookie,
+  parseSidebarWidthValue,
   buildSidebarWidthCookieString,
   SIDEBAR_COOKIE,
   SIDEBAR_COOKIE_MAX_AGE,
 } from './sidebarCookie'
+
+describe('parseSidebarWidthValue（單一 cookie 值 → 合法寬度；供 server 端 cookies() 讀值）', () => {
+  it('happy："320" → 320；邊界 "200"/"600" 通過', () => {
+    expect(parseSidebarWidthValue('320')).toBe(320)
+    expect(parseSidebarWidthValue('200')).toBe(200)
+    expect(parseSidebarWidthValue('600')).toBe(600)
+  })
+
+  it('edge：undefined / null / 空字串 → null', () => {
+    expect(parseSidebarWidthValue(undefined)).toBeNull()
+    expect(parseSidebarWidthValue(null)).toBeNull()
+    expect(parseSidebarWidthValue('')).toBeNull()
+  })
+
+  it('edge：非整數 / 非數字 / 越界 → null', () => {
+    expect(parseSidebarWidthValue('320.5')).toBeNull()
+    expect(parseSidebarWidthValue('abc')).toBeNull()
+    expect(parseSidebarWidthValue('199')).toBeNull()
+    expect(parseSidebarWidthValue('601')).toBeNull()
+  })
+})
 
 describe('extractSidebarWidthRaw（抽出 sidebar_width 原始值，供快照）', () => {
   it('happy：單一 cookie → 抽出值字串', () => {

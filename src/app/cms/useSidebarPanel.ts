@@ -80,10 +80,8 @@ function getRawSnapshot(): string {
   return `${getCookieWidthRaw()}|${getLocalRaw()}`
 }
 
-/** SSR / 首次 client render 用預設（空字串）→ hydration 不 mismatch。 */
-function getServerSnapshot(): string {
-  return ''
-}
+// SSR / hydration 快照由 hook 內依 initialWidth 組成（019 §3.5）：layout 於伺服器
+// 讀 cookie 直出，first paint 即正確寬；client 快照接手後值相同 → 無跳動。
 
 function parseLocal(raw: string): PersistedState {
   if (!raw) return { collapsed: false }
@@ -155,7 +153,13 @@ export interface SidebarPanel {
   setWidth: (px: number) => void
 }
 
-export function useSidebarPanel(): SidebarPanel {
+export function useSidebarPanel(initialWidth: number | null = null): SidebarPanel {
+  // 019 §3.5 — SSR / hydration 用伺服器讀到的 cookie 寬（缺省 → ''｜預設 256），
+  // 與伺服器輸出一致 → 無 mismatch、無首繪跳動；之後由 client 快照接手。
+  const getServerSnapshot = useCallback(
+    () => `${initialWidth ?? ''}|`,
+    [initialWidth],
+  )
   const snapshot = useSyncExternalStore(subscribe, getRawSnapshot, getServerSnapshot)
   const { width, collapsed } = parseSnapshot(snapshot)
 
